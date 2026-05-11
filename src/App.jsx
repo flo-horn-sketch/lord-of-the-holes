@@ -594,7 +594,16 @@ export default function LordOfTheHolesPWA() {
 
   async function saveFullSetup() {
     setSetupSavedMessage("");
-    const nextAllPlayers = allPlayers.map((p) => ({ ...p, course_hcp: Number(cleanNumericInput(localHandicaps[p.id]) || 0) }));
+    const nextAllPlayers = allPlayers.map((p) => {
+      const localValue = localHandicaps[p.id];
+      const cleanedLocalValue = cleanNumericInput(localValue);
+      const existingSheetValue = p.course_hcp;
+      const nextCourseHcp = cleanedLocalValue !== ""
+        ? Number(cleanedLocalValue)
+        : Number(existingSheetValue || 0);
+
+      return { ...p, course_hcp: nextCourseHcp };
+    });
     if (!selectedActiveRoundId) return setError("Bitte zuerst eine Runde auswählen.");
     setSaving(true);
     try {
