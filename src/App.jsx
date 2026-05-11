@@ -18,7 +18,7 @@ function Button({ className = "", children, type = "button", ...props }) {
 }
 
 const GOOGLE_SHEETS_API_URL =
-  "https://script.google.com/macros/s/AKfycbx0fShl6azxCzNYgA2ke5OFLvjqNq5KEPsDRSxOcOs7nVE4qgOnV0fZINp1pNAXIKtc/exec";
+  "https://script.google.com/macros/s/AKfycbyAs9jsDaeQn8LHqcvibV5GKqywzMKVZ5y1F1-DJuUYiuLyrQSS_aXb6SLb3LtAUp6n/exec";
 
 const ADMIN_PASSWORD = "weimar";
 
