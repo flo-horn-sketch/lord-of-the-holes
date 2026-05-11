@@ -12,7 +12,7 @@ function Button({ className = "", children, type = "button", ...props }) {
   return <button type={type} className={className} {...props}>{children}</button>;
 }
 
-const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycby4QUMjjrgE-YF9QpXcOGozVbYEkj-3vAYNU6sJcOcdxExFHgPEtNcuXByEJSgKn8WA/exec";
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbzDD9jNIN0lvmMEViighpdEbHzZtR1sYPWxl2Ml02dfRz8VFAKoPOlJ9GNM6MQHDaWm/exec";
 const ADMIN_PASSWORD = "weimar";
 
 const fallbackPlayers = [
