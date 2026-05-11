@@ -242,6 +242,7 @@ function buildPlayerStats(players, holes, scores) {
       return sum + Number(hole?.par || 0);
     }, 0);
     const { threePutts, fourPlusPutts, overTwoPutts } = getPuttBuckets(playerScores);
+    const ladyCount = playerScores.filter((s) => normalizeBoolean(s.lady)).length;
     const netStableford = playerScores.reduce((sum, s) => {
       const hole = holes.find((h) => Number(h.hole_number) === Number(s.hole_number));
       const shots = getShotsOnHole(p.course_hcp, hole?.hcp);
@@ -270,6 +271,7 @@ function buildPlayerStats(players, holes, scores) {
       threePutts,
       fourPlusPutts,
       puttPenaltyEuro: threePutts * 2 + fourPlusPutts * 4,
+      ladyCount,
       netStableford,
       grossStableford,
     };
@@ -302,6 +304,10 @@ function sortHcpAdjustedStrokePlay(stats) {
 
 function sortPuttPenalties(stats) {
   return [...stats].sort((a, b) => Number(b.puttPenaltyEuro || 0) - Number(a.puttPenaltyEuro || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
+}
+
+function sortLadyCounts(stats) {
+  return [...stats].sort((a, b) => Number(b.ladyCount || 0) - Number(a.ladyCount || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
 }
 
 function getQualificationRounds(rounds) {
@@ -476,6 +482,7 @@ function runSelfTests() {
 
   assert("leaderboard sorts best to-par first", sortStrokePlay(stats)[0].id === "mucky");
   assert("putt money calculates", stats.find((p) => p.id === "florian")?.puttPenaltyEuro === 4);
+  assert("lady count calculates", buildPlayerStats(fallbackPlayers.slice(0, 1), fallbackHoles.slice(0, 2), [{ round_id: "r1", player_id: "florian", hole_number: 1, strokes: 4, lady: true }, { round_id: "r1", player_id: "florian", hole_number: 2, strokes: 5, lady: "true" }])[0].ladyCount === 2);
 
   const rows = buildScorecardRows(
     { ...fallbackPlayers[0], course_hcp_goethe: 18 },
@@ -862,6 +869,7 @@ export default function LordOfTheHolesPWA() {
   const grossStablefordLeaderboard = useMemo(() => sortStableford(playerStats, "grossStableford"), [playerStats]);
   const hcpAdjustedStrokeLeaderboard = useMemo(() => sortHcpAdjustedStrokePlay(playerStats), [playerStats]);
   const puttPenaltyLeaderboard = useMemo(() => sortPuttPenalties(playerStats), [playerStats]);
+  const ladyLeaderboard = useMemo(() => sortLadyCounts(playerStats), [playerStats]);
   const myStrokeRank = useMemo(() => {
     const index = strokePlayLeaderboard.findIndex((player) => String(player.id) === String(myPlayerId));
     return index >= 0 ? index + 1 : null;
@@ -1277,6 +1285,7 @@ export default function LordOfTheHolesPWA() {
           <LeaderboardTable title="Zählspiel HCP adjusted" players={hcpAdjustedStrokeLeaderboard} columns={[{ label: "+/−", render: (p) => formatToPar(p.hcpAdjustedToPar, p.played), emphasize: true }, { label: "Netto", render: (p) => (p.played ? p.hcpAdjustedTotal : "–") }, { label: "HCP", render: (p) => p.hcpShotsUsed }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
           <LeaderboardTable title="Brutto Punkte" players={grossStablefordLeaderboard} columns={[{ label: "Punkte", render: (p) => p.grossStableford, emphasize: true }, { label: "Schläge", render: (p) => (p.played ? p.total : "–") }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
           <LeaderboardTable title="Putt-Kasse" players={puttPenaltyLeaderboard} columns={[{ label: "3 Putts", render: (p) => `${p.threePutts} × 2 €` }, { label: "4+ Putts", render: (p) => `${p.fourPlusPutts} × 4 €` }, { label: "Gesamt", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} />
+          <LeaderboardTable title="Ladys" players={ladyLeaderboard} columns={[{ label: "Anzahl", render: (p) => Number(p.ladyCount || 0), emphasize: true }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
         </CardContent></Card>
       </motion.section>
     );
