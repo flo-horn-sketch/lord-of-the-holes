@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 
 function Card({ className = "", children }) {
@@ -822,6 +822,9 @@ export default function LordOfTheHolesPWA() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [scoreSaveInFlight, setScoreSaveInFlight] = useState(false);
+  const pendingScoreSaveRef = useRef(Promise.resolve(true));
+  const scoreSaveSequenceRef = useRef(0);
   const [autoSync] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState("offline");
   const [error, setError] = useState("");
@@ -972,17 +975,44 @@ export default function LordOfTheHolesPWA() {
 
   async function saveScore(patch) {
     const next = optimisticUpdate(patch);
+    const saveId = scoreSaveSequenceRef.current + 1;
+    scoreSaveSequenceRef.current = saveId;
     setSaving(true);
-    try {
-      await callSheetApi({ action: "upsertScore", score: next });
-      setConnectionStatus("online");
-      setError("");
-    } catch (err) {
-      setConnectionStatus("offline");
-      setError(err.message || "Score konnte nicht gespeichert werden.");
-    } finally {
-      setSaving(false);
-    }
+    setScoreSaveInFlight(true);
+
+    const savePromise = callSheetApi({ action: "upsertScore", score: next })
+      .then(() => {
+        if (scoreSaveSequenceRef.current === saveId) {
+          setConnectionStatus("online");
+          setError("");
+        }
+        return true;
+      })
+      .catch((err) => {
+        if (scoreSaveSequenceRef.current === saveId) {
+          setConnectionStatus("offline");
+          setError(err.message || "Score konnte nicht gespeichert werden.");
+        }
+        return false;
+      })
+      .finally(() => {
+        if (scoreSaveSequenceRef.current === saveId) {
+          setSaving(false);
+          setScoreSaveInFlight(false);
+        }
+      });
+
+    pendingScoreSaveRef.current = savePromise;
+    return savePromise;
+  }
+
+  async function goToNextHole() {
+    if (activeHole === 18 || !hasCurrentScore || scoreSaveInFlight) return;
+
+    const wasSaved = await pendingScoreSaveRef.current;
+    if (!wasSaved) return;
+
+    setActiveHole((h) => Math.min(18, h + 1));
   }
 
   async function saveFullSetup() {
@@ -1264,7 +1294,7 @@ export default function LordOfTheHolesPWA() {
                 <div className="mb-3 flex items-center justify-between"><span className="text-sm font-semibold text-amber-100">Snake</span><input type="checkbox" checked={normalizeBoolean(currentScore.over_two_putts)} onChange={(e) => saveScore({ over_two_putts: e.target.checked, putts_count: e.target.checked ? currentScore.putts_count || 3 : "" })} className="h-5 w-5 accent-amber-500" /></div>
                 {normalizeBoolean(currentScore.over_two_putts) && <div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => saveScore({ over_two_putts: true, putts_count: 3 })} className={cls("rounded-2xl border py-2.5 text-sm font-bold", Number(currentScore.putts_count) === 3 ? "border-amber-300 bg-amber-500 text-amber-50" : "border-amber-700/40 bg-stone-950 text-amber-100")}>3 Putt</button><button type="button" onClick={() => saveScore({ over_two_putts: true, putts_count: 4 })} className={cls("rounded-2xl border py-2.5 text-sm font-bold", Number(currentScore.putts_count) >= 4 ? "border-amber-300 bg-amber-500 text-amber-50" : "border-amber-700/40 bg-stone-950 text-amber-100")}>4+ Putt</button></div>}
               </div>
-              <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 text-amber-100">Zurück</Button><Button disabled={activeHole === 18 || !hasCurrentScore} onClick={() => setActiveHole((h) => Math.min(18, h + 1))} className="rounded-2xl bg-amber-600 text-amber-50 disabled:opacity-50">Nächstes Loch</Button></div>
+              <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 text-amber-100">Zurück</Button><Button disabled={activeHole === 18 || !hasCurrentScore || scoreSaveInFlight} onClick={goToNextHole} className="rounded-2xl bg-amber-600 text-amber-50 disabled:opacity-50">{scoreSaveInFlight ? "Speichere ..." : "Nächstes Loch"}</Button></div>
               <div className="mt-3 rounded-2xl border border-amber-700/30 bg-black/25 p-2.5"><label className="mb-1 block text-sm text-amber-100/80">Spieler</label><select value={scoredPlayerId} onChange={(e) => setScoredPlayerId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2.5 text-amber-50">{scoreablePlayers.map((p) => <option key={p.id} value={p.id}>{getPlayerLabel(p)}</option>)}</select></div>
             </div>
           </CardContent>
