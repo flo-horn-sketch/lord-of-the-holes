@@ -503,16 +503,21 @@ export default function LordOfTheHolesPWA() {
   function applyPlayers(nextActivePlayers, nextAllPlayers = nextActivePlayers) {
     setPlayers(nextActivePlayers);
     setAllPlayers(nextAllPlayers);
+
     setLocalHandicaps((current) => {
       const saved = readLocalJson("lordOfTheHoles.localHandicaps", {});
       const merged = { ...saved, ...current };
 
       nextAllPlayers.forEach((p) => {
-        const valueFromSheet = p.course_hcp;
-        const hasSheetValue = valueFromSheet !== "" && valueFromSheet !== null && valueFromSheet !== undefined;
-        if (hasSheetValue) {
-          merged[p.id] = String(valueFromSheet);
-        } else if (merged[p.id] === undefined) {
+        const sheetValue = p.course_hcp;
+        const hasSheetValue = sheetValue !== "" && sheetValue !== null && sheetValue !== undefined;
+        const hasLocalValue = merged[p.id] !== "" && merged[p.id] !== null && merged[p.id] !== undefined;
+
+        if (!hasLocalValue && hasSheetValue) {
+          merged[p.id] = String(sheetValue);
+        }
+
+        if (!hasLocalValue && !hasSheetValue) {
           merged[p.id] = "0";
         }
       });
