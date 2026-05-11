@@ -53,7 +53,7 @@ class AppErrorBoundary extends React.Component {
 }
 
 const GOOGLE_SHEETS_API_URL =
-  "https://script.google.com/macros/s/AKfycbyAs9jsDaeQn8LHqcvibV5GKqywzMKVZ5y1F1-DJuUYiuLyrQSS_aXb6SLb3LtAUp6n/exec";
+  "https://script.google.com/macros/s/AKfycbyiiSpPosczsF6x_LSpWy_c31n8r8XqQ4mzhqNUD2oAEhPF8_CFwCTXOGyQLcIvr8C2/exec";
 
 const ADMIN_PASSWORD = "weimar";
 
