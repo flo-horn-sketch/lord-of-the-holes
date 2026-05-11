@@ -1,7 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+function Card({ className = "", children }) {
+  return <div className={className}>{children}</div>;
+}
+
+function CardContent({ className = "", children }) {
+  return <div className={className}>{children}</div>;
+}
+
+function Button({ className = "", children, type = "button", ...props }) {
+  return <button type={type} className={className} {...props}>{children}</button>;
+}
 
 const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbyoX_2zEXgmO7uccOc7itjNXGXmO64Z8h5I_nf3tX0Gp7GdgVz5yJyI5nHvqpdr5lkV/exec";
 const ADMIN_PASSWORD = "weimar";
