@@ -979,7 +979,6 @@ export default function LordOfTheHolesPWA() {
       await callSheetApi({ action: "upsertScore", score: next });
       setConnectionStatus("online");
       setError("");
-      await loadData({ silent: true });
     } catch (err) {
       setConnectionStatus("offline");
       setError(err.message || "Score konnte nicht gespeichert werden.");
