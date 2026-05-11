@@ -210,6 +210,31 @@ function getScoreMismatchMessage(officialScore, controlScore) {
   return differences.length ? differences.join(" · ") : "";
 }
 
+function getMismatchesForHole(scores, roundId, holeNumber, players = []) {
+  const playerMap = new Map((players || []).map((player) => [String(player.id), player]));
+  const playerIds = Array.from(
+    new Set(
+      (scores || [])
+        .filter((score) => String(score.round_id || "") === String(roundId || "") && Number(score.hole_number) === Number(holeNumber))
+        .map((score) => String(score.player_id || ""))
+        .filter(Boolean)
+    )
+  );
+
+  return playerIds
+    .map((playerId) => {
+      const officialScore = findScoreForPlayerHole(scores, roundId, playerId, holeNumber, false);
+      const controlScore = findScoreForPlayerHole(scores, roundId, playerId, holeNumber, true);
+      const message = getScoreMismatchMessage(officialScore, controlScore);
+      return {
+        playerId,
+        player: playerMap.get(playerId) || { id: playerId, character_name: playerId, display_name: playerId },
+        message,
+      };
+    })
+    .filter((item) => Boolean(item.message));
+}
+
 function withFallbackAlias(player) {
   if (!player) return player;
   return {
@@ -561,6 +586,7 @@ function runSelfTests() {
   assert("finds official score by player and hole", findScoreForPlayerHole([{ round_id: "r1", player_id: "florian", scorer_player_id: "mucky", hole_number: 1, strokes: 5 }], "r1", "florian", 1, false)?.strokes === 5);
   assert("finds own control score by player and hole", findScoreForPlayerHole([{ round_id: "r1", player_id: "florian", scorer_player_id: "florian", hole_number: 1, strokes: 6 }], "r1", "florian", 1, true)?.strokes === 6);
   assert("mismatch detects official vs own control", getScoreMismatchMessage({ strokes: 6, lady: false }, { strokes: 5, lady: false }).includes("Schläge"));
+  assert("mismatch list finds player on hole", getMismatchesForHole([{ round_id: "r1", player_id: "florian", scorer_player_id: "mucky", hole_number: 1, strokes: 6 }, { round_id: "r1", player_id: "florian", scorer_player_id: "florian", hole_number: 1, strokes: 5 }], "r1", 1, fallbackPlayers).length === 1);
   assert("stableford par is two points", getStablefordPoints(4, 4, 0) === 2);
   assert("picked up score gives zero net points", getScoreStablefordPoints({ strokes: getPickedUpStrokes({ course_hcp_goethe: 5 }, { par: 4, hcp: 5 }, "goethe"), picked_up: true }, 4, getShotsOnHole(5, 5)) === 0);
   assert("picked up score is double par", getPickedUpStrokes({ course_hcp_goethe: 18 }, { par: 5, hcp: 1 }, "goethe") === 10);
@@ -975,32 +1001,22 @@ function LordOfTheHolesApp() {
   const officialScores = useMemo(() => getOfficialScores(scores), [scores]);
   const officialAllScores = useMemo(() => getOfficialScores(allScores), [allScores]);
   const comparisonPlayerId = isScorerEntryMode ? myPlayerId : scoredPlayerId;
-  const playerScoreForComparison = useMemo(
-    () => findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", comparisonPlayerId, activeHole, false),
-    [scores, displayedActiveRound?.round_id, comparisonPlayerId, activeHole]
+  const holeMismatches = useMemo(
+    () => getMismatchesForHole(scores, displayedActiveRound?.round_id || "r1", activeHole, visiblePlayers),
+    [scores, displayedActiveRound?.round_id, activeHole, visiblePlayers]
   );
-  const scorerScoreForComparison = useMemo(
-    () => findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", comparisonPlayerId, activeHole, true),
-    [scores, displayedActiveRound?.round_id, comparisonPlayerId, activeHole]
+  const selectedPlayerMismatch = useMemo(
+    () => holeMismatches.find((item) => String(item.playerId) === String(scoredPlayerId)) || null,
+    [holeMismatches, scoredPlayerId]
   );
-  const ownPlayerScoreForComparison = useMemo(
-    () => myPlayerId ? findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", myPlayerId, activeHole, false) : null,
-    [scores, displayedActiveRound?.round_id, myPlayerId, activeHole]
+  const ownPlayerMismatch = useMemo(
+    () => myPlayerId ? holeMismatches.find((item) => String(item.playerId) === String(myPlayerId)) || null : null,
+    [holeMismatches, myPlayerId]
   );
-  const ownControlScoreForComparison = useMemo(
-    () => myPlayerId ? findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", myPlayerId, activeHole, true) : null,
-    [scores, displayedActiveRound?.round_id, myPlayerId, activeHole]
-  );
-  const scoreMismatchMessage = useMemo(
-    () => getScoreMismatchMessage(playerScoreForComparison, scorerScoreForComparison),
-    [playerScoreForComparison, scorerScoreForComparison]
-  );
-  const ownScoreMismatchMessage = useMemo(
-    () => getScoreMismatchMessage(ownPlayerScoreForComparison, ownControlScoreForComparison),
-    [ownPlayerScoreForComparison, ownControlScoreForComparison]
-  );
-  const visibleScoreMismatchMessage = scoreMismatchMessage || ownScoreMismatchMessage;
-  const hasScoreMismatch = Boolean(visibleScoreMismatchMessage);
+  const scoreMismatchMessage = selectedPlayerMismatch?.message || "";
+  const ownScoreMismatchMessage = ownPlayerMismatch?.message || "";
+  const visibleScoreMismatchMessage = scoreMismatchMessage || ownScoreMismatchMessage || holeMismatches[0]?.message || "";
+  const hasScoreMismatch = holeMismatches.length > 0;
   const hasSelectedPlayerScoreMismatch = Boolean(scoreMismatchMessage);
   const hasOwnScoreMismatch = Boolean(ownScoreMismatchMessage);
   const scoredPlayerButtonLabel = getPlayerLabel(scoredPlayer) || "Spieler";
@@ -1422,7 +1438,7 @@ function LordOfTheHolesApp() {
               )}
               {visibleScoreMismatchMessage && (
                 <div className="mb-3 rounded-2xl border border-red-500/50 bg-red-950/40 p-2.5 text-sm text-red-100">
-                  Achtung: Offizieller Score und Eigenkontrolle unterscheiden sich. {visibleScoreMismatchMessage}
+                  Achtung: Offizieller Score und Eigenkontrolle unterscheiden sich. {selectedPlayerMismatch ? getPlayerLabel(selectedPlayerMismatch.player) + ": " : ownPlayerMismatch ? getPlayerLabel(ownPlayerMismatch.player) + ": " : holeMismatches[0] ? getPlayerLabel(holeMismatches[0].player) + ": " : ""}{visibleScoreMismatchMessage}
                 </div>
               )}
               <div className="mb-3 flex items-center justify-between gap-2"><span className="font-serif text-lg text-amber-200">{getPlayerLabel(entryPlayer)} · Loch {activeHole}</span><span className="text-[11px] text-amber-100/65">Vorgabe <b className="text-amber-200 tracking-[0.18em]">{formatShotMarks(entryPlayerShotsOnActiveHole)}</b></span></div>
