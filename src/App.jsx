@@ -682,14 +682,14 @@ export default function LordOfTheHolesPWA() {
   const feiningerKey = getCourseHcpKey(p.id, "feininger");
   return (
     <div key={p.id} className="rounded-xl border border-amber-700/30 bg-black/25 p-2.5">
-      <div className="mb-2 font-semibold text-amber-100">{p.character_name}<div className="text-xs font-normal text-amber-100/70">Spielvorgabe je Kurs</div></div>
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label className="mb-1 block text-xs text-amber-100/70">Goethe</label>
+      <div className="mb-2 font-semibold text-amber-100">{p.character_name}<div className="text-xs font-normal text-amber-100/70">2 Kurs-Spielvorgaben</div></div>
+      <div className="grid grid-cols-1 gap-2">
+        <div className="rounded-xl border border-amber-700/20 bg-black/20 p-2">
+          <label className="mb-1 block text-xs font-bold uppercase tracking-[0.16em] text-amber-300/80">Goethe Spielvorgabe</label>
           <input inputMode="numeric" disabled={!isAdminUnlocked} value={localHandicaps[goetheKey] ?? String(p.course_hcp_goethe ?? 0)} onChange={(e) => { setAdminEditing(true); setLocalHandicaps((current) => ({ ...current, [goetheKey]: cleanNumericInput(e.target.value) })); }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2.5 text-center text-amber-50 disabled:opacity-60" />
         </div>
-        <div>
-          <label className="mb-1 block text-xs text-amber-100/70">Feininger</label>
+        <div className="rounded-xl border border-amber-700/20 bg-black/20 p-2">
+          <label className="mb-1 block text-xs font-bold uppercase tracking-[0.16em] text-amber-300/80">Feininger Spielvorgabe</label>
           <input inputMode="numeric" disabled={!isAdminUnlocked} value={localHandicaps[feiningerKey] ?? String(p.course_hcp_feininger ?? 0)} onChange={(e) => { setAdminEditing(true); setLocalHandicaps((current) => ({ ...current, [feiningerKey]: cleanNumericInput(e.target.value) })); }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2.5 text-center text-amber-50 disabled:opacity-60" />
         </div>
       </div>
