@@ -17,6 +17,41 @@ function Button({ className = "", children, type = "button", ...props }) {
   );
 }
 
+class AppErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error("Lord of the Holes runtime error:", error, info);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-screen bg-stone-950 p-4 text-amber-50">
+          <div className="mx-auto max-w-md rounded-2xl border border-red-500/60 bg-red-950/40 p-4">
+            <div className="font-serif text-xl text-red-100">App-Fehler</div>
+            <p className="mt-2 text-sm text-red-100/80">
+              Die App konnte nicht vollständig geladen werden. Bitte diese Meldung oder den Konsolenfehler schicken.
+            </p>
+            <pre className="mt-3 whitespace-pre-wrap rounded-xl bg-black/40 p-3 text-xs text-red-100">
+              {String(this.state.error?.message || this.state.error)}
+            </pre>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 const GOOGLE_SHEETS_API_URL =
   "https://script.google.com/macros/s/AKfycbyAs9jsDaeQn8LHqcvibV5GKqywzMKVZ5y1F1-DJuUYiuLyrQSS_aXb6SLb3LtAUp6n/exec";
 
@@ -129,6 +164,50 @@ function isScorerControlScore(score) {
 
 function getOfficialScores(scores) {
   return (scores || []).filter((score) => !isScorerControlScore(score));
+}
+
+function findScoreForPlayerHole(scores, roundId, playerId, holeNumber, wantControlScore) {
+  return (
+    (scores || []).find((score) => {
+      const sameRound = String(score.round_id || "") === String(roundId || "");
+      const samePlayer = String(score.player_id || "") === String(playerId || "");
+      const sameHole = Number(score.hole_number) === Number(holeNumber);
+      const isControl = isScorerControlScore(score);
+      return sameRound && samePlayer && sameHole && isControl === wantControlScore;
+    }) || null
+  );
+}
+
+function getScoreMismatchMessage(officialScore, controlScore) {
+  if (!officialScore || !controlScore) return "";
+
+  const officialHasScore = officialScore.strokes !== "" && officialScore.strokes != null;
+  const controlHasScore = controlScore.strokes !== "" && controlScore.strokes != null;
+
+  if (!officialHasScore || !controlHasScore) return "";
+
+  const differences = [];
+
+  if (Number(officialScore.strokes) !== Number(controlScore.strokes)) {
+    differences.push(`Schläge offiziell ${officialScore.strokes} / Eigen ${controlScore.strokes}`);
+  }
+
+  if (normalizeBoolean(officialScore.picked_up) !== normalizeBoolean(controlScore.picked_up)) {
+    differences.push("Strich unterschiedlich");
+  }
+
+  if (normalizeBoolean(officialScore.lady) !== normalizeBoolean(controlScore.lady)) {
+    differences.push("Lady unterschiedlich");
+  }
+
+  if (
+    normalizeBoolean(officialScore.over_two_putts) !== normalizeBoolean(controlScore.over_two_putts) ||
+    Number(officialScore.putts_count || 0) !== Number(controlScore.putts_count || 0)
+  ) {
+    differences.push("Snake unterschiedlich");
+  }
+
+  return differences.length ? differences.join(" · ") : "";
 }
 
 function withFallbackAlias(player) {
@@ -823,7 +902,7 @@ async function callSheetApi(payload) {
   return data;
 }
 
-export default function LordOfTheHolesPWA() {
+function LordOfTheHolesApp() {
   const [players, setPlayers] = useState(fallbackPlayers);
   const [allPlayers, setAllPlayers] = useState(fallbackPlayers);
   const [courses, setCourses] = useState(fallbackCourses);
@@ -881,7 +960,6 @@ export default function LordOfTheHolesPWA() {
   const pickedUpStrokes = getPickedUpStrokes(entryPlayer, activeHoleData, displayCourseId);
   const myShotsOnActiveHole = getShotsOnHole(myCurrentPlayer?.course_hcp, activeHoleData?.hcp);
   const entryPlayerShotsOnActiveHole = getShotsOnHole(entryPlayer?.course_hcp, activeHoleData?.hcp);
-  const scoredPlayerShotsOnActiveHole = getShotsOnHole(scoredPlayer?.course_hcp, activeHoleData?.hcp);
   const currentScore = useMemo(
     () =>
       scores.find((s) => {
@@ -925,6 +1003,8 @@ export default function LordOfTheHolesPWA() {
   const hasScoreMismatch = Boolean(visibleScoreMismatchMessage);
   const hasSelectedPlayerScoreMismatch = Boolean(scoreMismatchMessage);
   const hasOwnScoreMismatch = Boolean(ownScoreMismatchMessage);
+  const scoredPlayerButtonLabel = getPlayerLabel(scoredPlayer) || "Spieler";
+  const scorerButtonLabel = getPlayerLabel(myCurrentPlayer) || "Zähler";
   const playerStats = useMemo(() => buildPlayerStats(playersWithCurrentHandicaps, holes, officialScores), [playersWithCurrentHandicaps, holes, officialScores]);
   const myCurrentStats = useMemo(() => (myPlayerId ? playerStats.find((player) => String(player.id) === String(myPlayerId)) || null : null), [playerStats, myPlayerId]);
   const strokePlayLeaderboard = useMemo(() => sortStrokePlay(playerStats), [playerStats]);
@@ -1032,12 +1112,16 @@ export default function LordOfTheHolesPWA() {
       over_two_putts: normalizeBoolean(currentScore.over_two_putts),
       putts_count: currentScore.putts_count ?? "",
       lady: normalizeBoolean(currentScore.lady),
-      scorer_player_id: myPlayerId || "",
+      scorer_player_id: isScorerEntryMode ? entryPlayerId : (myPlayerId || ""),
       updated_at: new Date().toISOString(),
       ...patch,
     });
 
-    const sameScore = (score) => String(score.round_id) === String(next.round_id) && String(score.player_id) === String(next.player_id) && Number(score.hole_number) === Number(next.hole_number);
+    const sameScore = (score) =>
+      String(score.round_id) === String(next.round_id) &&
+      String(score.player_id) === String(next.player_id) &&
+      Number(score.hole_number) === Number(next.hole_number) &&
+      isScorerControlScore(score) === isScorerControlScore(next);
     const updateList = (current) => (current.some(sameScore) ? current.map((s) => (sameScore(s) ? next : s)) : [...current, next]);
     setScores(updateList);
     setAllScores(updateList);
@@ -1137,25 +1221,6 @@ export default function LordOfTheHolesPWA() {
     } catch (err) {
       setConnectionStatus("offline");
       setError(err.message || "Setup konnte nicht gespeichert werden.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function saveRoundToArchive() {
-    const roundToSave = displayedActiveRound || { round_id: "r1", round_name: "Runde 1" };
-    setSaving(true);
-    setRoundSavedMessage("");
-    try {
-      await callSheetApi({ action: "completeRoundAndStartNext", round_id: roundToSave.round_id });
-      setConnectionStatus("online");
-      setError("");
-      setRoundSavedMessage(`${roundToSave.round_name || "Runde"} wurde gespeichert und ins Archiv übernommen.`);
-      await loadData({ silent: true });
-      setView("archive");
-    } catch (err) {
-      setConnectionStatus("offline");
-      setError(err.message || "Runde konnte nicht gespeichert werden.");
     } finally {
       setSaving(false);
     }
@@ -1351,11 +1416,11 @@ export default function LordOfTheHolesPWA() {
             <div className={cls("rounded-2xl border bg-amber-50/5 p-4", hasScoreMismatch ? "border-red-500/70 ring-1 ring-red-500/40" : "border-amber-700/40")}>
               {myCurrentPlayer && (
                 <div className="mb-3 grid grid-cols-2 gap-2 rounded-2xl border border-amber-700/30 bg-black/25 p-1.5">
-                  <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/60")}>Spieler {hasSelectedPlayerScoreMismatch ? "⚠" : ""}</button>
-                  <button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasOwnScoreMismatch && "ring-1 ring-red-400/60")}>Zähler {hasOwnScoreMismatch ? "⚠" : ""}</button>
+                  <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/60")}>{scoredPlayerButtonLabel} {hasSelectedPlayerScoreMismatch ? "⚠" : ""}</button>
+                  <button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasOwnScoreMismatch && "ring-1 ring-red-400/60")}>{scorerButtonLabel} {hasOwnScoreMismatch ? "⚠" : ""}</button>
                 </div>
               )}
-              {scoreMismatchMessage && (
+              {visibleScoreMismatchMessage && (
                 <div className="mb-3 rounded-2xl border border-red-500/50 bg-red-950/40 p-2.5 text-sm text-red-100">
                   Achtung: Offizieller Score und Eigenkontrolle unterscheiden sich. {visibleScoreMismatchMessage}
                 </div>
@@ -1385,7 +1450,7 @@ export default function LordOfTheHolesPWA() {
               {!isScorerEntryMode ? (
                 <div className="mt-3 rounded-2xl border border-amber-700/30 bg-black/25 p-2.5"><label className="mb-1 block text-sm text-amber-100/80">Spieler</label><select value={scoredPlayerId} onChange={(e) => setScoredPlayerId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2.5 text-amber-50">{scoreablePlayers.map((p) => <option key={p.id} value={p.id}>{String(p.id) === String(scoredPlayerId) && hasSelectedPlayerScoreMismatch ? "⚠ " : ""}{getPlayerLabel(p)}</option>)}</select></div>
               ) : (
-                <div className="mt-3 rounded-2xl border border-amber-700/30 bg-black/25 p-2.5 text-sm text-amber-100/80">Zähler: <b className={cls("text-amber-200", hasScoreMismatch && "text-red-200")}>{hasOwnScoreMismatch ? "⚠ " : ""}{getPlayerLabel(myCurrentPlayer)}</b></div>
+                <div className="mt-3 rounded-2xl border border-amber-700/30 bg-black/25 p-2.5 text-sm text-amber-100/80">Zähler: <b className={cls("text-amber-200", hasOwnScoreMismatch && "text-red-200")}>{hasOwnScoreMismatch ? "⚠ " : ""}{getPlayerLabel(myCurrentPlayer)}</b></div>
               )}
             </div>
           </CardContent>
@@ -1440,5 +1505,13 @@ export default function LordOfTheHolesPWA() {
         {renderActiveView()}
       </main>
     </div>
+  );
+}
+
+export default function LordOfTheHolesPWA() {
+  return (
+    <AppErrorBoundary>
+      <LordOfTheHolesApp />
+    </AppErrorBoundary>
   );
 }
