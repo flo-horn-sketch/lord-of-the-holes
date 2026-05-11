@@ -185,9 +185,7 @@ function getStablefordPoints(strokes, par, shots) {
 }
 
 function getPickedUpStrokes(player, hole, courseId = "goethe") {
-  const courseHcp = player?.course_hcp ?? getCourseHandicap(player, courseId);
-  const shots = getShotsOnHole(courseHcp, hole?.hcp);
-  return Number(hole?.par || 0) + shots + 2;
+  return Number(hole?.par || 0) * 2;
 }
 
 function formatShotMarks(shots) {
@@ -453,6 +451,7 @@ function runSelfTests() {
   assert("normalizeBoolean handles German yes", normalizeBoolean("ja") === true);
   assert("stableford par is two points", getStablefordPoints(4, 4, 0) === 2);
   assert("picked up score gives zero net points", getStablefordPoints(getPickedUpStrokes({ course_hcp_goethe: 5 }, { par: 4, hcp: 5 }, "goethe"), 4, getShotsOnHole(5, 5)) === 0);
+  assert("picked up score is double par", getPickedUpStrokes({ course_hcp_goethe: 18 }, { par: 5, hcp: 1 }, "goethe") === 10);
   assert("course handicap allocates two strokes above 18", getShotsOnHole(19, 1) === 2);
   assert("shot marks display two strokes", formatShotMarks(2) === "||");
   assert("shot marks display no stroke as dash", formatShotMarks(0) === "–");
