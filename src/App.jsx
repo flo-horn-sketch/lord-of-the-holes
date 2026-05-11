@@ -140,9 +140,13 @@ function withFallbackAlias(player) {
 }
 
 function getPlayerLabel(player) {
+  if (!player) return "";
+
   const playerWithAlias = withFallbackAlias(player);
   const alias = String(playerWithAlias?.alias_name || "").trim();
   const name = String(playerWithAlias?.character_name || playerWithAlias?.display_name || playerWithAlias?.id || "").trim();
+
+  if (!name) return alias || "";
   return alias ? `${alias} (${name})` : name;
 }
 
@@ -1347,8 +1351,8 @@ export default function LordOfTheHolesPWA() {
             <div className={cls("rounded-2xl border bg-amber-50/5 p-4", hasScoreMismatch ? "border-red-500/70 ring-1 ring-red-500/40" : "border-amber-700/40")}>
               {myCurrentPlayer && (
                 <div className="mb-3 grid grid-cols-2 gap-2 rounded-2xl border border-amber-700/30 bg-black/25 p-1.5">
-                  <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/60")}>{getPlayerLabel(scoredPlayer)} {hasSelectedPlayerScoreMismatch ? "⚠" : ""}</button>
-                  <button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasOwnScoreMismatch && "ring-1 ring-red-400/60")}>{getPlayerLabel(myCurrentPlayer)} {hasOwnScoreMismatch ? "⚠" : ""}</button>
+                  <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/60")}>{getPlayerLabel(scoredPlayer) || "Spieler"} {hasSelectedPlayerScoreMismatch ? "⚠" : ""}</button>
+                  <button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasOwnScoreMismatch && "ring-1 ring-red-400/60")}>{getPlayerLabel(myCurrentPlayer) || "Zähler"} {hasOwnScoreMismatch ? "⚠" : ""}</button>
                 </div>
               )}
               {scoreMismatchMessage && (
