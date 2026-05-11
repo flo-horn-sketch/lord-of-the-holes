@@ -816,6 +816,7 @@ export default function LordOfTheHolesPWA() {
   const [allScores, setAllScores] = useState([]);
   const [localHandicaps, setLocalHandicaps] = useState({});
   const [scoredPlayerId, setScoredPlayerId] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerId", "florian"));
+  const [scoreEntryMode, setScoreEntryMode] = useState("player");
   const [activeHole, setActiveHole] = useState(() => readLocalJson("lordOfTheHoles.activeHole", 1));
   const [view, setView] = useState("score");
   const [mainMenu, setMainMenu] = useState("current");
@@ -853,17 +854,45 @@ export default function LordOfTheHolesPWA() {
   const activeHoleData = holes.find((h) => Number(h.hole_number) === activeHole) || holes[activeHole - 1] || fallbackHoles[activeHole - 1];
   const scoredPlayerBase = scoreablePlayers.find((p) => p.id === scoredPlayerId);
   const scoredPlayer = getPlayerForCourse(scoredPlayerBase, displayCourseId);
-  const pickedUpStrokes = getPickedUpStrokes(scoredPlayer, activeHoleData, displayCourseId);
   const myCurrentPlayer = myPlayerId ? getPlayerForCourse(visiblePlayers.find((player) => String(player.id) === String(myPlayerId)), displayCourseId) : null;
+  const isScorerEntryMode = scoreEntryMode === "scorer" && Boolean(myCurrentPlayer);
+  const entryPlayerId = isScorerEntryMode ? myPlayerId : scoredPlayerId;
+  const entryPlayer = isScorerEntryMode ? myCurrentPlayer : scoredPlayer;
+  const pickedUpStrokes = getPickedUpStrokes(entryPlayer, activeHoleData, displayCourseId);
   const myShotsOnActiveHole = getShotsOnHole(myCurrentPlayer?.course_hcp, activeHoleData?.hcp);
+  const entryPlayerShotsOnActiveHole = getShotsOnHole(entryPlayer?.course_hcp, activeHoleData?.hcp);
   const scoredPlayerShotsOnActiveHole = getShotsOnHole(scoredPlayer?.course_hcp, activeHoleData?.hcp);
   const currentScore = useMemo(
     () =>
-      scores.find((s) => String(s.round_id || "") === String(displayedActiveRound?.round_id || "r1") && s.player_id === scoredPlayerId && Number(s.hole_number) === activeHole) ||
+      scores.find((s) => String(s.round_id || "") === String(displayedActiveRound?.round_id || "r1") && String(s.player_id) === String(entryPlayerId) && Number(s.hole_number) === activeHole) ||
       { strokes: "", picked_up: false, over_two_putts: false, putts_count: "", lady: false },
-    [scores, scoredPlayerId, activeHole, displayedActiveRound?.round_id]
+    [scores, entryPlayerId, activeHole, displayedActiveRound?.round_id]
   );
   const hasCurrentScore = currentScore.strokes !== "" && currentScore.strokes != null;
+  const playerScoreForComparison = useMemo(
+    () => scores.find((s) => String(s.round_id || "") === String(displayedActiveRound?.round_id || "r1") && String(s.player_id) === String(scoredPlayerId) && Number(s.hole_number) === activeHole) || null,
+    [scores, displayedActiveRound?.round_id, scoredPlayerId, activeHole]
+  );
+  const scorerScoreForComparison = useMemo(
+    () => myPlayerId ? scores.find((s) => String(s.round_id || "") === String(displayedActiveRound?.round_id || "r1") && String(s.player_id) === String(myPlayerId) && Number(s.hole_number) === activeHole) || null : null,
+    [scores, displayedActiveRound?.round_id, myPlayerId, activeHole]
+  );
+  const scoreMismatchMessage = useMemo(() => {
+    if (!playerScoreForComparison || !scorerScoreForComparison) return "";
+    const playerHasScore = playerScoreForComparison.strokes !== "" && playerScoreForComparison.strokes != null;
+    const scorerHasScore = scorerScoreForComparison.strokes !== "" && scorerScoreForComparison.strokes != null;
+    if (!playerHasScore || !scorerHasScore) return "";
+
+    const differences = [];
+    if (Number(playerScoreForComparison.strokes) !== Number(scorerScoreForComparison.strokes)) {
+      differences.push(`Schläge Spieler ${playerScoreForComparison.strokes} / Zähler ${scorerScoreForComparison.strokes}`);
+    }
+    if (normalizeBoolean(playerScoreForComparison.picked_up) !== normalizeBoolean(scorerScoreForComparison.picked_up)) differences.push("Strich unterschiedlich");
+    if (normalizeBoolean(playerScoreForComparison.lady) !== normalizeBoolean(scorerScoreForComparison.lady)) differences.push("Lady unterschiedlich");
+    if (normalizeBoolean(playerScoreForComparison.over_two_putts) !== normalizeBoolean(scorerScoreForComparison.over_two_putts) || Number(playerScoreForComparison.putts_count || 0) !== Number(scorerScoreForComparison.putts_count || 0)) differences.push("Snake unterschiedlich");
+
+    return differences.length ? differences.join(" · ") : "";
+  }, [playerScoreForComparison, scorerScoreForComparison]);
   const playerStats = useMemo(() => buildPlayerStats(playersWithCurrentHandicaps, holes, scores), [playersWithCurrentHandicaps, holes, scores]);
   const myCurrentStats = useMemo(() => (myPlayerId ? playerStats.find((player) => String(player.id) === String(myPlayerId)) || null : null), [playerStats, myPlayerId]);
   const strokePlayLeaderboard = useMemo(() => sortStrokePlay(playerStats), [playerStats]);
@@ -887,8 +916,9 @@ export default function LordOfTheHolesPWA() {
 
   useEffect(() => {
     if (!scoreablePlayers.some((p) => String(p.id) === String(scoredPlayerId))) setScoredPlayerId(scoreablePlayers[0]?.id || "");
+    if (!myPlayerId && scoreEntryMode === "scorer") setScoreEntryMode("player");
     if (Number(activeHole) < 1 || Number(activeHole) > 18) setActiveHole(1);
-  }, [scoreablePlayers, scoredPlayerId]);
+  }, [scoreablePlayers, scoredPlayerId, myPlayerId, scoreEntryMode, activeHole]);
 
   useEffect(() => {
     writeLocalJson("lordOfTheHoles.myPlayerId", myPlayerId);
@@ -963,7 +993,7 @@ export default function LordOfTheHolesPWA() {
   function optimisticUpdate(patch) {
     const next = normalizeScoreRecord({
       round_id: displayedActiveRound?.round_id || "r1",
-      player_id: scoredPlayerId,
+      player_id: entryPlayerId,
       hole_number: activeHole,
       strokes: currentScore.strokes ?? "",
       picked_up: normalizeBoolean(currentScore.picked_up),
@@ -1282,7 +1312,18 @@ export default function LordOfTheHolesPWA() {
               <div className="mb-3 rounded-xl border border-amber-700/30 bg-black/20 p-2.5 text-xs text-amber-100/75">Unter Einstellungen kannst du festlegen, wer du bist. Danach erscheint hier dein aktueller Score.</div>
             )}
             <div className="rounded-2xl border border-amber-700/40 bg-amber-50/5 p-4">
-              <div className="mb-3 flex items-center justify-between gap-2"><span className="font-serif text-lg text-amber-200">{getPlayerLabel(scoredPlayer)} · Loch {activeHole}</span><span className="text-[11px] text-amber-100/65">Vorgabe <b className="text-amber-200 tracking-[0.18em]">{formatShotMarks(scoredPlayerShotsOnActiveHole)}</b></span></div>
+              {myCurrentPlayer && (
+                <div className="mb-3 grid grid-cols-2 gap-2 rounded-2xl border border-amber-700/30 bg-black/25 p-1.5">
+                  <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100")}>Spieler</button>
+                  <button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100")}>Zähler</button>
+                </div>
+              )}
+              {scoreMismatchMessage && (
+                <div className="mb-3 rounded-2xl border border-red-500/50 bg-red-950/40 p-2.5 text-sm text-red-100">
+                  Achtung: Spieler- und Zähler-Score unterscheiden sich. {scoreMismatchMessage}
+                </div>
+              )}
+              <div className="mb-3 flex items-center justify-between gap-2"><span className="font-serif text-lg text-amber-200">{getPlayerLabel(entryPlayer)} · Loch {activeHole}</span><span className="text-[11px] text-amber-100/65">Vorgabe <b className="text-amber-200 tracking-[0.18em]">{formatShotMarks(entryPlayerShotsOnActiveHole)}</b></span></div>
               <label className="mb-1 block text-sm text-amber-100/80">Score</label>
               <div className="mb-3 grid grid-cols-6 gap-2">
                 {quickScores.map((value) => <button key={value} onClick={() => saveScore({ strokes: value, picked_up: false })} className={cls("rounded-2xl border py-2.5 text-base font-bold", Number(currentScore.strokes) === value && !normalizeBoolean(currentScore.picked_up) ? "border-amber-300 bg-amber-500 text-amber-50" : "border-amber-700/40 bg-black/25 text-amber-100")}>{value}</button>)}
@@ -1304,7 +1345,11 @@ export default function LordOfTheHolesPWA() {
                 {normalizeBoolean(currentScore.over_two_putts) && <div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => saveScore({ over_two_putts: true, putts_count: 3 })} className={cls("rounded-2xl border py-2.5 text-sm font-bold", Number(currentScore.putts_count) === 3 ? "border-amber-300 bg-amber-500 text-amber-50" : "border-amber-700/40 bg-stone-950 text-amber-100")}>3 Putt</button><button type="button" onClick={() => saveScore({ over_two_putts: true, putts_count: 4 })} className={cls("rounded-2xl border py-2.5 text-sm font-bold", Number(currentScore.putts_count) >= 4 ? "border-amber-300 bg-amber-500 text-amber-50" : "border-amber-700/40 bg-stone-950 text-amber-100")}>4+ Putt</button></div>}
               </div>
               <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 text-amber-100">Zurück</Button><Button disabled={activeHole === 18 || !hasCurrentScore || scoreSaveInFlight} onClick={goToNextHole} className="rounded-2xl bg-amber-600 text-amber-50 disabled:opacity-50">{scoreSaveInFlight ? "Speichere ..." : "Nächstes Loch"}</Button></div>
-              <div className="mt-3 rounded-2xl border border-amber-700/30 bg-black/25 p-2.5"><label className="mb-1 block text-sm text-amber-100/80">Spieler</label><select value={scoredPlayerId} onChange={(e) => setScoredPlayerId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2.5 text-amber-50">{scoreablePlayers.map((p) => <option key={p.id} value={p.id}>{getPlayerLabel(p)}</option>)}</select></div>
+              {!isScorerEntryMode ? (
+                <div className="mt-3 rounded-2xl border border-amber-700/30 bg-black/25 p-2.5"><label className="mb-1 block text-sm text-amber-100/80">Spieler</label><select value={scoredPlayerId} onChange={(e) => setScoredPlayerId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2.5 text-amber-50">{scoreablePlayers.map((p) => <option key={p.id} value={p.id}>{getPlayerLabel(p)}</option>)}</select></div>
+              ) : (
+                <div className="mt-3 rounded-2xl border border-amber-700/30 bg-black/25 p-2.5 text-sm text-amber-100/80">Zähler: <b className="text-amber-200">{getPlayerLabel(myCurrentPlayer)}</b></div>
+              )}
             </div>
           </CardContent>
         </Card>
