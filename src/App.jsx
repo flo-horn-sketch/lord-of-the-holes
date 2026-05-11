@@ -862,6 +862,7 @@ export default function LordOfTheHolesPWA() {
       { strokes: "", picked_up: false, over_two_putts: false, putts_count: "", lady: false },
     [scores, scoredPlayerId, activeHole, displayedActiveRound?.round_id]
   );
+  const hasCurrentScore = currentScore.strokes !== "" && currentScore.strokes != null;
   const playerStats = useMemo(() => buildPlayerStats(playersWithCurrentHandicaps, holes, scores), [playersWithCurrentHandicaps, holes, scores]);
   const myCurrentStats = useMemo(() => (myPlayerId ? playerStats.find((player) => String(player.id) === String(myPlayerId)) || null : null), [playerStats, myPlayerId]);
   const strokePlayLeaderboard = useMemo(() => sortStrokePlay(playerStats), [playerStats]);
@@ -1266,7 +1267,7 @@ export default function LordOfTheHolesPWA() {
                 <div className="mb-3 flex items-center justify-between"><span className="text-sm font-semibold text-amber-100">Snake</span><input type="checkbox" checked={normalizeBoolean(currentScore.over_two_putts)} onChange={(e) => saveScore({ over_two_putts: e.target.checked, putts_count: e.target.checked ? currentScore.putts_count || 3 : "" })} className="h-5 w-5 accent-amber-500" /></div>
                 {normalizeBoolean(currentScore.over_two_putts) && <div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => saveScore({ over_two_putts: true, putts_count: 3 })} className={cls("rounded-2xl border py-2.5 text-sm font-bold", Number(currentScore.putts_count) === 3 ? "border-amber-300 bg-amber-500 text-amber-50" : "border-amber-700/40 bg-stone-950 text-amber-100")}>3 Putt</button><button type="button" onClick={() => saveScore({ over_two_putts: true, putts_count: 4 })} className={cls("rounded-2xl border py-2.5 text-sm font-bold", Number(currentScore.putts_count) >= 4 ? "border-amber-300 bg-amber-500 text-amber-50" : "border-amber-700/40 bg-stone-950 text-amber-100")}>4+ Putt</button></div>}
               </div>
-              <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 text-amber-100">Zurück</Button><Button disabled={activeHole === 18} onClick={() => setActiveHole((h) => Math.min(18, h + 1))} className="rounded-2xl bg-amber-600 text-amber-50">Nächstes Loch</Button></div>
+              <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 text-amber-100">Zurück</Button><Button disabled={activeHole === 18 || !hasCurrentScore} onClick={() => setActiveHole((h) => Math.min(18, h + 1))} className="rounded-2xl bg-amber-600 text-amber-50 disabled:opacity-50">Nächstes Loch</Button></div>
               <div className="mt-3 rounded-2xl border border-amber-700/30 bg-black/25 p-2.5"><label className="mb-1 block text-sm text-amber-100/80">Spieler</label><select value={scoredPlayerId} onChange={(e) => setScoredPlayerId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2.5 text-amber-50">{scoreablePlayers.map((p) => <option key={p.id} value={p.id}>{getPlayerLabel(p)}</option>)}</select></div>
             </div>
           </CardContent>
