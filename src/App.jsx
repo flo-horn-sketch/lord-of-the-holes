@@ -18,7 +18,7 @@ function Button({ className = "", children, type = "button", ...props }) {
 }
 
 const GOOGLE_SHEETS_API_URL =
-  "https://script.google.com/macros/s/AKfycbz0PtIVprG4HMLxvP4vz6kZKeWPQL2BIRP1TqtUW9idK2d0zJOB7k7VW1sr0tSPGYXG/exec";
+  "https://script.google.com/macros/s/AKfycbx0fShl6azxCzNYgA2ke5OFLvjqNq5KEPsDRSxOcOs7nVE4qgOnV0fZINp1pNAXIKtc/exec";
 
 const ADMIN_PASSWORD = "weimar";
 
@@ -117,6 +117,7 @@ function normalizeScoreRecord(score) {
     ...score,
     picked_up: normalizeBoolean(score?.picked_up),
     over_two_putts: normalizeBoolean(score?.over_two_putts),
+    lady: normalizeBoolean(score?.lady),
   };
 }
 
@@ -425,7 +426,7 @@ function buildScorecardRows(player, round, holes, scores) {
     const grossStableford = getScoreStablefordPoints(score, hole.par, 0);
     const toPar = strokes == null ? null : strokes - Number(hole.par || 0);
     const puttLabel = !normalizeBoolean(score?.over_two_putts) ? "–" : Number(score?.putts_count) >= 4 ? "4+ Putt" : "3 Putt";
-    return { hole, score, strokes, isPickedUp, shots, toPar, netStableford, grossStableford, puttLabel };
+    return { hole, score, strokes, isPickedUp, isLady: normalizeBoolean(score?.lady), shots, toPar, netStableford, grossStableford, puttLabel };
   });
 }
 
@@ -454,6 +455,7 @@ function runSelfTests() {
   assert("formatToPar returns E for even par", formatToPar(0, 3) === "E");
   assert("cleanNumericInput removes non-digits", cleanNumericInput("a1b2") === "12");
   assert("normalizeBoolean handles German yes", normalizeBoolean("ja") === true);
+  assert("score normalization handles lady", normalizeScoreRecord({ lady: "true" }).lady === true);
   assert("stableford par is two points", getStablefordPoints(4, 4, 0) === 2);
   assert("picked up score gives zero net points", getScoreStablefordPoints({ strokes: getPickedUpStrokes({ course_hcp_goethe: 5 }, { par: 4, hcp: 5 }, "goethe"), picked_up: true }, 4, getShotsOnHole(5, 5)) === 0);
   assert("picked up score is double par", getPickedUpStrokes({ course_hcp_goethe: 18 }, { par: 5, hcp: 1 }, "goethe") === 10);
@@ -743,6 +745,7 @@ function ScorecardArchive({ rounds, courses, players, roundPlayers, holes, score
                     <th className="px-2.5 py-1.5 text-right">Netto</th>
                     <th className="px-2.5 py-1.5 text-right">Brutto</th>
                     <th className="px-2.5 py-1.5 text-right">Putts</th>
+                    <th className="px-2.5 py-1.5 text-right">Lady</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -757,6 +760,7 @@ function ScorecardArchive({ rounds, courses, players, roundPlayers, holes, score
                       <td className="px-2.5 py-1.5 text-right">{row.strokes == null ? "–" : row.netStableford}</td>
                       <td className="px-2.5 py-1.5 text-right">{row.strokes == null ? "–" : row.grossStableford}</td>
                       <td className="px-2.5 py-1.5 text-right">{row.puttLabel}</td>
+                      <td className="px-2.5 py-1.5 text-right">{row.isLady ? "✓" : "–"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -771,6 +775,7 @@ function ScorecardArchive({ rounds, courses, players, roundPlayers, holes, score
                     <td className="px-2.5 py-1.5 text-right text-amber-300">{summary.netStableford}</td>
                     <td className="px-2.5 py-1.5 text-right text-amber-300">{summary.grossStableford}</td>
                     <td className="px-2.5 py-1.5 text-right">3× {summary.threePutts} · 4+× {summary.fourPlusPutts}</td>
+                    <td className="px-2.5 py-1.5 text-right">–</td>
                   </tr>
                 </tfoot>
               </table>
@@ -847,7 +852,7 @@ export default function LordOfTheHolesPWA() {
   const currentScore = useMemo(
     () =>
       scores.find((s) => String(s.round_id || "") === String(displayedActiveRound?.round_id || "r1") && s.player_id === scoredPlayerId && Number(s.hole_number) === activeHole) ||
-      { strokes: "", picked_up: false, over_two_putts: false, putts_count: "" },
+      { strokes: "", picked_up: false, over_two_putts: false, putts_count: "", lady: false },
     [scores, scoredPlayerId, activeHole, displayedActiveRound?.round_id]
   );
   const playerStats = useMemo(() => buildPlayerStats(playersWithCurrentHandicaps, holes, scores), [playersWithCurrentHandicaps, holes, scores]);
@@ -945,6 +950,7 @@ export default function LordOfTheHolesPWA() {
       picked_up: normalizeBoolean(currentScore.picked_up),
       over_two_putts: normalizeBoolean(currentScore.over_two_putts),
       putts_count: currentScore.putts_count ?? "",
+      lady: normalizeBoolean(currentScore.lady),
       scorer_player_id: myPlayerId || "",
       updated_at: new Date().toISOString(),
       ...patch,
@@ -1239,6 +1245,15 @@ export default function LordOfTheHolesPWA() {
               <label className="mb-1 block text-sm text-amber-100/80">Oder Score manuell</label>
               <input inputMode="numeric" value={currentScore.strokes ?? ""} onChange={(e) => saveScore({ strokes: cleanNumericInput(e.target.value) === "" ? "" : Number(cleanNumericInput(e.target.value)), picked_up: false })} placeholder="z. B. 5" className="mb-3 w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2.5 text-amber-50 placeholder:text-amber-100/30" />
               <div className="mb-3 rounded-2xl border border-amber-700/40 bg-black/25 p-2.5"><div className="flex items-center justify-between gap-3"><div><div className="text-sm font-semibold text-amber-100">Loch gestrichen?</div><div className="text-xs text-amber-100/65">Wertet automatisch {pickedUpStrokes} Schläge und 0 Netto-Punkte.</div></div><input type="checkbox" checked={normalizeBoolean(currentScore.picked_up)} onChange={(e) => saveScore(e.target.checked ? { picked_up: true, strokes: pickedUpStrokes } : { picked_up: false })} className="h-5 w-5 accent-amber-500" /></div></div>
+              <div className="mb-3 rounded-2xl border border-amber-700/40 bg-black/25 p-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-amber-100">Lady</div>
+                    <div className="text-xs text-amber-100/65">Markiert eine Lady für dieses Loch.</div>
+                  </div>
+                  <input type="checkbox" checked={normalizeBoolean(currentScore.lady)} onChange={(e) => saveScore({ lady: e.target.checked })} className="h-5 w-5 accent-amber-500" />
+                </div>
+              </div>
               <div className="mb-3 rounded-2xl border border-amber-700/40 bg-black/25 p-2.5">
                 <div className="mb-3 flex items-center justify-between"><span className="text-sm font-semibold text-amber-100">Snake</span><input type="checkbox" checked={normalizeBoolean(currentScore.over_two_putts)} onChange={(e) => saveScore({ over_two_putts: e.target.checked, putts_count: e.target.checked ? currentScore.putts_count || 3 : "" })} className="h-5 w-5 accent-amber-500" /></div>
                 {normalizeBoolean(currentScore.over_two_putts) && <div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => saveScore({ over_two_putts: true, putts_count: 3 })} className={cls("rounded-2xl border py-2.5 text-sm font-bold", Number(currentScore.putts_count) === 3 ? "border-amber-300 bg-amber-500 text-amber-50" : "border-amber-700/40 bg-stone-950 text-amber-100")}>3 Putt</button><button type="button" onClick={() => saveScore({ over_two_putts: true, putts_count: 4 })} className={cls("rounded-2xl border py-2.5 text-sm font-bold", Number(currentScore.putts_count) >= 4 ? "border-amber-300 bg-amber-500 text-amber-50" : "border-amber-700/40 bg-stone-950 text-amber-100")}>4+ Putt</button></div>}
