@@ -593,7 +593,6 @@ function TournamentStandings({ players, rounds, holes, scores, activeRoundId = "
                   <th className="px-2.5 py-1.5">#</th>
                   <th className="px-2.5 py-1.5">Spieler</th>
                   {qualificationRounds.map((round) => <th key={round.round_id} className="px-2.5 py-1.5 text-right">{round.round_name}</th>)}
-                  <th className="px-2.5 py-1.5 text-right">Streicher</th>
                   <th className="px-2.5 py-1.5 text-right">Gesamt</th>
                 </tr>
               </thead>
@@ -602,7 +601,7 @@ function TournamentStandings({ players, rounds, holes, scores, activeRoundId = "
                   <React.Fragment key={player.id}>
                     {index === 3 && (
                       <tr>
-                        <td colSpan={qualificationRounds.length + 5} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2.5 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-amber-200">Cut-Linie · Top 3 spielen den Finaltag</td>
+                        <td colSpan={qualificationRounds.length + 4} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2.5 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-amber-200">Cut-Linie · Top 3 spielen den Finaltag</td>
                       </tr>
                     )}
                     <tr className={cls("border-t border-amber-700/20", index < 3 && "bg-emerald-500/5")}>
@@ -619,7 +618,6 @@ function TournamentStandings({ players, rounds, holes, scores, activeRoundId = "
                           <td key={round.round_id} className={cls("px-2.5 py-1.5 text-right", isCounted && "font-bold text-amber-300", isDropped && "text-amber-100/50 line-through")}>{result?.played ? result.points : "–"}</td>
                         );
                       })}
-                      <td className="px-2.5 py-1.5 text-right text-amber-100/70">{player.droppedRoundId ? player.roundResults.find((item) => item.round_id === player.droppedRoundId)?.points ?? "–" : "–"}</td>
                       <td className="px-2.5 py-1.5 text-right font-serif text-xl font-bold text-amber-300">{player.totalBestTwo}</td>
                     </tr>
                   </React.Fragment>
