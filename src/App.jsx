@@ -815,8 +815,8 @@ export default function LordOfTheHolesPWA() {
   const [scores, setScores] = useState([]);
   const [allScores, setAllScores] = useState([]);
   const [localHandicaps, setLocalHandicaps] = useState({});
-  const [scoredPlayerId, setScoredPlayerId] = useState("florian");
-  const [activeHole, setActiveHole] = useState(1);
+  const [scoredPlayerId, setScoredPlayerId] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerId", "florian"));
+  const [activeHole, setActiveHole] = useState(() => readLocalJson("lordOfTheHoles.activeHole", 1));
   const [view, setView] = useState("score");
   const [mainMenu, setMainMenu] = useState("current");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -887,11 +887,20 @@ export default function LordOfTheHolesPWA() {
 
   useEffect(() => {
     if (!scoreablePlayers.some((p) => String(p.id) === String(scoredPlayerId))) setScoredPlayerId(scoreablePlayers[0]?.id || "");
+    if (Number(activeHole) < 1 || Number(activeHole) > 18) setActiveHole(1);
   }, [scoreablePlayers, scoredPlayerId]);
 
   useEffect(() => {
     writeLocalJson("lordOfTheHoles.myPlayerId", myPlayerId);
   }, [myPlayerId]);
+
+  useEffect(() => {
+    writeLocalJson("lordOfTheHoles.activeHole", activeHole);
+  }, [activeHole]);
+
+  useEffect(() => {
+    writeLocalJson("lordOfTheHoles.scoredPlayerId", scoredPlayerId);
+  }, [scoredPlayerId]);
 
   useEffect(() => {
     if (!selectedActiveRoundId) return;
