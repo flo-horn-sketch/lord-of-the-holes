@@ -530,12 +530,18 @@ export default function LordOfTheHolesPWA() {
         const goetheKey = getCourseHcpKey(p.id, "goethe");
         const feiningerKey = getCourseHcpKey(p.id, "feininger");
 
-        if (merged[goetheKey] === undefined || merged[goetheKey] === "") {
-          merged[goetheKey] = String(p.course_hcp_goethe ?? p.course_hcp ?? 0);
-        }
+        const sheetGoethe = String(p.course_hcp_goethe ?? p.course_hcp ?? 0);
+        const sheetFeininger = String(p.course_hcp_feininger ?? 0);
 
-        if (merged[feiningerKey] === undefined || merged[feiningerKey] === "") {
-          merged[feiningerKey] = String(p.course_hcp_feininger ?? 0);
+        if (!adminEditing) {
+          // Normalbetrieb: Sheet ist die Wahrheit. Dadurch überschreibt ein alter Handy-Cache mit 0
+          // nicht mehr die korrekt gespeicherten HCP-Werte aus dem Sheet.
+          merged[goetheKey] = sheetGoethe;
+          merged[feiningerKey] = sheetFeininger;
+        } else {
+          // Während Admin bearbeitet, aktuelle Eingaben nicht durch Auto-Sync überschreiben.
+          if (merged[goetheKey] === undefined || merged[goetheKey] === "") merged[goetheKey] = sheetGoethe;
+          if (merged[feiningerKey] === undefined || merged[feiningerKey] === "") merged[feiningerKey] = sheetFeininger;
         }
       });
 
