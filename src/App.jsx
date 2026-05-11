@@ -131,60 +131,6 @@ function getOfficialScores(scores) {
   return (scores || []).filter((score) => !isScorerControlScore(score));
 }
 
-function findScoreForPlayerHole(scores, roundId, playerId, holeNumber, wantControlScore) {
-  return (
-    (scores || []).find((score) => {
-      const sameRound = String(score.round_id || "") === String(roundId || "");
-      const samePlayer = String(score.player_id || "") === String(playerId || "");
-      const sameHole = Number(score.hole_number) === Number(holeNumber);
-      const isControl = isScorerControlScore(score);
-      return sameRound && samePlayer && sameHole && isControl === wantControlScore;
-    }) || null
-  );
-}
-
-function getScoreMismatchMessage(officialScore, controlScore) {
-  if (!officialScore || !controlScore) return "";
-
-  const officialHasScore = officialScore.strokes !== "" && officialScore.strokes != null;
-  const controlHasScore = controlScore.strokes !== "" && controlScore.strokes != null;
-
-  if (!officialHasScore || !controlHasScore) return "";
-
-  const differences = [];
-
-  if (Number(officialScore.strokes) !== Number(controlScore.strokes)) {
-    differences.push(`Schläge offiziell ${officialScore.strokes} / Eigen ${controlScore.strokes}`);
-  }
-
-  if (normalizeBoolean(officialScore.picked_up) !== normalizeBoolean(controlScore.picked_up)) {
-    differences.push("Strich unterschiedlich");
-  }
-
-  if (normalizeBoolean(officialScore.lady) !== normalizeBoolean(controlScore.lady)) {
-    differences.push("Lady unterschiedlich");
-  }
-
-  if (
-    normalizeBoolean(officialScore.over_two_putts) !== normalizeBoolean(controlScore.over_two_putts) ||
-    Number(officialScore.putts_count || 0) !== Number(controlScore.putts_count || 0)
-  ) {
-    differences.push("Snake unterschiedlich");
-  }
-
-  return differences.length ? differences.join(" · ") : "";
-}
-
-function isScorerControlScore(score) {
-  const playerId = String(score?.player_id || "").trim();
-  const scorerPlayerId = String(score?.scorer_player_id || "").trim();
-  return Boolean(playerId && scorerPlayerId && playerId === scorerPlayerId);
-}
-
-function getOfficialScores(scores) {
-  return (scores || []).filter((score) => !isScorerControlScore(score));
-}
-
 function withFallbackAlias(player) {
   if (!player) return player;
   return {
