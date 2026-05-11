@@ -121,6 +121,26 @@ function normalizeScoreRecord(score) {
   };
 }
 
+function isScorerControlScore(score) {
+  const playerId = String(score?.player_id || "").trim();
+  const scorerPlayerId = String(score?.scorer_player_id || "").trim();
+  return Boolean(playerId && scorerPlayerId && playerId === scorerPlayerId);
+}
+
+function getOfficialScores(scores) {
+  return (scores || []).filter((score) => !isScorerControlScore(score));
+}
+
+function isScorerControlScore(score) {
+  const playerId = String(score?.player_id || "").trim();
+  const scorerPlayerId = String(score?.scorer_player_id || "").trim();
+  return Boolean(playerId && scorerPlayerId && playerId === scorerPlayerId);
+}
+
+function getOfficialScores(scores) {
+  return (scores || []).filter((score) => !isScorerControlScore(score));
+}
+
 function withFallbackAlias(player) {
   if (!player) return player;
   return {
@@ -462,6 +482,9 @@ function runSelfTests() {
   assert("cleanNumericInput removes non-digits", cleanNumericInput("a1b2") === "12");
   assert("normalizeBoolean handles German yes", normalizeBoolean("ja") === true);
   assert("score normalization handles lady", normalizeScoreRecord({ lady: "true" }).lady === true);
+  assert("scorer control score is detected", isScorerControlScore({ player_id: "florian", scorer_player_id: "florian" }) === true);
+  assert("official score keeps external scorer", isScorerControlScore({ player_id: "florian", scorer_player_id: "mucky" }) === false);
+  assert("control scores are filtered from official scores", getOfficialScores([{ player_id: "florian", scorer_player_id: "florian" }, { player_id: "florian", scorer_player_id: "mucky" }]).length === 1);
   assert("stableford par is two points", getStablefordPoints(4, 4, 0) === 2);
   assert("picked up score gives zero net points", getScoreStablefordPoints({ strokes: getPickedUpStrokes({ course_hcp_goethe: 5 }, { par: 4, hcp: 5 }, "goethe"), picked_up: true }, 4, getShotsOnHole(5, 5)) === 0);
   assert("picked up score is double par", getPickedUpStrokes({ course_hcp_goethe: 18 }, { par: 5, hcp: 1 }, "goethe") === 10);
@@ -864,17 +887,24 @@ export default function LordOfTheHolesPWA() {
   const scoredPlayerShotsOnActiveHole = getShotsOnHole(scoredPlayer?.course_hcp, activeHoleData?.hcp);
   const currentScore = useMemo(
     () =>
-      scores.find((s) => String(s.round_id || "") === String(displayedActiveRound?.round_id || "r1") && String(s.player_id) === String(entryPlayerId) && Number(s.hole_number) === activeHole) ||
+      scores.find((s) => {
+        const sameHole = String(s.round_id || "") === String(displayedActiveRound?.round_id || "r1") && Number(s.hole_number) === activeHole;
+        if (!sameHole) return false;
+        if (isScorerEntryMode) return String(s.player_id) === String(entryPlayerId) && isScorerControlScore(s);
+        return String(s.player_id) === String(entryPlayerId) && !isScorerControlScore(s);
+      }) ||
       { strokes: "", picked_up: false, over_two_putts: false, putts_count: "", lady: false },
-    [scores, entryPlayerId, activeHole, displayedActiveRound?.round_id]
+    [scores, entryPlayerId, activeHole, displayedActiveRound?.round_id, isScorerEntryMode]
   );
   const hasCurrentScore = currentScore.strokes !== "" && currentScore.strokes != null;
+  const officialScores = useMemo(() => getOfficialScores(scores), [scores]);
+  const officialAllScores = useMemo(() => getOfficialScores(allScores), [allScores]);
   const playerScoreForComparison = useMemo(
-    () => scores.find((s) => String(s.round_id || "") === String(displayedActiveRound?.round_id || "r1") && String(s.player_id) === String(scoredPlayerId) && Number(s.hole_number) === activeHole) || null,
+    () => scores.find((s) => String(s.round_id || "") === String(displayedActiveRound?.round_id || "r1") && String(s.player_id) === String(scoredPlayerId) && Number(s.hole_number) === activeHole && !isScorerControlScore(s)) || null,
     [scores, displayedActiveRound?.round_id, scoredPlayerId, activeHole]
   );
   const scorerScoreForComparison = useMemo(
-    () => myPlayerId ? scores.find((s) => String(s.round_id || "") === String(displayedActiveRound?.round_id || "r1") && String(s.player_id) === String(myPlayerId) && Number(s.hole_number) === activeHole) || null : null,
+    () => myPlayerId ? scores.find((s) => String(s.round_id || "") === String(displayedActiveRound?.round_id || "r1") && String(s.player_id) === String(myPlayerId) && Number(s.hole_number) === activeHole && isScorerControlScore(s)) || null : null,
     [scores, displayedActiveRound?.round_id, myPlayerId, activeHole]
   );
   const scoreMismatchMessage = useMemo(() => {
@@ -893,7 +923,8 @@ export default function LordOfTheHolesPWA() {
 
     return differences.length ? differences.join(" · ") : "";
   }, [playerScoreForComparison, scorerScoreForComparison]);
-  const playerStats = useMemo(() => buildPlayerStats(playersWithCurrentHandicaps, holes, scores), [playersWithCurrentHandicaps, holes, scores]);
+  const hasScoreMismatch = Boolean(scoreMismatchMessage);
+  const playerStats = useMemo(() => buildPlayerStats(playersWithCurrentHandicaps, holes, officialScores), [playersWithCurrentHandicaps, holes, officialScores]);
   const myCurrentStats = useMemo(() => (myPlayerId ? playerStats.find((player) => String(player.id) === String(myPlayerId)) || null : null), [playerStats, myPlayerId]);
   const strokePlayLeaderboard = useMemo(() => sortStrokePlay(playerStats), [playerStats]);
   const netStablefordLeaderboard = useMemo(() => sortStableford(playerStats, "netStableford"), [playerStats]);
@@ -1197,7 +1228,7 @@ export default function LordOfTheHolesPWA() {
   function renderTournamentView() {
     return (
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
-        <TournamentStandings players={allPlayers} rounds={rounds} holes={allHoles} scores={allScores} activeRoundId={displayedActiveRound?.round_id} />
+        <TournamentStandings players={allPlayers} rounds={rounds} holes={allHoles} scores={officialAllScores} activeRoundId={displayedActiveRound?.round_id} />
       </motion.section>
     );
   }
@@ -1290,10 +1321,15 @@ export default function LordOfTheHolesPWA() {
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
         <Card className="mb-3 rounded-2xl border-amber-700/40 bg-[#20170f]/90 shadow-xl">
           <CardContent className="p-3">
-            <div className="mb-3 rounded-xl border border-amber-700/30 bg-black/25 p-2.5">
-              <div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Aktuell gespielt</div>
-              <div className="mt-0.5 font-serif text-lg text-amber-200">{displayedActiveRound?.round_name || "Runde 1"}</div>
-              <div className="text-xs text-amber-100/65">{activeCourse?.course_name || "Kein Kurs ausgewählt"}</div>
+            <div className={cls("mb-3 rounded-xl border bg-black/25 p-2.5", hasScoreMismatch ? "border-red-500/60" : "border-amber-700/30")}>
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Aktuell gespielt</div>
+                  <div className="mt-0.5 font-serif text-lg text-amber-200">{displayedActiveRound?.round_name || "Runde 1"}</div>
+                  <div className="text-xs text-amber-100/65">{activeCourse?.course_name || "Kein Kurs ausgewählt"}</div>
+                </div>
+                {hasScoreMismatch && <div className="rounded-full border border-red-400/50 bg-red-950/50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-red-100">Abweichung</div>}
+              </div>
             </div>
             <div className="mb-3 flex items-center justify-between">
               <div><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Aktives Loch</p><h2 className="font-serif text-4xl font-black text-amber-200">{activeHole}</h2></div>
@@ -1311,11 +1347,11 @@ export default function LordOfTheHolesPWA() {
             ) : (
               <div className="mb-3 rounded-xl border border-amber-700/30 bg-black/20 p-2.5 text-xs text-amber-100/75">Unter Einstellungen kannst du festlegen, wer du bist. Danach erscheint hier dein aktueller Score.</div>
             )}
-            <div className="rounded-2xl border border-amber-700/40 bg-amber-50/5 p-4">
+            <div className={cls("rounded-2xl border bg-amber-50/5 p-4", hasScoreMismatch ? "border-red-500/70 ring-1 ring-red-500/40" : "border-amber-700/40")}>
               {myCurrentPlayer && (
                 <div className="mb-3 grid grid-cols-2 gap-2 rounded-2xl border border-amber-700/30 bg-black/25 p-1.5">
-                  <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100")}>Spieler</button>
-                  <button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100")}>Zähler</button>
+                  <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasScoreMismatch && "ring-1 ring-red-400/60")}>Spieler {hasScoreMismatch ? "⚠" : ""}</button>
+                  <button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasScoreMismatch && "ring-1 ring-red-400/60")}>Zähler {hasScoreMismatch ? "⚠" : ""}</button>
                 </div>
               )}
               {scoreMismatchMessage && (
@@ -1346,9 +1382,9 @@ export default function LordOfTheHolesPWA() {
               </div>
               <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 text-amber-100">Zurück</Button><Button disabled={activeHole === 18 || !hasCurrentScore || scoreSaveInFlight} onClick={goToNextHole} className="rounded-2xl bg-amber-600 text-amber-50 disabled:opacity-50">{scoreSaveInFlight ? "Speichere ..." : "Nächstes Loch"}</Button></div>
               {!isScorerEntryMode ? (
-                <div className="mt-3 rounded-2xl border border-amber-700/30 bg-black/25 p-2.5"><label className="mb-1 block text-sm text-amber-100/80">Spieler</label><select value={scoredPlayerId} onChange={(e) => setScoredPlayerId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2.5 text-amber-50">{scoreablePlayers.map((p) => <option key={p.id} value={p.id}>{getPlayerLabel(p)}</option>)}</select></div>
+                <div className="mt-3 rounded-2xl border border-amber-700/30 bg-black/25 p-2.5"><label className="mb-1 block text-sm text-amber-100/80">Spieler</label><select value={scoredPlayerId} onChange={(e) => setScoredPlayerId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2.5 text-amber-50">{scoreablePlayers.map((p) => <option key={p.id} value={p.id}>{String(p.id) === String(scoredPlayerId) && hasScoreMismatch ? "⚠ " : ""}{getPlayerLabel(p)}</option>)}</select></div>
               ) : (
-                <div className="mt-3 rounded-2xl border border-amber-700/30 bg-black/25 p-2.5 text-sm text-amber-100/80">Zähler: <b className="text-amber-200">{getPlayerLabel(myCurrentPlayer)}</b></div>
+                <div className="mt-3 rounded-2xl border border-amber-700/30 bg-black/25 p-2.5 text-sm text-amber-100/80">Zähler: <b className={cls("text-amber-200", hasScoreMismatch && "text-red-200")}>{hasScoreMismatch ? "⚠ " : ""}{getPlayerLabel(myCurrentPlayer)}</b></div>
               )}
             </div>
           </CardContent>
@@ -1376,7 +1412,7 @@ export default function LordOfTheHolesPWA() {
   function renderArchiveView() {
     return (
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
-        <ScorecardArchive rounds={rounds} courses={courses} players={allPlayers} roundPlayers={roundPlayers} holes={allHoles} scores={allScores} selectedCourseId={selectedCourseId} />
+        <ScorecardArchive rounds={rounds} courses={courses} players={allPlayers} roundPlayers={roundPlayers} holes={allHoles} scores={officialAllScores} selectedCourseId={selectedCourseId} />
       </motion.section>
     );
   }
