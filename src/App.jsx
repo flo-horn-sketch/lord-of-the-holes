@@ -131,6 +131,50 @@ function getOfficialScores(scores) {
   return (scores || []).filter((score) => !isScorerControlScore(score));
 }
 
+function findScoreForPlayerHole(scores, roundId, playerId, holeNumber, wantControlScore) {
+  return (
+    (scores || []).find((score) => {
+      const sameRound = String(score.round_id || "") === String(roundId || "");
+      const samePlayer = String(score.player_id || "") === String(playerId || "");
+      const sameHole = Number(score.hole_number) === Number(holeNumber);
+      const isControl = isScorerControlScore(score);
+      return sameRound && samePlayer && sameHole && isControl === wantControlScore;
+    }) || null
+  );
+}
+
+function getScoreMismatchMessage(officialScore, controlScore) {
+  if (!officialScore || !controlScore) return "";
+
+  const officialHasScore = officialScore.strokes !== "" && officialScore.strokes != null;
+  const controlHasScore = controlScore.strokes !== "" && controlScore.strokes != null;
+
+  if (!officialHasScore || !controlHasScore) return "";
+
+  const differences = [];
+
+  if (Number(officialScore.strokes) !== Number(controlScore.strokes)) {
+    differences.push(`Schläge offiziell ${officialScore.strokes} / Eigen ${controlScore.strokes}`);
+  }
+
+  if (normalizeBoolean(officialScore.picked_up) !== normalizeBoolean(controlScore.picked_up)) {
+    differences.push("Strich unterschiedlich");
+  }
+
+  if (normalizeBoolean(officialScore.lady) !== normalizeBoolean(controlScore.lady)) {
+    differences.push("Lady unterschiedlich");
+  }
+
+  if (
+    normalizeBoolean(officialScore.over_two_putts) !== normalizeBoolean(controlScore.over_two_putts) ||
+    Number(officialScore.putts_count || 0) !== Number(controlScore.putts_count || 0)
+  ) {
+    differences.push("Snake unterschiedlich");
+  }
+
+  return differences.length ? differences.join(" · ") : "";
+}
+
 function isScorerControlScore(score) {
   const playerId = String(score?.player_id || "").trim();
   const scorerPlayerId = String(score?.scorer_player_id || "").trim();
@@ -485,6 +529,9 @@ function runSelfTests() {
   assert("scorer control score is detected", isScorerControlScore({ player_id: "florian", scorer_player_id: "florian" }) === true);
   assert("official score keeps external scorer", isScorerControlScore({ player_id: "florian", scorer_player_id: "mucky" }) === false);
   assert("control scores are filtered from official scores", getOfficialScores([{ player_id: "florian", scorer_player_id: "florian" }, { player_id: "florian", scorer_player_id: "mucky" }]).length === 1);
+  assert("finds official score by player and hole", findScoreForPlayerHole([{ round_id: "r1", player_id: "florian", scorer_player_id: "mucky", hole_number: 1, strokes: 5 }], "r1", "florian", 1, false)?.strokes === 5);
+  assert("finds own control score by player and hole", findScoreForPlayerHole([{ round_id: "r1", player_id: "florian", scorer_player_id: "florian", hole_number: 1, strokes: 6 }], "r1", "florian", 1, true)?.strokes === 6);
+  assert("mismatch detects official vs own control", getScoreMismatchMessage({ strokes: 6, lady: false }, { strokes: 5, lady: false }).includes("Schläge"));
   assert("stableford par is two points", getStablefordPoints(4, 4, 0) === 2);
   assert("picked up score gives zero net points", getScoreStablefordPoints({ strokes: getPickedUpStrokes({ course_hcp_goethe: 5 }, { par: 4, hcp: 5 }, "goethe"), picked_up: true }, 4, getShotsOnHole(5, 5)) === 0);
   assert("picked up score is double par", getPickedUpStrokes({ course_hcp_goethe: 18 }, { par: 5, hcp: 1 }, "goethe") === 10);
@@ -899,31 +946,35 @@ export default function LordOfTheHolesPWA() {
   const hasCurrentScore = currentScore.strokes !== "" && currentScore.strokes != null;
   const officialScores = useMemo(() => getOfficialScores(scores), [scores]);
   const officialAllScores = useMemo(() => getOfficialScores(allScores), [allScores]);
+  const comparisonPlayerId = isScorerEntryMode ? myPlayerId : scoredPlayerId;
   const playerScoreForComparison = useMemo(
-    () => scores.find((s) => String(s.round_id || "") === String(displayedActiveRound?.round_id || "r1") && String(s.player_id) === String(scoredPlayerId) && Number(s.hole_number) === activeHole && !isScorerControlScore(s)) || null,
-    [scores, displayedActiveRound?.round_id, scoredPlayerId, activeHole]
+    () => findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", comparisonPlayerId, activeHole, false),
+    [scores, displayedActiveRound?.round_id, comparisonPlayerId, activeHole]
   );
   const scorerScoreForComparison = useMemo(
-    () => myPlayerId ? scores.find((s) => String(s.round_id || "") === String(displayedActiveRound?.round_id || "r1") && String(s.player_id) === String(myPlayerId) && Number(s.hole_number) === activeHole && isScorerControlScore(s)) || null : null,
+    () => findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", comparisonPlayerId, activeHole, true),
+    [scores, displayedActiveRound?.round_id, comparisonPlayerId, activeHole]
+  );
+  const ownPlayerScoreForComparison = useMemo(
+    () => myPlayerId ? findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", myPlayerId, activeHole, false) : null,
     [scores, displayedActiveRound?.round_id, myPlayerId, activeHole]
   );
-  const scoreMismatchMessage = useMemo(() => {
-    if (!playerScoreForComparison || !scorerScoreForComparison) return "";
-    const playerHasScore = playerScoreForComparison.strokes !== "" && playerScoreForComparison.strokes != null;
-    const scorerHasScore = scorerScoreForComparison.strokes !== "" && scorerScoreForComparison.strokes != null;
-    if (!playerHasScore || !scorerHasScore) return "";
-
-    const differences = [];
-    if (Number(playerScoreForComparison.strokes) !== Number(scorerScoreForComparison.strokes)) {
-      differences.push(`Schläge Spieler ${playerScoreForComparison.strokes} / Zähler ${scorerScoreForComparison.strokes}`);
-    }
-    if (normalizeBoolean(playerScoreForComparison.picked_up) !== normalizeBoolean(scorerScoreForComparison.picked_up)) differences.push("Strich unterschiedlich");
-    if (normalizeBoolean(playerScoreForComparison.lady) !== normalizeBoolean(scorerScoreForComparison.lady)) differences.push("Lady unterschiedlich");
-    if (normalizeBoolean(playerScoreForComparison.over_two_putts) !== normalizeBoolean(scorerScoreForComparison.over_two_putts) || Number(playerScoreForComparison.putts_count || 0) !== Number(scorerScoreForComparison.putts_count || 0)) differences.push("Snake unterschiedlich");
-
-    return differences.length ? differences.join(" · ") : "";
-  }, [playerScoreForComparison, scorerScoreForComparison]);
-  const hasScoreMismatch = Boolean(scoreMismatchMessage);
+  const ownControlScoreForComparison = useMemo(
+    () => myPlayerId ? findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", myPlayerId, activeHole, true) : null,
+    [scores, displayedActiveRound?.round_id, myPlayerId, activeHole]
+  );
+  const scoreMismatchMessage = useMemo(
+    () => getScoreMismatchMessage(playerScoreForComparison, scorerScoreForComparison),
+    [playerScoreForComparison, scorerScoreForComparison]
+  );
+  const ownScoreMismatchMessage = useMemo(
+    () => getScoreMismatchMessage(ownPlayerScoreForComparison, ownControlScoreForComparison),
+    [ownPlayerScoreForComparison, ownControlScoreForComparison]
+  );
+  const visibleScoreMismatchMessage = scoreMismatchMessage || ownScoreMismatchMessage;
+  const hasScoreMismatch = Boolean(visibleScoreMismatchMessage);
+  const hasSelectedPlayerScoreMismatch = Boolean(scoreMismatchMessage);
+  const hasOwnScoreMismatch = Boolean(ownScoreMismatchMessage);
   const playerStats = useMemo(() => buildPlayerStats(playersWithCurrentHandicaps, holes, officialScores), [playersWithCurrentHandicaps, holes, officialScores]);
   const myCurrentStats = useMemo(() => (myPlayerId ? playerStats.find((player) => String(player.id) === String(myPlayerId)) || null : null), [playerStats, myPlayerId]);
   const strokePlayLeaderboard = useMemo(() => sortStrokePlay(playerStats), [playerStats]);
@@ -1328,7 +1379,7 @@ export default function LordOfTheHolesPWA() {
                   <div className="mt-0.5 font-serif text-lg text-amber-200">{displayedActiveRound?.round_name || "Runde 1"}</div>
                   <div className="text-xs text-amber-100/65">{activeCourse?.course_name || "Kein Kurs ausgewählt"}</div>
                 </div>
-                {hasScoreMismatch && <div className="rounded-full border border-red-400/50 bg-red-950/50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-red-100">Abweichung</div>}
+                {hasScoreMismatch && <div className="rounded-full border border-red-400/50 bg-red-950/50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-red-100">{hasSelectedPlayerScoreMismatch ? "Abweichung" : "Dein Score"}</div>}
               </div>
             </div>
             <div className="mb-3 flex items-center justify-between">
@@ -1350,13 +1401,13 @@ export default function LordOfTheHolesPWA() {
             <div className={cls("rounded-2xl border bg-amber-50/5 p-4", hasScoreMismatch ? "border-red-500/70 ring-1 ring-red-500/40" : "border-amber-700/40")}>
               {myCurrentPlayer && (
                 <div className="mb-3 grid grid-cols-2 gap-2 rounded-2xl border border-amber-700/30 bg-black/25 p-1.5">
-                  <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasScoreMismatch && "ring-1 ring-red-400/60")}>Spieler {hasScoreMismatch ? "⚠" : ""}</button>
-                  <button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasScoreMismatch && "ring-1 ring-red-400/60")}>Zähler {hasScoreMismatch ? "⚠" : ""}</button>
+                  <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/60")}>Spieler {hasSelectedPlayerScoreMismatch ? "⚠" : ""}</button>
+                  <button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasOwnScoreMismatch && "ring-1 ring-red-400/60")}>Zähler {hasOwnScoreMismatch ? "⚠" : ""}</button>
                 </div>
               )}
               {scoreMismatchMessage && (
                 <div className="mb-3 rounded-2xl border border-red-500/50 bg-red-950/40 p-2.5 text-sm text-red-100">
-                  Achtung: Spieler- und Zähler-Score unterscheiden sich. {scoreMismatchMessage}
+                  Achtung: Offizieller Score und Eigenkontrolle unterscheiden sich. {visibleScoreMismatchMessage}
                 </div>
               )}
               <div className="mb-3 flex items-center justify-between gap-2"><span className="font-serif text-lg text-amber-200">{getPlayerLabel(entryPlayer)} · Loch {activeHole}</span><span className="text-[11px] text-amber-100/65">Vorgabe <b className="text-amber-200 tracking-[0.18em]">{formatShotMarks(entryPlayerShotsOnActiveHole)}</b></span></div>
@@ -1382,9 +1433,9 @@ export default function LordOfTheHolesPWA() {
               </div>
               <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 text-amber-100">Zurück</Button><Button disabled={activeHole === 18 || !hasCurrentScore || scoreSaveInFlight} onClick={goToNextHole} className="rounded-2xl bg-amber-600 text-amber-50 disabled:opacity-50">{scoreSaveInFlight ? "Speichere ..." : "Nächstes Loch"}</Button></div>
               {!isScorerEntryMode ? (
-                <div className="mt-3 rounded-2xl border border-amber-700/30 bg-black/25 p-2.5"><label className="mb-1 block text-sm text-amber-100/80">Spieler</label><select value={scoredPlayerId} onChange={(e) => setScoredPlayerId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2.5 text-amber-50">{scoreablePlayers.map((p) => <option key={p.id} value={p.id}>{String(p.id) === String(scoredPlayerId) && hasScoreMismatch ? "⚠ " : ""}{getPlayerLabel(p)}</option>)}</select></div>
+                <div className="mt-3 rounded-2xl border border-amber-700/30 bg-black/25 p-2.5"><label className="mb-1 block text-sm text-amber-100/80">Spieler</label><select value={scoredPlayerId} onChange={(e) => setScoredPlayerId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2.5 text-amber-50">{scoreablePlayers.map((p) => <option key={p.id} value={p.id}>{String(p.id) === String(scoredPlayerId) && hasSelectedPlayerScoreMismatch ? "⚠ " : ""}{getPlayerLabel(p)}</option>)}</select></div>
               ) : (
-                <div className="mt-3 rounded-2xl border border-amber-700/30 bg-black/25 p-2.5 text-sm text-amber-100/80">Zähler: <b className={cls("text-amber-200", hasScoreMismatch && "text-red-200")}>{hasScoreMismatch ? "⚠ " : ""}{getPlayerLabel(myCurrentPlayer)}</b></div>
+                <div className="mt-3 rounded-2xl border border-amber-700/30 bg-black/25 p-2.5 text-sm text-amber-100/80">Zähler: <b className={cls("text-amber-200", hasScoreMismatch && "text-red-200")}>{hasOwnScoreMismatch ? "⚠ " : ""}{getPlayerLabel(myCurrentPlayer)}</b></div>
               )}
             </div>
           </CardContent>
