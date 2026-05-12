@@ -1159,7 +1159,6 @@ function LordOfTheHolesApp() {
       <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-1 pt-2">
         <div className="mb-1 flex items-center justify-end gap-2"><button type="button" onClick={() => setMenuOpen((value) => !value)} className="rounded-xl border border-amber-700/40 bg-black/45 px-2.5 py-1 text-base leading-none text-amber-100 shadow-lg shadow-black/40 backdrop-blur-sm" aria-label="Menü öffnen">☰</button></div>
         <div className="relative text-center">
-          <p className="mx-auto inline-flex rounded-full border border-amber-500/30 bg-black/45 px-2.5 py-0.5 text-[11px] font-semibold text-amber-100/85 shadow-lg shadow-black/40 backdrop-blur-sm">{subtitle}</p>
           {menuOpen ? <div className="absolute right-0 top-[42px] z-30 w-64 overflow-hidden rounded-2xl border border-amber-700/40 bg-stone-950/95 text-left shadow-2xl shadow-black/70 backdrop-blur">{[["current", "Aktuelle Runde"], ["tournament", "Turnier"], ["archive", "Scorekarten"], ["fun", "Mittelerde"], ["settings", "Einstellungen"], ["admin", "Admin"]].map(([value, label]) => <button key={value} type="button" onClick={() => setMainMenuAndView(value)} className={cls("block w-full border-b border-amber-700/20 px-4 py-3 text-left text-sm last:border-b-0", mainMenu === value ? "bg-amber-600 text-amber-50" : "bg-transparent text-amber-100")}>{label}</button>)}</div> : null}
         </div>
         <div className="mt-1 flex justify-center"><div className="inline-flex items-center gap-1.5 rounded-full border border-amber-700/40 bg-black/35 px-2 py-0.5 text-[10px] text-amber-100/75"><Icon size={14} className={connectionStatus === "online" ? "text-emerald-300" : "text-red-300"}>{connectionStatus === "online" ? "●" : "○"}</Icon><span>{pendingScores.length ? `${pendingScores.length} Score${pendingScores.length === 1 ? "" : "s"} offen` : connectionStatus === "online" ? "Datenbank verbunden" : "Datenbank nicht verbunden"}</span></div></div>
@@ -1221,6 +1220,7 @@ function LordOfTheHolesApp() {
                 <div>
                   <div className="text-[10px] uppercase tracking-[0.18em] text-amber-300/75">Aktuell gespielt</div>
                   <div className="font-serif text-base leading-tight text-amber-200">{displayedActiveRound?.round_name || "Runde 1"}</div>
+                  <div className="text-[10px] text-amber-100/70">{getRoundChapterLabel(displayedActiveRound).replace(`${displayedActiveRound?.round_name || ""} · `, "")}</div>
                   <div className="text-[10px] text-amber-100/65">{activeCourse?.course_name || "Kein Kurs ausgewählt"}</div>
                 </div>
                 {hasScoreMismatch ? (
