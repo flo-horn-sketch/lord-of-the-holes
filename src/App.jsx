@@ -667,8 +667,8 @@ function TournamentStandings({ players, rounds, holes, scores, activeRoundId = "
   const isFinalActive = String(activeRoundId) === String(finalRound?.round_id || "r4");
 
   return (
-    <Card className="mb-3 rounded-2xl border-amber-700/40 bg-[#20170f]/90 shadow-xl">
-      <CardContent className="p-3">
+    <Card className="mb-3 rounded-2xl border-amber-700/40 bg-[#20170f]/90 shadow-xl landscape:rounded-xl">
+      <CardContent className="p-3 landscape:p-2">
         <div className="mb-3">
           <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Turnier</p>
           <h2 className="font-serif text-lg text-amber-200">{isFinalActive ? "Finalwertung Netto" : "Gesamtwertung Netto"}</h2>
@@ -833,10 +833,10 @@ function ScorecardArchive({ rounds, courses, players, roundPlayers, holes, score
     <Card className="mb-3 rounded-2xl border-amber-700/40 bg-[#20170f]/90 shadow-xl">
       <CardContent className="p-3">
         <div className="mb-3">
-          <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Archiv</p>
-          <h2 className="font-serif text-lg text-amber-200">Scorekarte je Spieler</h2>
+          <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Scorekarten</p>
+          <h2 className="font-serif text-lg text-amber-200">Klassische Scorekarte je Spieler</h2>
         </div>
-        <div className="mb-3 grid gap-2 rounded-xl border border-amber-700/30 bg-black/25 p-2.5">
+        <div className="mb-3 grid gap-2 rounded-xl border border-amber-700/30 bg-black/25 p-2.5 landscape:grid-cols-4 landscape:items-end landscape:gap-2">
           <label className="block text-sm text-amber-100/80">Runde</label>
           <select value={selectedRoundId} onChange={(e) => setSelectedRoundId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2.5 text-amber-50">
             {availableRounds.map((round) => <option key={round.round_id} value={round.round_id}>{archiveRoundLabel(round)}</option>)}
@@ -853,7 +853,7 @@ function ScorecardArchive({ rounds, courses, players, roundPlayers, holes, score
           <div className="rounded-2xl border border-amber-700/30 bg-amber-950/40 p-4 text-sm text-amber-100">Für diese Runde ist kein Spieler ausgewählt.</div>
         ) : (
           <>
-            <div className="mb-3 grid grid-cols-2 gap-2 text-center text-sm">
+            <div className="mb-3 grid grid-cols-2 gap-2 text-center text-sm landscape:grid-cols-6 landscape:text-xs">
               {[
                 ["Löcher", `${summary.played}/18`],
                 ["Schläge", summary.played ? summary.totalStrokes : "–"],
@@ -865,8 +865,8 @@ function ScorecardArchive({ rounds, courses, players, roundPlayers, holes, score
                 <div key={label} className="rounded-2xl bg-amber-50/5 p-2.5 text-amber-50"><div className="text-amber-100">{label}</div><b className="text-amber-200">{value}</b></div>
               ))}
             </div>
-            <div className="overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <table className="w-full min-w-[760px] border-collapse text-sm text-amber-50">
+            <div className="overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden landscape:rounded-xl">
+              <table className="w-full min-w-[760px] border-collapse text-sm text-amber-50 landscape:min-w-[1120px] landscape:text-xs">
                 <thead>
                   <tr className="text-left text-xs uppercase tracking-wider text-amber-100">
                     <th className="sticky left-0 z-10 bg-[#20170f] px-2.5 py-1.5">Loch</th>
@@ -1278,7 +1278,7 @@ function LordOfTheHolesApp() {
   }
 
   function renderHeader() {
-    const subtitle = mainMenu === "current" ? displayedActiveRound?.round_name || "Aktive Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Archiv" : mainMenu === "admin" ? "Admin" : "Einstellungen";
+    const subtitle = mainMenu === "current" ? displayedActiveRound?.round_name || "Aktive Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "admin" ? "Admin" : "Einstellungen";
     return (
       <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-3">
         <div className="mb-1 flex items-center justify-between gap-2">
@@ -1293,7 +1293,7 @@ function LordOfTheHolesApp() {
               {[
                 ["current", "Aktuelle Runde"],
                 ["tournament", "Turnier"],
-                ["archive", "Archiv"],
+                ["archive", "Scorekarten"],
                 ["settings", "Einstellungen"],
                 ["admin", "Admin"],
               ].map(([value, label]) => (
@@ -1508,8 +1508,10 @@ function LordOfTheHolesApp() {
 
   function renderArchiveView() {
     return (
-      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
-        <ScorecardArchive rounds={rounds} courses={courses} players={allPlayers} roundPlayers={roundPlayers} holes={allHoles} scores={officialAllScores} selectedCourseId={selectedCourseId} />
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
+        <div className="landscape:mx-auto landscape:max-w-none">
+          <ScorecardArchive rounds={rounds} courses={courses} players={allPlayers} roundPlayers={roundPlayers} holes={allHoles} scores={officialAllScores} selectedCourseId={selectedCourseId} />
+        </div>
       </motion.section>
     );
   }
