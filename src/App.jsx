@@ -1574,14 +1574,14 @@ function LordOfTheHolesApp() {
               <div className="rounded-2xl border border-amber-700/50 bg-black/30 p-3 text-right text-sm text-amber-50"><div className="text-amber-100">Par <b className="text-amber-200">{activeHoleData.par}</b></div><div className="text-amber-100">HCP <b className="text-amber-200">{activeHoleData.hcp}</b></div><div className="text-amber-100">{activeHoleData.meters} m</div></div>
             </div>
             {myCurrentStats ? (
-              <button type="button" onClick={goToHcpAdjustedBoard} className="mb-3 w-full rounded-xl border border-amber-700/30 bg-black/25 p-2.5 text-left transition active:scale-[0.99]">
+              <div className="mb-3 w-full rounded-xl border border-amber-700/30 bg-black/25 p-2.5 text-left">
                 <div className="mb-2 flex items-center justify-between gap-2"><div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Mein aktueller Stand</div><div className="font-serif text-sm text-amber-200">{getPlayerLabel(myCurrentStats)}</div></div>
                 <div className="grid grid-cols-2 gap-2 text-center text-sm">
-                  <div className="rounded-xl bg-amber-50/5 p-2 text-amber-50"><div className="text-amber-100">Strokes</div><b className="text-xl text-amber-200">{myCurrentStats.played ? myCurrentStats.hcpAdjustedTotal : "–"}</b><div className="mt-0.5 text-[11px] text-amber-100/70">Tatsächlich {myCurrentStats.played ? myCurrentStats.total : "–"} · Platz {myHcpAdjustedStrokeRank || "–"}</div></div>
+                  <button type="button" onClick={goToHcpAdjustedBoard} className="rounded-xl bg-amber-50/5 p-2 text-amber-50 transition active:scale-[0.99]"><div className="text-amber-100">Strokes</div><b className="text-xl text-amber-200">{myCurrentStats.played ? myCurrentStats.hcpAdjustedTotal : "–"}</b><div className="mt-0.5 text-[11px] text-amber-100/70">Tatsächlich {myCurrentStats.played ? myCurrentStats.total : "–"} · Platz {myHcpAdjustedStrokeRank || "–"}</div></button>
                   <button type="button" onClick={goToNetStablefordBoard} className="rounded-xl bg-amber-50/5 p-2 text-amber-50 transition active:scale-[0.99]"><div className="text-amber-100">Netto Stbl</div><b className="text-xl text-amber-200">{myCurrentStats.netStableford}</b><div className="mt-0.5 text-[11px] text-amber-100/70">SpV {Number(myCurrentStats.course_hcp || 0)} · Platz {myNetStablefordRank || "–"}</div></button>
                   
                 </div>
-              </button>
+              </div>
             ) : (
               <div className="mb-3 rounded-xl border border-amber-700/30 bg-black/20 p-2.5 text-xs text-amber-100/75">Unter Einstellungen kannst du festlegen, wer du bist. Danach erscheint hier dein aktueller Score.</div>
             )}
