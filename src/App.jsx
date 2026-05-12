@@ -2512,19 +2512,20 @@ function LordOfTheHolesApp() {
   }
 
   return (
-    <div
-      className="min-h-screen bg-black bg-cover bg-center bg-no-repeat text-amber-50"
-      style={{ backgroundImage: "url('/lord-bg.webp')" }}
-    >
+    <div className="min-h-screen bg-black text-amber-50">
+      <div
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/lord-bg.webp')" }}
+      />
       <div className="fixed inset-0 bg-black/45" />
       <div className="fixed inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.06),rgba(0,0,0,0.58)_38%,rgba(0,0,0,0.86)_100%)]" />
       {showSplash ? (
         <div className="fixed inset-0 z-[100] bg-black">
-          <img
-            src="/loading-screen.png"
-            alt="Lord of the Holes Golf Scoring"
-            className="h-full w-full object-cover"
+          <div
+            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+            style={{ backgroundImage: "url('/lord-bg.webp')" }}
           />
+          <div className="absolute inset-0 bg-black/20" />
           <div className="absolute inset-x-0 bottom-8 flex justify-center px-6 pb-[env(safe-area-inset-bottom)]">
             <button
               type="button"
