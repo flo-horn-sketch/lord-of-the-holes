@@ -587,7 +587,7 @@ function getMismatchesForHole(scores, roundId, holeNumber, players = []) {
         officialScore,
         controlScore,
         officialScorerId: String(officialScore?.scorer_player_id || "").trim(),
-        message: message ? `Abweichung · Loch ${holeNumber} · ${message}` : "",
+        message: message ? `Loch ${holeNumber} · ${message}` : "",
       };
     })
     .filter((item) => Boolean(item.message));
@@ -1660,7 +1660,7 @@ function LordOfTheHolesApp() {
               )}
               {visibleScoreMismatchMessage && (
                 <div className="mb-3 rounded-2xl border border-red-500/50 bg-red-950/40 p-2.5 text-sm text-red-100">
-                  Abweichung
+                  <span className="underline underline-offset-4">Abweichung</span>
                   <div className="mt-1 space-y-0.5">
                     {visibleScoreMismatchMessages.map((message) => (
                       <div key={message}>{message}</div>
