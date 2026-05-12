@@ -188,6 +188,20 @@ function findScoreForPlayerHole(scores, roundId, playerId, holeNumber, wantContr
   );
 }
 
+function formatBoolDiff(value) {
+  return normalizeBoolean(value) ? "Ja" : "Nein";
+}
+
+function formatScoreDiff(score) {
+  if (!score || score.strokes === "" || score.strokes == null) return "–";
+  return normalizeBoolean(score.picked_up) ? "X" : String(score.strokes);
+}
+
+function formatPuttsDiff(score) {
+  if (!score || score.putts_count === "" || score.putts_count == null) return "–";
+  return String(score.putts_count);
+}
+
 function getScoreMismatchMessage(officialScore, controlScore) {
   if (!officialScore || !controlScore) return "";
 
@@ -198,26 +212,25 @@ function getScoreMismatchMessage(officialScore, controlScore) {
 
   const differences = [];
 
-  if (Number(officialScore.strokes) !== Number(controlScore.strokes)) {
-    differences.push(`Schläge offiziell ${officialScore.strokes} / Eigen ${controlScore.strokes}`);
-  }
-
-  if (normalizeBoolean(officialScore.picked_up) !== normalizeBoolean(controlScore.picked_up)) {
-    differences.push("Strich unterschiedlich");
+  if (
+    Number(officialScore.strokes) !== Number(controlScore.strokes) ||
+    normalizeBoolean(officialScore.picked_up) !== normalizeBoolean(controlScore.picked_up)
+  ) {
+    differences.push(`Score: ${formatScoreDiff(officialScore)} ≠ ${formatScoreDiff(controlScore)}`);
   }
 
   if (normalizeBoolean(officialScore.lady) !== normalizeBoolean(controlScore.lady)) {
-    differences.push("Lady unterschiedlich");
+    differences.push(`Lady: ${formatBoolDiff(officialScore.lady)} ≠ ${formatBoolDiff(controlScore.lady)}`);
   }
 
   if (
     normalizeBoolean(officialScore.over_two_putts) !== normalizeBoolean(controlScore.over_two_putts) ||
     Number(officialScore.putts_count || 0) !== Number(controlScore.putts_count || 0)
   ) {
-    differences.push("Snake unterschiedlich");
+    differences.push(`Putts: ${formatPuttsDiff(officialScore)} ≠ ${formatPuttsDiff(controlScore)}`);
   }
 
-  return differences.length ? differences.join(" · ") : "";
+  return differences.join(" · ");
 }
 
 function getMismatchesForHole(scores, roundId, holeNumber, players = []) {
