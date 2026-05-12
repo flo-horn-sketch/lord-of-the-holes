@@ -512,16 +512,33 @@ function getScoreIdentityKey(score) {
   ].join("|");
 }
 
+function getScoreTimestamp(score) {
+  const time = Date.parse(score?.updated_at || "");
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function isNewerOrEqualScore(candidate, existing) {
+  return getScoreTimestamp(candidate) >= getScoreTimestamp(existing);
+}
+
 function mergeScoresPreservingPending(sheetScores = [], pendingScores = []) {
   const map = new Map();
+
   sheetScores.forEach((score) => {
     if (!score || !score.player_id || !score.hole_number) return;
     map.set(getScoreIdentityKey(score), normalizeScoreRecord(score));
   });
+
   pendingScores.forEach((score) => {
     if (!score || !score.player_id || !score.hole_number) return;
-    map.set(getScoreIdentityKey(score), normalizeScoreRecord(score));
+    const key = getScoreIdentityKey(score);
+    const existing = map.get(key);
+
+    if (!existing || isNewerOrEqualScore(score, existing)) {
+      map.set(key, normalizeScoreRecord(score));
+    }
   });
+
   return Array.from(map.values());
 }
 
@@ -1119,6 +1136,7 @@ function LordOfTheHolesApp() {
   const [scores, setScores] = useState(cachedState?.scores?.length ? cachedState.scores.map(normalizeScoreRecord) : []);
   const [allScores, setAllScores] = useState(cachedState?.allScores?.length ? cachedState.allScores.map(normalizeScoreRecord) : []);
   const [pendingScores, setPendingScores] = useState(() => readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord));
+  const pendingScoresRef = useRef(readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord));
   const [localHandicaps, setLocalHandicaps] = useState({});
   const [scoredPlayerId, setScoredPlayerId] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerId", "florian"));
   const [scoreEntryMode, setScoreEntryMode] = useState("player");
@@ -1252,13 +1270,15 @@ function LordOfTheHolesApp() {
   }, [scoredPlayerId]);
 
   useEffect(() => {
+    pendingScoresRef.current = pendingScores;
     writeLocalJson("lordOfTheHoles.pendingScores", pendingScores);
   }, [pendingScores]);
 
   useEffect(() => {
     if (!selectedActiveRoundId) return;
     const selectedRoundScores = allScores.filter((score) => String(score.round_id || "") === String(selectedActiveRoundId));
-    setScores(selectedRoundScores);
+    const selectedPendingScores = pendingScoresRef.current.filter((score) => String(score.round_id || "") === String(selectedActiveRoundId));
+    setScores(mergeScoresPreservingPending(selectedRoundScores, selectedPendingScores));
   }, [selectedActiveRoundId, allScores]);
 
   useEffect(() => {
@@ -1328,10 +1348,11 @@ function LordOfTheHolesApp() {
       setAllHoles(normalizeHoles(data.holes));
       const sheetAllScores = (data.scores || []).map(normalizeScoreRecord);
       const sheetActiveScores = (data.activeScores || []).map(normalizeScoreRecord);
-      const nextAllScores = mergeScoresPreservingPending(sheetAllScores, pendingScores);
+      const livePendingScores = pendingScoresRef.current;
+      const nextAllScores = mergeScoresPreservingPending(sheetAllScores, livePendingScores);
       const nextActiveScores = mergeScoresPreservingPending(
         sheetActiveScores,
-        pendingScores.filter((score) => String(score.round_id || "") === String(nextActiveRound?.round_id || ""))
+        livePendingScores.filter((score) => String(score.round_id || "") === String(nextActiveRound?.round_id || ""))
       );
       setAllScores(nextAllScores);
       setScores(nextActiveScores);
@@ -1374,13 +1395,28 @@ function LordOfTheHolesApp() {
   function addPendingScore(score) {
     setPendingScores((current) => {
       const key = getScoreIdentityKey(score);
-      const withoutExisting = current.filter((item) => getScoreIdentityKey(item) !== key);
-      return [...withoutExisting, normalizeScoreRecord(score)];
+      const nextPendingScores = [...current.filter((item) => getScoreIdentityKey(item) !== key), normalizeScoreRecord(score)];
+      pendingScoresRef.current = nextPendingScores;
+      writeLocalJson("lordOfTheHoles.pendingScores", nextPendingScores);
+      return nextPendingScores;
     });
   }
 
   function removePendingScore(score) {
-    setPendingScores((current) => current.filter((item) => getScoreIdentityKey(item) !== getScoreIdentityKey(score)));
+    setPendingScores((current) => {
+      const targetKey = getScoreIdentityKey(score);
+      const targetTimestamp = getScoreTimestamp(score);
+      const nextPendingScores = current.filter((item) => {
+        if (getScoreIdentityKey(item) !== targetKey) return true;
+
+        // Wichtig: Wenn inzwischen ein neuerer lokaler Score existiert,
+        // darf ein älterer erfolgreicher Speichervorgang ihn nicht entfernen.
+        return getScoreTimestamp(item) > targetTimestamp;
+      });
+      pendingScoresRef.current = nextPendingScores;
+      writeLocalJson("lordOfTheHoles.pendingScores", nextPendingScores);
+      return nextPendingScores;
+    });
   }
 
   async function savePendingScore(score) {
@@ -1398,10 +1434,11 @@ function LordOfTheHolesApp() {
   }
 
   async function flushPendingScores() {
-    if (!pendingScores.length) return true;
+    const livePendingScores = [...pendingScoresRef.current];
+    if (!livePendingScores.length) return true;
 
     let allSaved = true;
-    for (const pendingScore of pendingScores) {
+    for (const pendingScore of livePendingScores) {
       const saved = await savePendingScore(pendingScore);
       if (!saved) allSaved = false;
     }
