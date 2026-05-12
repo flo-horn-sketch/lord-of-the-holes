@@ -2033,6 +2033,12 @@ function LordOfTheHolesApp() {
                   }}
                 />
               </div>
+              <div className="mb-3">
+                <PuttStepper
+                  value={currentScore.putts_count}
+                  onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })}
+                />
+              </div>
               <div className="mb-3 rounded-2xl border border-amber-700/40 bg-black/25 p-2.5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -2041,12 +2047,6 @@ function LordOfTheHolesApp() {
                   </div>
                   <input type="checkbox" checked={normalizeBoolean(currentScore.lady)} onChange={(e) => saveScore({ lady: e.target.checked })} className="h-5 w-5 accent-amber-500" />
                 </div>
-              </div>
-              <div className="mb-3">
-                <PuttStepper
-                  value={currentScore.putts_count}
-                  onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })}
-                />
               </div>
               {scoreHintMessage ? <div className="mb-2 rounded-xl border border-amber-500/40 bg-amber-950/50 p-2 text-center text-xs font-semibold text-amber-100">{scoreHintMessage}</div> : null}
               <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 text-amber-100">Zurück</Button><Button disabled={activeHole === 18} onClick={goToNextHole} className={cls("rounded-2xl text-amber-50 disabled:opacity-50", hasCurrentScore ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>Loch {Math.min(18, Number(activeHole || 1) + 1)}</Button></div>
