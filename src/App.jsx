@@ -1240,7 +1240,113 @@ function LordOfTheHolesApp() {
   }
 
   function renderArchiveView() {
-    return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}><Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm"><CardContent className="p-3"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Scorekarten</p><div className="mt-0.5 text-sm font-semibold text-amber-300/85">Chroniken der Runde</div><h2 className="font-serif text-lg text-amber-200">Klassische Scorekarte je Spieler</h2><p className="mt-2 text-sm text-amber-100/70">Die ausführliche Scorekarte ist aktuell in der kompakten App-Ansicht reduziert. Nutze Board und Turnier für die aktuelle Auswertung.</p></CardContent></Card></motion.section>;
+    const scorecardPlayers = playersWithCurrentHandicaps.length ? playersWithCurrentHandicaps : visiblePlayers;
+    const scorecardHoles = holes.length ? holes : fallbackHoles.filter((hole) => String(hole.course_id) === String(displayCourseId));
+
+    return (
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
+        <div className="landscape:mx-auto landscape:max-w-none landscape:pb-6">
+          <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm">
+            <CardContent className="p-3">
+              <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Scorekarten</p>
+              <div className="mt-0.5 text-sm font-semibold text-amber-300/85">Chroniken der Runde</div>
+              <h2 className="font-serif text-lg text-amber-200">{displayedActiveRound?.round_name || "Aktive Runde"}</h2>
+              <p className="mt-1 text-sm text-amber-100/70">{activeCourse?.course_name || "Kurs"} · klassische Scorekarte je Spieler</p>
+            </CardContent>
+          </Card>
+
+          {scorecardPlayers.map((player) => {
+            const playerScores = scorecardHoles.map((hole) => {
+              const score = officialScores.find(
+                (item) =>
+                  String(item.round_id || "") === String(displayedActiveRound?.round_id || "") &&
+                  String(item.player_id || "") === String(player.id) &&
+                  Number(item.hole_number) === Number(hole.hole_number)
+              );
+              const shots = getShotsOnHole(player.course_hcp, hole.hcp);
+              const stableford = score ? getScoreStablefordPoints(score, hole.par, shots) : 0;
+              return { hole, score, shots, stableford };
+            });
+
+            const playedRows = playerScores.filter((row) => row.score && row.score.strokes !== "" && row.score.strokes != null);
+            const totalStrokes = playedRows.reduce((sum, row) => sum + Number(row.score?.strokes || 0), 0);
+            const totalPar = playedRows.reduce((sum, row) => sum + Number(row.hole?.par || 0), 0);
+            const totalPutts = playedRows.reduce((sum, row) => sum + Number(row.score?.putts_count || 0), 0);
+            const totalStableford = playedRows.reduce((sum, row) => sum + Number(row.stableford || 0), 0);
+            const hcpShots = playedRows.reduce((sum, row) => sum + Number(row.shots || 0), 0);
+            const adjustedStrokes = playedRows.length ? totalStrokes - hcpShots : null;
+
+            return (
+              <Card key={player.id} className="mb-3 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm">
+                <CardContent className="p-3">
+                  <div className="mb-3 flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-serif text-lg font-bold text-amber-200">{getPlayerLabel(player)}</div>
+                      <div className="text-xs text-amber-100/65">SpV {Number(player.course_hcp || 0)} · {playedRows.length}/18 Löcher</div>
+                    </div>
+                    <div className="rounded-2xl border border-amber-700/30 bg-black/25 px-3 py-2 text-right text-xs text-amber-100/80">
+                      <div>Strokes HCP</div>
+                      <b className="font-serif text-lg text-amber-300">{adjustedStrokes ?? "–"}</b>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <table className="w-full min-w-[760px] border-collapse text-xs text-amber-50 landscape:min-w-0 landscape:text-[11px]">
+                      <thead>
+                        <tr className="text-left uppercase tracking-wider text-amber-100/80">
+                          <th className="px-2 py-1.5">Loch</th>
+                          {scorecardHoles.map((hole) => <th key={hole.hole_number} className="px-2 py-1.5 text-center">{hole.hole_number}</th>)}
+                          <th className="px-2 py-1.5 text-center">Σ</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-t border-amber-700/20">
+                          <td className="px-2 py-1.5 font-semibold text-amber-100">Par</td>
+                          {scorecardHoles.map((hole) => <td key={hole.hole_number} className="px-2 py-1.5 text-center">{hole.par}</td>)}
+                          <td className="px-2 py-1.5 text-center font-bold text-amber-200">{scorecardHoles.reduce((sum, hole) => sum + Number(hole.par || 0), 0)}</td>
+                        </tr>
+                        <tr className="border-t border-amber-700/20">
+                          <td className="px-2 py-1.5 font-semibold text-amber-100">Score</td>
+                          {playerScores.map(({ hole, score }) => (
+                            <td key={hole.hole_number} className="px-2 py-1.5 text-center font-bold text-amber-200">
+                              {score ? normalizeBoolean(score.picked_up) ? "X" : score.strokes || "–" : "–"}
+                            </td>
+                          ))}
+                          <td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? totalStrokes : "–"}</td>
+                        </tr>
+                        <tr className="border-t border-amber-700/20">
+                          <td className="px-2 py-1.5 font-semibold text-amber-100">Putts</td>
+                          {playerScores.map(({ hole, score }) => (
+                            <td key={hole.hole_number} className="px-2 py-1.5 text-center">{score?.putts_count ?? "–"}</td>
+                          ))}
+                          <td className="px-2 py-1.5 text-center font-bold text-amber-200">{playedRows.length ? totalPutts : "–"}</td>
+                        </tr>
+                        <tr className="border-t border-amber-700/20">
+                          <td className="px-2 py-1.5 font-semibold text-amber-100">Netto Stbl</td>
+                          {playerScores.map(({ hole, score, stableford }) => (
+                            <td key={hole.hole_number} className="px-2 py-1.5 text-center">{score ? stableford : "–"}</td>
+                          ))}
+                          <td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? totalStableford : "–"}</td>
+                        </tr>
+                        <tr className="border-t border-amber-700/20">
+                          <td className="px-2 py-1.5 font-semibold text-amber-100">+/−</td>
+                          {playerScores.map(({ hole, score }) => {
+                            const played = Boolean(score && score.strokes !== "" && score.strokes != null);
+                            const diff = played ? Number(score.strokes || 0) - Number(hole.par || 0) : null;
+                            return <td key={hole.hole_number} className="px-2 py-1.5 text-center">{formatToPar(diff, played)}</td>;
+                          })}
+                          <td className="px-2 py-1.5 text-center font-bold text-amber-200">{formatToPar(totalStrokes - totalPar, playedRows.length > 0)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </motion.section>
+    );
   }
 
   function renderActiveView() {
