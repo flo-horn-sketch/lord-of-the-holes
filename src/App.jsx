@@ -1770,6 +1770,9 @@ function LordOfTheHolesApp() {
         {renderStatusMessages()}
         {renderCurrentTabs()}
         {renderActiveView()}
+        <footer className="pb-4 pt-2 text-center text-[10px] uppercase tracking-[0.18em] text-amber-100/35">
+          © Lord of the Holes Association
+        </footer>
       </main>
       {setupSavedMessage ? (
         <div className="fixed inset-x-3 top-4 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/50 bg-emerald-950/95 p-3 text-emerald-50 shadow-2xl shadow-black/60 backdrop-blur">
