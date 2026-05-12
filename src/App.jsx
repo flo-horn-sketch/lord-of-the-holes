@@ -716,18 +716,26 @@ function getScoreRelationLabel(score, par) {
 
 function ScoreStepper({ value, par, pickedUpStrokes, onChange }) {
   const displayScore = value === "" || value == null ? Number(par || 4) : value;
+  const isPickedValue = Number(displayScore) === 0 || Number(displayScore) >= Number(pickedUpStrokes || 0);
   const relationLabel = getScoreRelationLabel(displayScore, par);
+  const effectiveStatus =
+    value === "" || value == null
+      ? ""
+      : isPickedValue
+        ? `X · gewertet ${pickedUpStrokes}`
+        : relationLabel;
+
   return (
     <TouchStepper
       label="Score"
       value={value}
       min={0}
-      max={12}
+      max={30}
       emptyLabel={String(par || 4)}
       defaultValue={Number(par || 4)}
       helper=""
-      status={value === "" || value == null ? "" : relationLabel}
-      formatValue={(nextValue) => (Number(nextValue) === 0 ? "–" : nextValue)}
+      status={effectiveStatus}
+      formatValue={(nextValue) => (Number(nextValue) === 0 ? "X" : nextValue)}
       onChange={onChange}
     />
   );
