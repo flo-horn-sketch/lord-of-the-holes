@@ -1386,6 +1386,7 @@ function LordOfTheHolesApp() {
   const [setupSavedMessage, setSetupSavedMessage] = useState("");
   const [backupSavedMessage, setBackupSavedMessage] = useState("");
   const [scoreHintMessage, setScoreHintMessage] = useState("");
+  const [showSplash, setShowSplash] = useState(true);
 
   const displayedActiveRound =
     (selectedActiveRoundId && (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(selectedActiveRoundId))) ||
@@ -1522,6 +1523,11 @@ function LordOfTheHolesApp() {
       cachedAt: new Date().toISOString(),
     });
   }, [players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setShowSplash(false), 1400);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!autoSync) return undefined;
@@ -2130,6 +2136,22 @@ function LordOfTheHolesApp() {
   return (
     <div className="min-h-screen bg-stone-950 text-amber-50">
       <div className="fixed inset-0 bg-[radial-gradient(circle_at_30%_10%,rgba(245,158,11,0.22),transparent_35%),radial-gradient(circle_at_80%_15%,rgba(220,38,38,0.18),transparent_30%),linear-gradient(180deg,rgba(0,0,0,0.25),rgba(0,0,0,0.9))]" />
+      {showSplash ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-stone-950">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.94, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            className="flex flex-col items-center px-8 text-center"
+          >
+            <div className="mb-4 rounded-[2rem] border border-amber-500/35 bg-black/40 p-2 shadow-2xl shadow-amber-950/40">
+              <img src="/apple-touch-icon.png" alt="Lord of the Holes" className="h-28 w-28 rounded-[1.5rem] object-cover" />
+            </div>
+            <div className="font-serif text-2xl font-black tracking-wide text-amber-300 drop-shadow">Lord of the Holes</div>
+            <div className="mt-1 text-[10px] uppercase tracking-[0.22em] text-amber-100/60">Association Scoring</div>
+          </motion.div>
+        </div>
+      ) : null}
       <main className="relative mx-auto max-w-md px-3 py-3">
         {renderHeader()}
         {renderStatusMessages()}
