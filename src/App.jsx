@@ -1655,7 +1655,14 @@ function LordOfTheHolesApp() {
     [allPlayers, rounds, allHoles, officialAllScores, roundPlayers, roundHonorDismissedKeys]
   );
   const simulatedRoundHonorCelebration = useMemo(() => {
-    const standings = hcpAdjustedStrokeLeaderboard.filter((player) => player.played > 0);
+    const scoredStandings = hcpAdjustedStrokeLeaderboard.filter((player) => player.played > 0);
+    const fallbackStandings = playersWithCurrentHandicaps.map((player, index) => ({
+      ...player,
+      played: 18,
+      hcpAdjustedStrokes: 70 + index,
+      hcpAdjustedTotal: 70 + index,
+    }));
+    const standings = scoredStandings.length ? scoredStandings : fallbackStandings;
     if (!standings.length) return null;
 
     const roundOrder = Number(displayedActiveRound?.sort_order || 1);
@@ -1670,7 +1677,7 @@ function LordOfTheHolesApp() {
       lords: standings.slice(0, lordCount),
       butlers: standings.slice(-butlerCount).reverse(),
     };
-  }, [hcpAdjustedStrokeLeaderboard, displayedActiveRound]);
+  }, [hcpAdjustedStrokeLeaderboard, playersWithCurrentHandicaps, displayedActiveRound]);
   const displayedRoundHonorCelebration = forceRoundHonorPopupOpen ? simulatedRoundHonorCelebration : roundHonorCelebration;
   const finalWinnerPopupKey = finalWinnerCelebration ? `${finalWinnerCelebration.roundId}_${finalWinnerCelebration.winner?.id || "winner"}` : "";
   const displayedWinnerCelebration = finalWinnerCelebration;
