@@ -1370,6 +1370,8 @@ function LordOfTheHolesApp() {
   const [setupSavedMessage, setSetupSavedMessage] = useState("");
   const [backupSavedMessage, setBackupSavedMessage] = useState("");
   const [scoreHintMessage, setScoreHintMessage] = useState("");
+  const [clearScoresConfirmOpen, setClearScoresConfirmOpen] = useState(false);
+  const [clearScoresSaving, setClearScoresSaving] = useState(false);
 
   const displayedActiveRound =
     (selectedActiveRoundId && (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(selectedActiveRoundId))) ||
@@ -1721,6 +1723,29 @@ function LordOfTheHolesApp() {
     }
   }
 
+  async function clearAllScores() {
+    setClearScoresSaving(true);
+    setError("");
+
+    try {
+      await callSheetApi({ action: "clearScores" });
+      setScores([]);
+      setAllScores([]);
+      setPendingScores([]);
+      pendingScoresRef.current = [];
+      writeLocalJson("lordOfTheHoles.pendingScores", []);
+      setConnectionStatus("online");
+      setClearScoresConfirmOpen(false);
+      setBackupSavedMessage("");
+      setSetupSavedMessage("Alle Scores wurden gelöscht. Backups bleiben erhalten.");
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Scores konnten nicht gelöscht werden.");
+    } finally {
+      setClearScoresSaving(false);
+    }
+  }
+
   async function saveFullSetup() {
     setBackupSavedMessage("");
     setSetupSavedMessage("");
@@ -1918,6 +1943,7 @@ function LordOfTheHolesApp() {
             </div>
             <Button disabled={!isAdminUnlocked || setupSaving} onClick={saveFullSetup} className="mt-3 w-full rounded-2xl bg-amber-600 text-amber-50 disabled:opacity-50">{setupSaving ? "Speichere ..." : "Admin-Einstellungen speichern"}</Button>
             <Button disabled={!isAdminUnlocked || backupSaving} onClick={createRoundBackup} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-700/80 text-emerald-50 disabled:opacity-50">{backupSaving ? "Erstelle Backup ..." : "Backup für aktive Runde erstellen"}</Button>
+            <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={() => setClearScoresConfirmOpen(true)} className="mt-2 w-full rounded-2xl border border-red-500/50 bg-red-950/60 text-red-100 disabled:opacity-50">Scores löschen</Button>
           </CardContent>
         </Card>
       </motion.section>
@@ -2156,6 +2182,34 @@ function LordOfTheHolesApp() {
             >
               ×
             </button>
+          </div>
+        </div>
+      ) : null}
+      {clearScoresConfirmOpen ? (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-red-500/60 bg-stone-950 p-4 text-red-50 shadow-2xl shadow-black/70">
+            <div className="font-serif text-xl text-red-100">Alle Scores löschen?</div>
+            <p className="mt-2 text-sm text-red-100/80">
+              Dadurch werden alle Einträge im Tab Scores gelöscht. Backup-Tabs bleiben erhalten.
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={clearScoresSaving}
+                onClick={() => setClearScoresConfirmOpen(false)}
+                className="rounded-2xl border border-amber-700/40 bg-stone-900 px-3 py-3 text-sm font-bold text-amber-100 disabled:opacity-50"
+              >
+                Abbrechen
+              </button>
+              <button
+                type="button"
+                disabled={clearScoresSaving}
+                onClick={clearAllScores}
+                className="rounded-2xl border border-red-400/60 bg-red-700 px-3 py-3 text-sm font-bold text-red-50 disabled:opacity-50"
+              >
+                {clearScoresSaving ? "Lösche ..." : "Ja, Scores löschen"}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
