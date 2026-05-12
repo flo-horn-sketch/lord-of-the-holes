@@ -1072,7 +1072,7 @@ function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", hel
           type="button"
           onClick={() => setValue(baseValue - 1)}
           disabled={baseValue <= min}
-          className="h-12 rounded-xl border border-amber-700/50 bg-stone-950 text-xl font-black leading-none text-amber-100 disabled:opacity-35"
+          className="h-12 rounded-xl border border-amber-700/50 bg-stone-950 text-lg font-black leading-none text-amber-100 disabled:opacity-35"
           aria-label={`${label} verringern`}
         >
           −
@@ -1092,7 +1092,7 @@ function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", hel
           type="button"
           onClick={() => setValue(baseValue + 1)}
           disabled={baseValue >= max}
-          className="h-12 rounded-xl border border-amber-700/50 bg-stone-950 text-xl font-black leading-none text-amber-100 disabled:opacity-35"
+          className="h-12 rounded-xl border border-amber-700/50 bg-stone-950 text-lg font-black leading-none text-amber-100 disabled:opacity-35"
           aria-label={`${label} erhöhen`}
         >
           +
@@ -2136,13 +2136,24 @@ function LordOfTheHolesApp() {
   const activeRoundChapterLabel = getRoundChapterLabel(displayedActiveRound);
   const subtitle = mainMenu === "current" ? activeRoundChapterLabel : mainMenu === "tournament" ? activeRoundIsFinal ? "Turnier · Am Schicksalsberg" : "Turnier · Kapitel der Gefährten" : mainMenu === "archive" ? "Scorekarten · Chroniken der Runde" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "admin" ? "Admin" : "Einstellungen";
     return (
-      <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-2 pt-6"},{>
+      <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-2 pt-6">
         <div className="mb-2 flex items-center justify-end gap-2">
-          <button type="button" onClick={() => setMenuOpen((value) => !value)} className="rounded-xl border border-amber-700/40 bg-black/45 px-3 py-1.5 text-lg leading-none text-amber-100 shadow-lg shadow-black/40 backdrop-blur-sm" aria-label="Menü öffnen">☰</button>
+          <button
+            type="button"
+            onClick={() => setMenuOpen((value) => !value)}
+            className="rounded-xl border border-amber-700/40 bg-black/45 px-3 py-1.5 text-lg leading-none text-amber-100 shadow-lg shadow-black/40 backdrop-blur-sm"
+            aria-label="Menü öffnen"
+          >
+            ☰
+          </button>
         </div>
+
         <div className="relative text-center">
-          <p className="mx-auto inline-flex rounded-full border border-amber-500/30 bg-black/45 px-3 py-1 text-xs font-semibold text-amber-100/85 shadow-lg shadow-black/40 backdrop-blur-sm">{subtitle}</p>
-          {menuOpen && (
+          <p className="mx-auto inline-flex rounded-full border border-amber-500/30 bg-black/45 px-3 py-1 text-xs font-semibold text-amber-100/85 shadow-lg shadow-black/40 backdrop-blur-sm">
+            {subtitle}
+          </p>
+
+          {menuOpen ? (
             <div className="absolute right-0 top-[42px] z-30 w-64 overflow-hidden rounded-2xl border border-amber-700/40 bg-stone-950/95 text-left shadow-2xl shadow-black/70 backdrop-blur">
               {[
                 ["current", "Aktuelle Runde"],
@@ -2152,15 +2163,34 @@ function LordOfTheHolesApp() {
                 ["settings", "Einstellungen"],
                 ["admin", "Admin"],
               ].map(([value, label]) => (
-                <button key={value} type="button" onClick={() => setMainMenuAndView(value)} className={cls("block w-full border-b border-amber-700/20 px-4 py-3 text-left text-sm last:border-b-0", mainMenu === value ? "bg-amber-600 text-amber-50" : "bg-transparent text-amber-100")}>{label}</button>
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setMainMenuAndView(value)}
+                  className={cls(
+                    "block w-full border-b border-amber-700/20 px-4 py-3 text-left text-sm last:border-b-0",
+                    mainMenu === value ? "bg-amber-600 text-amber-50" : "bg-transparent text-amber-100"
+                  )}
+                >
+                  {label}
+                </button>
               ))}
             </div>
-          )}
+          ) : null}
         </div>
+
         <div className="mt-2 flex justify-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-amber-700/40 bg-black/35 px-2 py-1 text-[11px] text-amber-100/75">
-            <Icon size={14} className={connectionStatus === "online" ? "text-emerald-300" : "text-red-300"}>{connectionStatus === "online" ? "●" : "○"}</Icon>
-            {pendingScores.length ? `${pendingScores.length} Score${pendingScores.length === 1 ? "" : "s"} offen` : connectionStatus === "online" ? "Datenbank verbunden" : "Datenbank nicht verbunden"}
+            <Icon size={14} className={connectionStatus === "online" ? "text-emerald-300" : "text-red-300"}>
+              {connectionStatus === "online" ? "●" : "○"}
+            </Icon>
+            <span>
+              {pendingScores.length
+                ? `${pendingScores.length} Score${pendingScores.length === 1 ? "" : "s"} offen`
+                : connectionStatus === "online"
+                  ? "Datenbank verbunden"
+                  : "Datenbank nicht verbunden"}
+            </span>
           </div>
         </div>
       </motion.header>
@@ -2589,13 +2619,13 @@ function LordOfTheHolesApp() {
             <div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.28),transparent_45%),linear-gradient(180deg,rgba(120,53,15,0.55),rgba(12,10,9,1))] p-5">
               <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-amber-300/50 bg-black/30 text-3xl shadow-xl shadow-amber-950/40">⚜</div>
               <div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/70">{displayedRoundHonorCelebration.roundName} beendet</div>
-              <div className="mt-2 font-serif text-xl font-black text-amber-200">Gondors Erlass</div>
+              <div className="mt-2 font-serif text-lg font-black text-amber-200">Gondors Erlass</div>
               <div className="mt-1 text-sm text-amber-100/70">Die Runde ist gespielt. Der Hofstaat wird neu geordnet.</div>
-              <div className="mt-3 rounded-2xl border border-amber-300/40 bg-amber-500/10 p-3 text-sm font-semibold text-amber-50">
+              <div className="mt-2 rounded-2xl border border-amber-300/40 bg-amber-500/10 p-3 text-sm font-semibold text-amber-50">
                 {roundHonorPersonalMessage}
               </div>
 
-              <div className="mt-3 rounded-2xl border border-amber-500/35 bg-black/25 p-3 text-left">
+              <div className="mt-2 rounded-2xl border border-amber-500/35 bg-black/25 p-3 text-left">
                 <div className="text-xs uppercase tracking-[0.22em] text-amber-300/75">
                   {displayedRoundHonorCelebration.lords.length === 1 ? "Herr von Gondor" : "Herren von Gondor"}
                 </div>
@@ -2651,7 +2681,7 @@ function LordOfTheHolesApp() {
             <div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.28),transparent_45%),linear-gradient(180deg,rgba(120,53,15,0.55),rgba(12,10,9,1))] p-5">
               <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-amber-300/50 bg-black/30 text-3xl shadow-xl shadow-amber-950/40">♛</div>
               <div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/70">Finale beendet</div>
-              <div className="mt-2 font-serif text-xl font-black text-amber-200">Lord of the Holes 2026 ist</div>
+              <div className="mt-2 font-serif text-lg font-black text-amber-200">Lord of the Holes 2026 ist</div>
               <div className="mt-2 font-serif text-4xl font-black text-amber-300 drop-shadow">{displayedWinnerCelebration?.winnerName}</div>
               <div className="mt-2 text-sm text-amber-100/70">{displayedWinnerCelebration?.winnerLabel}</div>
               <div className="mt-2 rounded-2xl border border-amber-500/35 bg-black/25 p-2 text-sm text-amber-100">
@@ -2682,7 +2712,7 @@ function LordOfTheHolesApp() {
                 Fehler: {clearScoresError}
               </div>
             ) : null}
-            <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="mt-2 grid grid-cols-2 gap-2">
               <button
                 type="button"
                 disabled={clearScoresSaving}
