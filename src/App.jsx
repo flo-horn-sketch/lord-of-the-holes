@@ -380,6 +380,135 @@ function sortLadyCounts(stats) {
   return [...(stats || [])].sort((a, b) => Number(b.ladyCount || 0) - Number(a.ladyCount || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
 }
 
+function getScoreDiffToPar(score, hole) {
+  if (!score || score.strokes === "" || score.strokes == null) return null;
+  return Number(score.strokes || 0) - Number(hole?.par || 0);
+}
+
+function buildFunPlayerStats(players, holes, scores) {
+  return (players || []).map((player) => {
+    const playerScores = (scores || []).filter((score) => String(score.player_id) === String(player.id) && score.strokes !== "" && score.strokes != null);
+    const enrichedScores = playerScores.map((score) => {
+      const hole = (holes || []).find((item) => Number(item.hole_number) === Number(score.hole_number));
+      return { score, hole, diff: getScoreDiffToPar(score, hole) };
+    }).filter((item) => item.hole);
+
+    const frontScores = enrichedScores.filter((item) => Number(item.hole.hole_number) <= 9);
+    const backScores = enrichedScores.filter((item) => Number(item.hole.hole_number) > 9);
+    const frontTotal = frontScores.length ? frontScores.reduce((sum, item) => sum + Number(item.score.strokes || 0), 0) : null;
+    const backTotal = backScores.length ? backScores.reduce((sum, item) => sum + Number(item.score.strokes || 0), 0) : null;
+    const frontPar = frontScores.length ? frontScores.reduce((sum, item) => sum + Number(item.hole.par || 0), 0) : null;
+    const backPar = backScores.length ? backScores.reduce((sum, item) => sum + Number(item.hole.par || 0), 0) : null;
+    const frontToPar = frontTotal == null || frontPar == null ? null : frontTotal - frontPar;
+    const backToPar = backTotal == null || backPar == null ? null : backTotal - backPar;
+    const backMinusFront = frontToPar == null || backToPar == null ? null : backToPar - frontToPar;
+
+    const birdies = enrichedScores.filter((item) => item.diff === -1 && !normalizeBoolean(item.score.picked_up)).length;
+    const eaglesOrBetter = enrichedScores.filter((item) => item.diff != null && item.diff <= -2 && !normalizeBoolean(item.score.picked_up)).length;
+    const pars = enrichedScores.filter((item) => item.diff === 0 && !normalizeBoolean(item.score.picked_up)).length;
+    const parOrBetter = enrichedScores.filter((item) => item.diff != null && item.diff <= 0 && !normalizeBoolean(item.score.picked_up)).length;
+    const doubleBogeyPlus = enrichedScores.filter((item) => item.diff != null && item.diff >= 2).length;
+    const triplePlus = enrichedScores.filter((item) => item.diff != null && item.diff >= 3).length;
+    const pickedUpCount = enrichedScores.filter((item) => normalizeBoolean(item.score.picked_up)).length;
+    const ladyCount = enrichedScores.filter((item) => normalizeBoolean(item.score.lady)).length;
+    const { threePutts, fourPlusPutts } = getPuttBuckets(playerScores);
+    const grossStableford = enrichedScores.reduce((sum, item) => sum + getScoreStablefordPoints(item.score, item.hole.par, 0), 0);
+    const netStableford = enrichedScores.reduce((sum, item) => {
+      const shots = getShotsOnHole(player.course_hcp, item.hole.hcp);
+      return sum + getScoreStablefordPoints(item.score, item.hole.par, shots);
+    }, 0);
+    const hcpBonus = netStableford - grossStableford;
+    const hcpShotsUsed = enrichedScores.reduce((sum, item) => sum + getShotsOnHole(player.course_hcp, item.hole.hcp), 0);
+
+    return {
+      ...withFallbackAlias(player),
+      played: enrichedScores.length,
+      birdies,
+      eaglesOrBetter,
+      pars,
+      parOrBetter,
+      doubleBogeyPlus,
+      triplePlus,
+      pickedUpCount,
+      ladyCount,
+      threePutts,
+      fourPlusPutts,
+      puttPenaltyEuro: threePutts * 2 + fourPlusPutts * 4,
+      frontTotal,
+      backTotal,
+      frontToPar,
+      backToPar,
+      backMinusFront,
+      grossStableford,
+      netStableford,
+      hcpBonus,
+      hcpShotsUsed,
+      pointsPerHcpShot: hcpShotsUsed ? Number((netStableford / hcpShotsUsed).toFixed(2)) : 0,
+    };
+  });
+}
+
+function buildFunHoleStats(players, holes, scores) {
+  return (holes || []).map((hole) => {
+    const holeScores = (scores || []).filter((score) => Number(score.hole_number) === Number(hole.hole_number) && score.strokes !== "" && score.strokes != null);
+    const played = holeScores.length;
+    const totalStrokes = holeScores.reduce((sum, score) => sum + Number(score.strokes || 0), 0);
+    const avgScore = played ? totalStrokes / played : 0;
+    const avgToPar = played ? avgScore - Number(hole.par || 0) : 0;
+    const birdies = holeScores.filter((score) => getScoreDiffToPar(score, hole) === -1 && !normalizeBoolean(score.picked_up)).length;
+    const pars = holeScores.filter((score) => getScoreDiffToPar(score, hole) === 0 && !normalizeBoolean(score.picked_up)).length;
+    const pickedUpCount = holeScores.filter((score) => normalizeBoolean(score.picked_up)).length;
+    const ladies = holeScores.filter((score) => normalizeBoolean(score.lady)).length;
+    const snakes = holeScores.filter((score) => normalizeBoolean(score.over_two_putts)).length;
+    return {
+      hole_number: hole.hole_number,
+      par: hole.par,
+      hcp: hole.hcp,
+      played,
+      avgScore,
+      avgToPar,
+      birdies,
+      pars,
+      pickedUpCount,
+      ladies,
+      snakes,
+    };
+  }).filter((item) => item.played > 0);
+}
+
+function buildScorerMismatchStats(mismatches, players) {
+  const playerMap = new Map((players || []).map((player) => [String(player.id), withFallbackAlias(player)]));
+  const stats = new Map();
+
+  (players || []).forEach((player) => {
+    stats.set(String(player.id), {
+      ...withFallbackAlias(player),
+      asPlayer: 0,
+      asScorer: 0,
+      total: 0,
+    });
+  });
+
+  (mismatches || []).forEach((item) => {
+    const playerId = String(item.playerId || "");
+    const scorerId = String(item.officialScorerId || "");
+    if (playerId) {
+      const current = stats.get(playerId) || { ...(playerMap.get(playerId) || { id: playerId, character_name: playerId }), asPlayer: 0, asScorer: 0, total: 0 };
+      current.asPlayer += 1;
+      current.total += 1;
+      stats.set(playerId, current);
+    }
+    if (scorerId) {
+      const current = stats.get(scorerId) || { ...(playerMap.get(scorerId) || { id: scorerId, character_name: scorerId }), asPlayer: 0, asScorer: 0, total: 0 };
+      current.asScorer += 1;
+      current.total += 1;
+      stats.set(scorerId, current);
+    }
+  });
+
+  return Array.from(stats.values()).sort((a, b) => Number(b.total || 0) - Number(a.total || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
+}
+
 function getQualificationRounds(rounds) {
   return (rounds?.length ? rounds : fallbackRounds)
     .filter((round) => String(round.stage || "qualification") === "qualification")
@@ -846,6 +975,86 @@ function LeaderboardTable({ title, players, columns }) {
         </table>
       </div>
     </div>
+  );
+}
+
+function FunTable({ title, subtitle = "", players, columns }) {
+  return (
+    <div className="mb-3 overflow-hidden rounded-2xl border border-amber-700/30 bg-black/20">
+      <div className="border-b border-amber-700/30 bg-amber-500/10 px-2.5 py-1.5">
+        <div className="font-serif text-lg text-amber-200">{title}</div>
+        {subtitle ? <div className="text-xs text-amber-100/60">{subtitle}</div> : null}
+      </div>
+      <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <table className="w-full min-w-[360px] border-collapse text-sm text-amber-50 landscape:min-w-[520px] landscape:text-xs">
+          <thead>
+            <tr className="text-left text-xs uppercase tracking-wider text-amber-100">
+              <th className="px-2.5 py-1.5">#</th>
+              <th className="px-2.5 py-1.5">Name</th>
+              {columns.map((column) => (
+                <th key={column.label} className="px-2.5 py-1.5 text-right">{column.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {players.map((item, index) => (
+              <tr key={item.id || item.hole_number || index} className="border-t border-amber-700/20">
+                <td className="px-2.5 py-1.5 text-amber-200/75">{index + 1}</td>
+                <td className="px-2.5 py-1.5 font-semibold text-amber-100">{item.hole_number ? `Loch ${item.hole_number}` : (item.character_name || item.display_name || item.id)}</td>
+                {columns.map((column) => (
+                  <td key={column.label} className={cls("px-2.5 py-1.5 text-right", column.emphasize && "font-serif text-lg text-amber-300")}>{column.render(item)}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function MiddleEarthTables({ players, holes, scores, mismatches }) {
+  const funPlayers = useMemo(() => buildFunPlayerStats(players, holes, scores), [players, holes, scores]);
+  const funHoles = useMemo(() => buildFunHoleStats(players, holes, scores), [players, holes, scores]);
+  const palantirStats = useMemo(() => buildScorerMismatchStats(mismatches, players), [mismatches, players]);
+
+  const snakeLords = [...funPlayers].sort((a, b) => Number(b.puttPenaltyEuro || 0) - Number(a.puttPenaltyEuro || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
+  const ladies = [...funPlayers].sort((a, b) => Number(b.ladyCount || 0) - Number(a.ladyCount || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
+  const whiteFlags = [...funPlayers].sort((a, b) => Number(b.pickedUpCount || 0) - Number(a.pickedUpCount || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
+  const parMachines = [...funPlayers].sort((a, b) => Number(b.parOrBetter || 0) - Number(a.parOrBetter || 0) || Number(b.pars || 0) - Number(a.pars || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
+  const birdieHunters = [...funPlayers].sort((a, b) => Number((b.birdies || 0) + (b.eaglesOrBetter || 0)) - Number((a.birdies || 0) + (a.eaglesOrBetter || 0)) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
+  const bogeyBunkers = [...funPlayers].sort((a, b) => Number(b.doubleBogeyPlus || 0) - Number(a.doubleBogeyPlus || 0) || Number(b.triplePlus || 0) - Number(a.triplePlus || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
+  const comebackKings = [...funPlayers].filter((p) => p.backMinusFront != null).sort((a, b) => Number(a.backMinusFront) - Number(b.backMinusFront));
+  const balrogFalls = [...funPlayers].filter((p) => p.backMinusFront != null).sort((a, b) => Number(b.backMinusFront) - Number(a.backMinusFront));
+  const hardestHoles = [...funHoles].sort((a, b) => Number(b.avgToPar || 0) - Number(a.avgToPar || 0));
+  const favoriteHoles = [...funHoles].sort((a, b) => Number(a.avgToPar || 0) - Number(b.avgToPar || 0));
+  const hcpRaiders = [...funPlayers].sort((a, b) => Number(b.hcpBonus || 0) - Number(a.hcpBonus || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
+  const mithrilMiners = [...funPlayers].sort((a, b) => Number(b.pointsPerHcpShot || 0) - Number(a.pointsPerHcpShot || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
+
+  return (
+    <Card className="mb-3 rounded-2xl border-amber-700/40 bg-[#20170f]/90 shadow-xl landscape:rounded-xl">
+      <CardContent className="p-3 landscape:p-2">
+        <div className="mb-3">
+          <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Mittelerde</p>
+          <h2 className="font-serif text-lg text-amber-200">Die Chroniken der Runde</h2>
+          <p className="mt-1 text-sm text-amber-100/65">Fun-Tabellen aus den Scores der aktuellen Runde.</p>
+        </div>
+
+        <FunTable title="Shelobs Putt-Kammer" subtitle="Snake-König der Runde" players={snakeLords} columns={[{ label: "3P", render: (p) => p.threePutts }, { label: "4+P", render: (p) => p.fourPlusPutts }, { label: "€", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} />
+        <FunTable title="Galadriels Spiegel" subtitle="Lady-Liga" players={ladies} columns={[{ label: "Ladys", render: (p) => p.ladyCount, emphasize: true }, { label: "Quote", render: (p) => p.played ? `${Math.round((p.ladyCount / p.played) * 100)} %` : "–" }]} />
+        <FunTable title="Die weißen Fahnen von Gondor" subtitle="Gestrichene Löcher" players={whiteFlags} columns={[{ label: "X", render: (p) => p.pickedUpCount, emphasize: true }, { label: "Quote", render: (p) => p.played ? `${Math.round((p.pickedUpCount / p.played) * 100)} %` : "–" }]} />
+        <FunTable title="Die Ents der Fairways" subtitle="Par oder besser" players={parMachines} columns={[{ label: "Par+", render: (p) => p.parOrBetter, emphasize: true }, { label: "Pars", render: (p) => p.pars }, { label: "Birdie+", render: (p) => p.birdies + p.eaglesOrBetter }]} />
+        <FunTable title="Die Adler von Manwë" subtitle="Birdie-Jäger" players={birdieHunters} columns={[{ label: "Eagle+", render: (p) => p.eaglesOrBetter }, { label: "Birdies", render: (p) => p.birdies }, { label: "Summe", render: (p) => p.birdies + p.eaglesOrBetter, emphasize: true }]} />
+        <FunTable title="Die Minen von Moria" subtitle="Doppelbogey oder schlimmer" players={bogeyBunkers} columns={[{ label: "DB+", render: (p) => p.doubleBogeyPlus, emphasize: true }, { label: "Triple+", render: (p) => p.triplePlus }, { label: "X", render: (p) => p.pickedUpCount }]} />
+        <FunTable title="Die Rückkehr des Königs" subtitle="Back Nine besser als Front Nine" players={comebackKings} columns={[{ label: "Front", render: (p) => formatToPar(p.frontToPar, p.frontToPar != null) }, { label: "Back", render: (p) => formatToPar(p.backToPar, p.backToPar != null) }, { label: "Swing", render: (p) => formatToPar(p.backMinusFront, p.backMinusFront != null), emphasize: true }]} />
+        <FunTable title="Der Balrog an Loch 10" subtitle="Back Nine schwerer als Front Nine" players={balrogFalls} columns={[{ label: "Front", render: (p) => formatToPar(p.frontToPar, p.frontToPar != null) }, { label: "Back", render: (p) => formatToPar(p.backToPar, p.backToPar != null) }, { label: "Absturz", render: (p) => formatToPar(p.backMinusFront, p.backMinusFront != null), emphasize: true }]} />
+        <FunTable title="Der Schicksalsberg" subtitle="Härtestes Loch des Feldes" players={hardestHoles} columns={[{ label: "Par", render: (h) => h.par }, { label: "Ø +/−", render: (h) => formatToPar(Math.round(h.avgToPar * 10) / 10, h.played), emphasize: true }, { label: "X", render: (h) => h.pickedUpCount }, { label: "Snake", render: (h) => h.snakes }]} />
+        <FunTable title="Bruchtal" subtitle="Lieblingsloch des Feldes" players={favoriteHoles} columns={[{ label: "Par", render: (h) => h.par }, { label: "Ø +/−", render: (h) => formatToPar(Math.round(h.avgToPar * 10) / 10, h.played), emphasize: true }, { label: "Birdies", render: (h) => h.birdies }, { label: "Pars", render: (h) => h.pars }]} />
+        <FunTable title="Gollums Netto-Schatz" subtitle="Netto minus Brutto Stableford" players={hcpRaiders} columns={[{ label: "Netto", render: (p) => p.netStableford }, { label: "Brutto", render: (p) => p.grossStableford }, { label: "Schatz", render: (p) => p.hcpBonus, emphasize: true }]} />
+        <FunTable title="Mithril pro Vorgabeschlag" subtitle="Netto-Punkte je erhaltenem Schlag" players={mithrilMiners} columns={[{ label: "SpV genutzt", render: (p) => p.hcpShotsUsed }, { label: "Netto", render: (p) => p.netStableford }, { label: "Quote", render: (p) => p.hcpShotsUsed ? p.pointsPerHcpShot : "–", emphasize: true }]} />
+        <FunTable title="Der Palantír" subtitle="Nur echte Abweichungen, wenn beide Scores vorhanden sind" players={palantirStats} columns={[{ label: "Als Spieler", render: (p) => p.asPlayer }, { label: "Als Zähler", render: (p) => p.asScorer }, { label: "Total", render: (p) => p.total, emphasize: true }]} />
+      </CardContent>
+    </Card>
   );
 }
 
@@ -1582,6 +1791,7 @@ function LordOfTheHolesApp() {
     if (value === "current") setView("score");
     if (value === "tournament") setView("tournament");
     if (value === "archive") setView("archive");
+    if (value === "fun") setView("fun");
     if (value === "settings") setView("handicaps");
     if (value === "admin") setView("admin");
   }
@@ -1596,7 +1806,7 @@ function LordOfTheHolesApp() {
   }
 
   function renderHeader() {
-    const subtitle = mainMenu === "current" ? displayedActiveRound?.round_name || "Aktive Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "admin" ? "Admin" : "Einstellungen";
+    const subtitle = mainMenu === "current" ? displayedActiveRound?.round_name || "Aktive Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "admin" ? "Admin" : "Einstellungen";
     return (
       <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-3">
         <div className="mb-1 flex items-center justify-between gap-2">
@@ -1612,6 +1822,7 @@ function LordOfTheHolesApp() {
                 ["current", "Aktuelle Runde"],
                 ["tournament", "Turnier"],
                 ["archive", "Scorekarten"],
+                ["fun", "Mittelerde"],
                 ["settings", "Einstellungen"],
                 ["admin", "Admin"],
               ].map(([value, label]) => (
@@ -1870,6 +2081,16 @@ function LordOfTheHolesApp() {
     );
   }
 
+  function renderFunView() {
+    return (
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
+        <div className="landscape:mx-auto landscape:max-w-none">
+          <MiddleEarthTables players={playersWithCurrentHandicaps} holes={holes} scores={officialScores} mismatches={roundMismatches} />
+        </div>
+      </motion.section>
+    );
+  }
+
   function renderArchiveView() {
     return (
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
@@ -1889,6 +2110,7 @@ function LordOfTheHolesApp() {
     if (view === "handicaps") return renderSettingsView();
     if (view === "score") return renderScoreView();
     if (view === "leaderboard") return renderLeaderboardView();
+    if (view === "fun") return renderFunView();
     return renderArchiveView();
   }
 
