@@ -802,6 +802,7 @@ function LordOfTheHolesApp() {
   const [winnerPopupDismissedKey, setWinnerPopupDismissedKey] = useState(() => readLocalJson("lordOfTheHoles.winnerPopupDismissedKey", ""));
   const [roundHonorDismissedKeys, setRoundHonorDismissedKeys] = useState(() => readLocalJson("lordOfTheHoles.roundHonorDismissedKeys", []));
   const [scorecardRoundId, setScorecardRoundId] = useState(() => readLocalJson("lordOfTheHoles.scorecardRoundId", ""));
+  const [roundSummaryDismissedKeys, setRoundSummaryDismissedKeys] = useState(() => readLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", []));
 
   const displayedActiveRound = (selectedActiveRoundId && (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(selectedActiveRoundId))) || activeRound || rounds.find((round) => String(round.status).toLowerCase() === "active") || fallbackRounds[0];
   const displayCourseId = displayedActiveRound?.course_id || selectedCourseId || "goethe";
@@ -861,7 +862,74 @@ function LordOfTheHolesApp() {
   const roundHonorCloseLabel = myRoundHonorRole === "lord" ? "Krone richten ×" : myRoundHonorRole === "shieldbearer" ? "Schild aufnehmen ×" : "Erlass zur Kenntnis nehmen ×";
   const finalWinnerPopupKey = finalWinnerCelebration ? `${finalWinnerCelebration.roundId}_${finalWinnerCelebration.winner?.id || "winner"}` : "";
   const showFinalWinnerPopup = Boolean(finalWinnerCelebration && finalWinnerPopupKey !== winnerPopupDismissedKey);
-  const activePopupSoundKey = showSplash ? "" : showFinalWinnerPopup ? `finalWinner:${finalWinnerPopupKey}` : displayedRoundHonorCelebration ? `roundHonor:${displayedRoundHonorCelebration.key}` : clearScoresConfirmOpen ? "clearScoresConfirm" : backupSavedMessage ? "backupSaved" : setupSavedMessage ? "setupSaved" : clearScoresError ? "clearScoresError" : error ? "error" : "";
+  const roundSummaryPopup = useMemo(() => {
+    if (!myPlayerId || !displayedActiveRound?.round_id) return null;
+
+    const roundId = displayedActiveRound.round_id;
+    const playerBase = visiblePlayers.find((player) => String(player.id) === String(myPlayerId));
+    const player = getPlayerForCourse(playerBase, displayCourseId, courses);
+    if (!player) return null;
+
+    const sortedHoles = (holes.length ? holes : fallbackHoles.filter((hole) => String(hole.course_id) === String(displayCourseId))).sort((a, b) => Number(a.hole_number) - Number(b.hole_number));
+
+    const buildSummary = (checkpoint) => {
+      const summaryKey = `round_summary_${roundId}_${myPlayerId}_${checkpoint}`;
+      if ((roundSummaryDismissedKeys || []).includes(summaryKey)) return null;
+
+      const checkpointHoles = sortedHoles.filter((hole) => Number(hole.hole_number) <= checkpoint);
+      if (checkpointHoles.length < checkpoint) return null;
+
+      const rows = checkpointHoles.map((hole) => {
+        const score = officialScores.find(
+          (item) =>
+            String(item.round_id || "") === String(roundId) &&
+            String(item.player_id || "") === String(myPlayerId) &&
+            Number(item.hole_number) === Number(hole.hole_number)
+        );
+        const shots = getShotsOnHole(player.course_hcp, hole.hcp);
+        const grossStableford = score ? getScoreStablefordPoints(score, hole.par, 0) : 0;
+        const netStableford = score ? getScoreStablefordPoints(score, hole.par, shots) : 0;
+        const strokes = score && score.strokes !== "" && score.strokes != null ? Number(score.strokes || 0) : null;
+        const putts = score && score.putts_count !== "" && score.putts_count != null ? Number(score.putts_count || 0) : null;
+        const gir = strokes != null && putts != null && !normalizeBoolean(score?.picked_up) ? strokes - putts <= Number(hole.par || 0) - 2 : false;
+        return { hole, score, shots, grossStableford, netStableford, strokes, putts, gir };
+      });
+
+      if (rows.some((row) => row.strokes == null)) return null;
+
+      const strokes = rows.reduce((sum, row) => sum + Number(row.strokes || 0), 0);
+      const par = rows.reduce((sum, row) => sum + Number(row.hole.par || 0), 0);
+      const putts = rows.reduce((sum, row) => sum + Number(row.putts || 0), 0);
+      const hcpShots = rows.reduce((sum, row) => sum + Number(row.shots || 0), 0);
+      const netStableford = rows.reduce((sum, row) => sum + Number(row.netStableford || 0), 0);
+      const grossStableford = rows.reduce((sum, row) => sum + Number(row.grossStableford || 0), 0);
+      const birdiesOrBetter = rows.filter((row) => row.strokes != null && row.strokes - Number(row.hole.par || 0) <= -1 && !normalizeBoolean(row.score?.picked_up)).length;
+      const pars = rows.filter((row) => row.strokes != null && row.strokes - Number(row.hole.par || 0) === 0 && !normalizeBoolean(row.score?.picked_up)).length;
+      const girCount = rows.filter((row) => row.gir).length;
+      const pickedUp = rows.filter((row) => normalizeBoolean(row.score?.picked_up)).length;
+
+      return {
+        key: summaryKey,
+        checkpoint,
+        title: checkpoint === 9 ? "Halbzeit-Chronik" : "Runden-Chronik",
+        subtitle: checkpoint === 9 ? "Nach 9 Löchern" : "Nach 18 Löchern",
+        playerName: getPlayerLabel(player),
+        strokes,
+        toPar: strokes - par,
+        hcpAdjustedStrokes: strokes - hcpShots,
+        netStableford,
+        grossStableford,
+        putts,
+        birdiesOrBetter,
+        pars,
+        girCount,
+        pickedUp,
+      };
+    };
+
+    return buildSummary(9) || buildSummary(18);
+  }, [myPlayerId, displayedActiveRound?.round_id, visiblePlayers, displayCourseId, courses, holes, officialScores, roundSummaryDismissedKeys]);
+  const activePopupSoundKey = showSplash ? "" : showFinalWinnerPopup ? `finalWinner:${finalWinnerPopupKey}` : displayedRoundHonorCelebration ? `roundHonor:${displayedRoundHonorCelebration.key}` : roundSummaryPopup ? `roundSummary:${roundSummaryPopup.key}` : clearScoresConfirmOpen ? "clearScoresConfirm" : backupSavedMessage ? "backupSaved" : setupSavedMessage ? "setupSaved" : clearScoresError ? "clearScoresError" : error ? "error" : "";
 
   useEffect(() => {
     if (!scoreablePlayers.some((p) => String(p.id) === String(scoredPlayerId))) setScoredPlayerId(scoreablePlayers[0]?.id || "");
@@ -874,6 +942,7 @@ function LordOfTheHolesApp() {
   useEffect(() => { writeLocalJson("lordOfTheHoles.winnerPopupDismissedKey", winnerPopupDismissedKey); }, [winnerPopupDismissedKey]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundHonorDismissedKeys", roundHonorDismissedKeys); }, [roundHonorDismissedKeys]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scorecardRoundId", scorecardRoundId); }, [scorecardRoundId]);
+  useEffect(() => { writeLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", roundSummaryDismissedKeys); }, [roundSummaryDismissedKeys]);
   useEffect(() => { pendingScoresRef.current = pendingScores; writeLocalJson("lordOfTheHoles.pendingScores", pendingScores); }, [pendingScores]);
   useEffect(() => {
     writeLocalJson("lordOfTheHoles.cachedState", { players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId, cachedAt: new Date().toISOString() });
@@ -1428,6 +1497,57 @@ function LordOfTheHolesApp() {
       {setupSavedMessage ? <div className="fixed inset-x-3 top-4 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/50 bg-emerald-950/95 p-3 text-emerald-50 shadow-2xl shadow-black/60 backdrop-blur"><div className="flex items-start justify-between gap-2"><div><div className="font-serif text-lg text-emerald-100">Gespeichert</div><div className="mt-0.5 text-sm text-emerald-100/85">{setupSavedMessage}</div></div><button type="button" onClick={() => setSetupSavedMessage("")} className="rounded-xl border border-emerald-400/40 bg-black/20 px-3 py-1 text-sm font-bold text-emerald-50">×</button></div></div> : null}
       {backupSavedMessage ? <div className="fixed inset-x-3 top-4 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/50 bg-emerald-950/95 p-3 text-emerald-50 shadow-2xl shadow-black/60 backdrop-blur"><div className="flex items-start justify-between gap-2"><div><div className="font-serif text-lg text-emerald-100">Backup erstellt</div><div className="mt-0.5 text-sm text-emerald-100/85">{backupSavedMessage}</div></div><button type="button" onClick={() => setBackupSavedMessage("")} className="rounded-xl border border-emerald-400/40 bg-black/20 px-3 py-1 text-sm font-bold text-emerald-50">×</button></div></div> : null}
       {renderPopupStandingsTable()}
+      {roundSummaryPopup && !showFinalWinnerPopup && !displayedRoundHonorCelebration ? (
+        <div className="fixed inset-0 z-[94] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-400/60 bg-stone-950 text-center text-amber-50 shadow-2xl shadow-black/80">
+            <div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.25),transparent_45%),linear-gradient(180deg,rgba(41,37,36,0.92),rgba(12,10,9,1))] p-5">
+              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full border border-amber-300/50 bg-black/30 text-3xl shadow-xl shadow-amber-950/40">📜</div>
+              <div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/70">{roundSummaryPopup.subtitle}</div>
+              <div className="mt-2 font-serif text-2xl font-black text-amber-200">{roundSummaryPopup.title}</div>
+              <div className="mt-1 text-sm font-semibold text-amber-100/80">{roundSummaryPopup.playerName}</div>
+
+              <div className="mt-4 grid grid-cols-2 gap-2 text-left text-sm">
+                <div className="rounded-2xl border border-amber-500/30 bg-black/25 p-3">
+                  <div className="text-xs uppercase tracking-[0.18em] text-amber-300/70">Strokes</div>
+                  <div className="font-serif text-2xl font-black text-amber-200">{roundSummaryPopup.strokes}</div>
+                  <div className="text-xs text-amber-100/65">{formatToPar(roundSummaryPopup.toPar, true)} zu Par</div>
+                </div>
+                <div className="rounded-2xl border border-amber-500/30 bg-black/25 p-3">
+                  <div className="text-xs uppercase tracking-[0.18em] text-amber-300/70">HCP adjusted</div>
+                  <div className="font-serif text-2xl font-black text-amber-200">{roundSummaryPopup.hcpAdjustedStrokes}</div>
+                  <div className="text-xs text-amber-100/65">Strokes HCP</div>
+                </div>
+                <div className="rounded-2xl border border-amber-500/30 bg-black/25 p-3">
+                  <div className="text-xs uppercase tracking-[0.18em] text-amber-300/70">Netto Stblf.</div>
+                  <div className="font-serif text-2xl font-black text-amber-200">{roundSummaryPopup.netStableford}</div>
+                  <div className="text-xs text-amber-100/65">Punkte</div>
+                </div>
+                <div className="rounded-2xl border border-amber-500/30 bg-black/25 p-3">
+                  <div className="text-xs uppercase tracking-[0.18em] text-amber-300/70">Brutto</div>
+                  <div className="font-serif text-2xl font-black text-amber-200">{roundSummaryPopup.grossStableford}</div>
+                  <div className="text-xs text-amber-100/65">Punkte</div>
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-4 gap-1.5 text-xs text-amber-100/80">
+                <div className="rounded-xl bg-amber-500/10 p-2"><b className="block text-amber-200">{roundSummaryPopup.putts}</b>Putts</div>
+                <div className="rounded-xl bg-emerald-500/10 p-2"><b className="block text-emerald-200">{roundSummaryPopup.girCount}</b>GIR</div>
+                <div className="rounded-xl bg-amber-500/10 p-2"><b className="block text-amber-200">{roundSummaryPopup.birdiesOrBetter}</b>Birdie+</div>
+                <div className="rounded-xl bg-red-500/10 p-2"><b className="block text-red-100">{roundSummaryPopup.pickedUp}</b>X</div>
+              </div>
+            </div>
+            <div className="p-3">
+              <button
+                type="button"
+                onClick={() => setRoundSummaryDismissedKeys((current) => Array.from(new Set([...(current || []), roundSummaryPopup.key])))}
+                className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-2.5 text-sm font-bold text-amber-50"
+              >
+                Chronik schließen ×
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {displayedRoundHonorCelebration && !showFinalWinnerPopup ? <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm"><div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-400/60 bg-stone-950 text-center text-amber-50 shadow-2xl shadow-black/80"><div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.28),transparent_45%),linear-gradient(180deg,rgba(120,53,15,0.55),rgba(12,10,9,1))] p-5"><div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-amber-300/50 bg-black/30 text-3xl shadow-xl shadow-amber-950/40">⚜</div><div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/70">{displayedRoundHonorCelebration.roundName} beendet</div><div className="mt-2 font-serif text-lg font-black text-amber-200">Gondors Erlass</div><div className="mt-1 text-sm text-amber-100/70">Die Runde ist gespielt. Der Hofstaat wird neu geordnet.</div><div className="mt-2 rounded-2xl border border-amber-300/40 bg-amber-500/10 p-3 text-sm font-semibold text-amber-50">{roundHonorPersonalMessage}</div><div className="mt-2 rounded-2xl border border-amber-500/35 bg-black/25 p-3 text-left"><div className="text-xs uppercase tracking-[0.22em] text-amber-300/75">{displayedRoundHonorCelebration.lords.length === 1 ? "Herr von Gondor" : "Herren von Gondor"}</div><div className="mt-2 space-y-1">{displayedRoundHonorCelebration.lords.map((player, index) => <div key={player.id} className="flex items-center justify-between gap-2 rounded-xl bg-amber-500/10 px-2 py-1.5"><span className="font-serif text-lg font-black text-amber-200">{index + 1}. {getPlayerLabel(player)}</span><span className="text-xs text-amber-100/70">{player.hcpAdjustedStrokes}</span></div>)}</div></div><div className="mt-2 rounded-2xl border border-red-500/35 bg-black/25 p-3 text-left"><div className="text-xs uppercase tracking-[0.22em] text-red-200/80">Schildträger</div><div className="mt-2 space-y-1">{displayedRoundHonorCelebration.butlers.map((player) => <div key={player.id} className="flex items-center justify-between gap-2 rounded-xl bg-red-500/10 px-2 py-1.5"><span className="font-serif text-lg font-black text-red-100">{getPlayerLabel(player)}</span><span className="text-xs text-red-100/70">{player.hcpAdjustedStrokes}</span></div>)}</div></div><div className="mt-2 rounded-2xl border border-amber-500/25 bg-black/20 p-2 text-sm text-amber-100/75">{displayedRoundHonorCelebration.roundOrder === 1 ? "Der Herr von Gondor steht fest. Der Schildträger ebenso. Dein Wort gilt — und irgendwo schwitzt bereits jemand." : "Die Herren von Gondor und ihre Schildträger stehen fest. Der Hofstaat ist informiert, die Becher sind gefährlich leer."}</div></div><div className="p-3"><button type="button" onClick={() => setRoundHonorDismissedKeys((current) => Array.from(new Set([...(current || []), displayedRoundHonorCelebration.key])))} className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-2.5 text-sm font-bold text-amber-50">{roundHonorCloseLabel}</button></div></div></div> : null}
       {showFinalWinnerPopup ? <div className="fixed inset-0 z-[96] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm"><div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-400/60 bg-stone-950 text-center text-amber-50 shadow-2xl shadow-black/80"><div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.28),transparent_45%),linear-gradient(180deg,rgba(120,53,15,0.55),rgba(12,10,9,1))] p-5"><div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-amber-300/50 bg-black/30 text-3xl shadow-xl shadow-amber-950/40">♛</div><div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/70">Finale beendet</div><div className="mt-2 font-serif text-lg font-black text-amber-200">Lord of the Holes 2026 ist</div><div className="mt-2 font-serif text-4xl font-black text-amber-300 drop-shadow">{finalWinnerCelebration?.winnerName}</div><div className="mt-2 text-sm text-amber-100/70">{finalWinnerCelebration?.winnerLabel}</div><div className="mt-2 rounded-2xl border border-amber-500/35 bg-black/25 p-2 text-sm text-amber-100">Final Strokes HCP: <b className="text-amber-200">{finalWinnerCelebration?.finalHcpAdjustedStrokes ?? "–"}</b></div></div><div className="p-3"><button type="button" onClick={() => setWinnerPopupDismissedKey(finalWinnerPopupKey)} className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-2.5 text-sm font-bold text-amber-50">Krone anerkennen ×</button></div></div></div> : null}
       {clearScoresConfirmOpen ? <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"><div className="w-full max-w-md rounded-3xl border border-red-500/60 bg-stone-950 p-4 text-red-50 shadow-2xl shadow-black/70"><div className="font-serif text-lg text-red-100">Alle Scores löschen?</div><p className="mt-2 text-sm text-red-100/80">Dadurch werden alle Einträge im Tab Scores gelöscht. Vorher wird automatisch ein Backup erstellt. Backup-Tabs bleiben erhalten.</p>{clearScoresError ? <div className="mt-2 rounded-2xl border border-red-400/50 bg-red-950/50 p-2 text-xs text-red-100">Fehler: {clearScoresError}</div> : null}<div className="mt-2 grid grid-cols-2 gap-2"><button type="button" disabled={clearScoresSaving} onClick={() => setClearScoresConfirmOpen(false)} className="rounded-2xl border border-amber-700/40 bg-stone-900 px-3 py-2.5 text-sm font-bold text-amber-100 disabled:opacity-50">Abbrechen</button><button type="button" disabled={clearScoresSaving} onClick={clearAllScores} className="rounded-2xl border border-red-400/60 bg-red-700 px-3 py-2.5 text-sm font-bold text-red-50 disabled:opacity-50">{clearScoresSaving ? "Lösche ..." : "Ja, Scores löschen"}</button></div></div></div> : null}
