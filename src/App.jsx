@@ -53,7 +53,7 @@ class AppErrorBoundary extends React.Component {
 }
 
 const GOOGLE_SHEETS_API_URL =
-  "https://script.google.com/macros/s/AKfycbyiiSpPosczsF6x_LSpWy_c31n8r8XqQ4mzhqNUD2oAEhPF8_CFwCTXOGyQLcIvr8C2/exec";
+  "https://script.google.com/macros/s/AKfycbwxzgjYwHARkagN03Y2q9HxbCBL16x5zlj7m4Q46GDsVTn_EWc_cJN741EDpan2BcOF/exec";
 
 const ADMIN_PASSWORD = "weimar";
 
@@ -290,9 +290,16 @@ function roundPlayingHandicap(value) {
 
 function getCourseSettings(id, list = fallbackCourses) {
   const cid = String(id || "goethe").toLowerCase().trim();
-  const known = cid === "feininger" ? fallbackCourses[1] : fallbackCourses[0];
-  const fromList = (list || []).find((item) => String(item?.course_id || "").toLowerCase().trim() === cid);
-  return fromList || known;
+  const fallbackCourse = cid === "feininger" ? fallbackCourses[1] : fallbackCourses[0];
+  const sheetCourse = (list || []).find((item) => String(item?.course_id || "").toLowerCase().trim() === cid);
+
+  return {
+    ...fallbackCourse,
+    ...sheetCourse,
+    course_rating: Number(sheetCourse?.course_rating || sheetCourse?.rating || sheetCourse?.cr || fallbackCourse.course_rating),
+    slope_rating: Number(sheetCourse?.slope_rating || sheetCourse?.slope || sheetCourse?.sr || fallbackCourse.slope_rating),
+    par: Number(sheetCourse?.par || fallbackCourse.par),
+  };
 }
 
 function calculatePlayingHandicap(handicapIndex, course) {
