@@ -797,6 +797,7 @@ function LordOfTheHolesApp() {
   const [standingsPopup, setStandingsPopup] = useState(null);
   const [winnerPopupDismissedKey, setWinnerPopupDismissedKey] = useState(() => readLocalJson("lordOfTheHoles.winnerPopupDismissedKey", ""));
   const [roundHonorDismissedKeys, setRoundHonorDismissedKeys] = useState(() => readLocalJson("lordOfTheHoles.roundHonorDismissedKeys", []));
+  const [scorecardRoundId, setScorecardRoundId] = useState(() => readLocalJson("lordOfTheHoles.scorecardRoundId", ""));
 
   const displayedActiveRound = (selectedActiveRoundId && (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(selectedActiveRoundId))) || activeRound || rounds.find((round) => String(round.status).toLowerCase() === "active") || fallbackRounds[0];
   const displayCourseId = displayedActiveRound?.course_id || selectedCourseId || "goethe";
@@ -856,7 +857,7 @@ function LordOfTheHolesApp() {
   const roundHonorCloseLabel = myRoundHonorRole === "lord" ? "Krone richten ×" : myRoundHonorRole === "shieldbearer" ? "Schild aufnehmen ×" : "Erlass zur Kenntnis nehmen ×";
   const finalWinnerPopupKey = finalWinnerCelebration ? `${finalWinnerCelebration.roundId}_${finalWinnerCelebration.winner?.id || "winner"}` : "";
   const showFinalWinnerPopup = Boolean(finalWinnerCelebration && finalWinnerPopupKey !== winnerPopupDismissedKey);
-  const activePopupSoundKey = showSplash ? "" : showFinalWinnerPopup ? `finalWinner:${finalWinnerPopupKey}` : displayedRoundHonorCelebration ? `roundHonor:${displayedRoundHonorCelebration.key}` : standingsPopup ? `standings:${standingsPopup}` : clearScoresConfirmOpen ? "clearScoresConfirm" : backupSavedMessage ? "backupSaved" : setupSavedMessage ? "setupSaved" : clearScoresError ? "clearScoresError" : error ? "error" : "";
+  const activePopupSoundKey = showSplash ? "" : showFinalWinnerPopup ? `finalWinner:${finalWinnerPopupKey}` : displayedRoundHonorCelebration ? `roundHonor:${displayedRoundHonorCelebration.key}` : clearScoresConfirmOpen ? "clearScoresConfirm" : backupSavedMessage ? "backupSaved" : setupSavedMessage ? "setupSaved" : clearScoresError ? "clearScoresError" : error ? "error" : "";
 
   useEffect(() => {
     if (!scoreablePlayers.some((p) => String(p.id) === String(scoredPlayerId))) setScoredPlayerId(scoreablePlayers[0]?.id || "");
@@ -868,6 +869,7 @@ function LordOfTheHolesApp() {
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerId", scoredPlayerId); }, [scoredPlayerId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.winnerPopupDismissedKey", winnerPopupDismissedKey); }, [winnerPopupDismissedKey]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundHonorDismissedKeys", roundHonorDismissedKeys); }, [roundHonorDismissedKeys]);
+  useEffect(() => { writeLocalJson("lordOfTheHoles.scorecardRoundId", scorecardRoundId); }, [scorecardRoundId]);
   useEffect(() => { pendingScoresRef.current = pendingScores; writeLocalJson("lordOfTheHoles.pendingScores", pendingScores); }, [pendingScores]);
   useEffect(() => {
     writeLocalJson("lordOfTheHoles.cachedState", { players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId, cachedAt: new Date().toISOString() });
@@ -1239,9 +1241,26 @@ function LordOfTheHolesApp() {
     return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3"><div className="landscape:mx-auto landscape:max-w-none landscape:pb-6"><MiddleEarthTables players={playersWithCurrentHandicaps} holes={holes} scores={officialScores} mismatches={roundMismatches} /></div></motion.section>;
   }
 
+  function getStrokesCellClass(score, hole) {
+    if (!score || score.strokes === "" || score.strokes == null) return "bg-black/10 text-amber-100/55";
+    if (normalizeBoolean(score.picked_up)) return "bg-red-900/65 text-red-100 ring-1 ring-red-400/40";
+    const diff = Number(score.strokes || 0) - Number(hole?.par || 0);
+    if (diff <= -1) return "bg-emerald-700/70 text-emerald-50 ring-1 ring-emerald-300/30";
+    if (diff === 0) return "bg-amber-500/25 text-amber-100 ring-1 ring-amber-300/25";
+    if (diff === 1) return "bg-orange-800/65 text-orange-100 ring-1 ring-orange-300/25";
+    return "bg-red-900/65 text-red-100 ring-1 ring-red-400/40";
+  }
+
   function renderArchiveView() {
-    const scorecardPlayers = playersWithCurrentHandicaps.length ? playersWithCurrentHandicaps : visiblePlayers;
-    const scorecardHoles = holes.length ? holes : fallbackHoles.filter((hole) => String(hole.course_id) === String(displayCourseId));
+    const availableRounds = rounds.length ? rounds : fallbackRounds;
+    const archiveRound = availableRounds.find((round) => String(round.round_id) === String(scorecardRoundId)) || displayedActiveRound || availableRounds[0] || fallbackRounds[0];
+    const archiveCourseId = archiveRound?.course_id || displayCourseId || "goethe";
+    const archiveCourse = (courses.length ? courses : fallbackCourses).find((course) => String(course.course_id) === String(archiveCourseId));
+    const scorecardHoles = (allHoles.length ? allHoles : fallbackHoles)
+      .filter((hole) => String(hole.course_id) === String(archiveCourseId))
+      .sort((a, b) => Number(a.hole_number) - Number(b.hole_number));
+    const scorecardPlayers = getPlayersForCourse(getRoundPlayers(archiveRound?.round_id, allPlayers, roundPlayers), archiveCourseId, courses);
+    const scorecardScores = officialAllScores.filter((score) => String(score.round_id || "") === String(archiveRound?.round_id || ""));
 
     return (
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
@@ -1250,31 +1269,55 @@ function LordOfTheHolesApp() {
             <CardContent className="p-3">
               <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Scorekarten</p>
               <div className="mt-0.5 text-sm font-semibold text-amber-300/85">Chroniken der Runde</div>
-              <h2 className="font-serif text-lg text-amber-200">{displayedActiveRound?.round_name || "Aktive Runde"}</h2>
-              <p className="mt-1 text-sm text-amber-100/70">{activeCourse?.course_name || "Kurs"} · klassische Scorekarte je Spieler</p>
+              <h2 className="font-serif text-lg text-amber-200">{archiveRound?.round_name || "Aktive Runde"}</h2>
+              <p className="mt-1 text-sm text-amber-100/70">{archiveCourse?.course_name || "Kurs"} · klassische Scorekarte je Spieler</p>
+
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {availableRounds.map((round) => (
+                  <button
+                    key={round.round_id}
+                    type="button"
+                    onClick={() => setScorecardRoundId(round.round_id)}
+                    className={cls(
+                      "rounded-xl border px-2 py-2 text-xs font-bold",
+                      String(archiveRound?.round_id) === String(round.round_id)
+                        ? "border-amber-400/60 bg-amber-600 text-amber-50"
+                        : "border-amber-700/35 bg-black/25 text-amber-100"
+                    )}
+                  >
+                    {round.round_name || round.round_id}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-1.5 text-[10px] text-amber-100/70 sm:grid-cols-4">
+                <div className="rounded-lg bg-emerald-700/50 px-2 py-1 text-emerald-50">Birdie oder besser</div>
+                <div className="rounded-lg bg-amber-500/20 px-2 py-1 text-amber-100">Par</div>
+                <div className="rounded-lg bg-orange-800/55 px-2 py-1 text-orange-100">Bogey</div>
+                <div className="rounded-lg bg-red-900/60 px-2 py-1 text-red-100">Doppelbogey+ / X</div>
+              </div>
             </CardContent>
           </Card>
 
           {scorecardPlayers.map((player) => {
             const playerScores = scorecardHoles.map((hole) => {
-              const score = officialScores.find(
+              const score = scorecardScores.find(
                 (item) =>
-                  String(item.round_id || "") === String(displayedActiveRound?.round_id || "") &&
                   String(item.player_id || "") === String(player.id) &&
                   Number(item.hole_number) === Number(hole.hole_number)
               );
               const shots = getShotsOnHole(player.course_hcp, hole.hcp);
-              const stableford = score ? getScoreStablefordPoints(score, hole.par, shots) : 0;
-              return { hole, score, shots, stableford };
+              const grossStableford = score ? getScoreStablefordPoints(score, hole.par, 0) : 0;
+              const netStableford = score ? getScoreStablefordPoints(score, hole.par, shots) : 0;
+              const hcpAdjustedStrokes = score && score.strokes !== "" && score.strokes != null ? Number(score.strokes || 0) - shots : null;
+              return { hole, score, shots, grossStableford, netStableford, hcpAdjustedStrokes };
             });
 
             const playedRows = playerScores.filter((row) => row.score && row.score.strokes !== "" && row.score.strokes != null);
             const totalStrokes = playedRows.reduce((sum, row) => sum + Number(row.score?.strokes || 0), 0);
-            const totalPar = playedRows.reduce((sum, row) => sum + Number(row.hole?.par || 0), 0);
-            const totalPutts = playedRows.reduce((sum, row) => sum + Number(row.score?.putts_count || 0), 0);
-            const totalStableford = playedRows.reduce((sum, row) => sum + Number(row.stableford || 0), 0);
-            const hcpShots = playedRows.reduce((sum, row) => sum + Number(row.shots || 0), 0);
-            const adjustedStrokes = playedRows.length ? totalStrokes - hcpShots : null;
+            const totalGrossStableford = playedRows.reduce((sum, row) => sum + Number(row.grossStableford || 0), 0);
+            const totalNetStableford = playedRows.reduce((sum, row) => sum + Number(row.netStableford || 0), 0);
+            const totalHcpAdjustedStrokes = playedRows.reduce((sum, row) => sum + Number(row.hcpAdjustedStrokes || 0), 0);
 
             return (
               <Card key={player.id} className="mb-3 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm">
@@ -1285,8 +1328,8 @@ function LordOfTheHolesApp() {
                       <div className="text-xs text-amber-100/65">SpV {Number(player.course_hcp || 0)} · {playedRows.length}/18 Löcher</div>
                     </div>
                     <div className="rounded-2xl border border-amber-700/30 bg-black/25 px-3 py-2 text-right text-xs text-amber-100/80">
-                      <div>Strokes HCP</div>
-                      <b className="font-serif text-lg text-amber-300">{adjustedStrokes ?? "–"}</b>
+                      <div>Strokes HCP adjusted</div>
+                      <b className="font-serif text-lg text-amber-300">{playedRows.length ? totalHcpAdjustedStrokes : "–"}</b>
                     </div>
                   </div>
 
@@ -1295,47 +1338,47 @@ function LordOfTheHolesApp() {
                       <thead>
                         <tr className="text-left uppercase tracking-wider text-amber-100/80">
                           <th className="px-2 py-1.5">Loch</th>
-                          {scorecardHoles.map((hole) => <th key={hole.hole_number} className="px-2 py-1.5 text-center">{hole.hole_number}</th>)}
+                          {scorecardHoles.map((hole) => <th key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hole.hole_number}</th>)}
                           <th className="px-2 py-1.5 text-center">Σ</th>
                         </tr>
                       </thead>
                       <tbody>
                         <tr className="border-t border-amber-700/20">
                           <td className="px-2 py-1.5 font-semibold text-amber-100">Par</td>
-                          {scorecardHoles.map((hole) => <td key={hole.hole_number} className="px-2 py-1.5 text-center">{hole.par}</td>)}
+                          {scorecardHoles.map((hole) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hole.par}</td>)}
                           <td className="px-2 py-1.5 text-center font-bold text-amber-200">{scorecardHoles.reduce((sum, hole) => sum + Number(hole.par || 0), 0)}</td>
                         </tr>
                         <tr className="border-t border-amber-700/20">
-                          <td className="px-2 py-1.5 font-semibold text-amber-100">Score</td>
+                          <td className="px-2 py-1.5 font-semibold text-amber-100">Strokes</td>
                           {playerScores.map(({ hole, score }) => (
-                            <td key={hole.hole_number} className="px-2 py-1.5 text-center font-bold text-amber-200">
-                              {score ? normalizeBoolean(score.picked_up) ? "X" : score.strokes || "–" : "–"}
+                            <td key={hole.hole_number} className="px-1 py-1.5 text-center">
+                              <span className={cls("inline-flex min-w-[26px] justify-center rounded-lg px-1.5 py-0.5 font-bold", getStrokesCellClass(score, hole))}>
+                                {score ? normalizeBoolean(score.picked_up) ? "X" : score.strokes || "–" : "–"}
+                              </span>
                             </td>
                           ))}
                           <td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? totalStrokes : "–"}</td>
                         </tr>
                         <tr className="border-t border-amber-700/20">
-                          <td className="px-2 py-1.5 font-semibold text-amber-100">Putts</td>
-                          {playerScores.map(({ hole, score }) => (
-                            <td key={hole.hole_number} className="px-2 py-1.5 text-center">{score?.putts_count ?? "–"}</td>
+                          <td className="px-2 py-1.5 font-semibold text-amber-100">Strokes HCP adjusted</td>
+                          {playerScores.map(({ hole, hcpAdjustedStrokes }) => (
+                            <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hcpAdjustedStrokes ?? "–"}</td>
                           ))}
-                          <td className="px-2 py-1.5 text-center font-bold text-amber-200">{playedRows.length ? totalPutts : "–"}</td>
+                          <td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? totalHcpAdjustedStrokes : "–"}</td>
                         </tr>
                         <tr className="border-t border-amber-700/20">
-                          <td className="px-2 py-1.5 font-semibold text-amber-100">Netto Stbl</td>
-                          {playerScores.map(({ hole, score, stableford }) => (
-                            <td key={hole.hole_number} className="px-2 py-1.5 text-center">{score ? stableford : "–"}</td>
+                          <td className="px-2 py-1.5 font-semibold text-amber-100">Netto Stblf.</td>
+                          {playerScores.map(({ hole, score, netStableford }) => (
+                            <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{score ? netStableford : "–"}</td>
                           ))}
-                          <td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? totalStableford : "–"}</td>
+                          <td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? totalNetStableford : "–"}</td>
                         </tr>
                         <tr className="border-t border-amber-700/20">
-                          <td className="px-2 py-1.5 font-semibold text-amber-100">+/−</td>
-                          {playerScores.map(({ hole, score }) => {
-                            const played = Boolean(score && score.strokes !== "" && score.strokes != null);
-                            const diff = played ? Number(score.strokes || 0) - Number(hole.par || 0) : null;
-                            return <td key={hole.hole_number} className="px-2 py-1.5 text-center">{formatToPar(diff, played)}</td>;
-                          })}
-                          <td className="px-2 py-1.5 text-center font-bold text-amber-200">{formatToPar(totalStrokes - totalPar, playedRows.length > 0)}</td>
+                          <td className="px-2 py-1.5 font-semibold text-amber-100">Brutto</td>
+                          {playerScores.map(({ hole, score, grossStableford }) => (
+                            <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{score ? grossStableford : "–"}</td>
+                          ))}
+                          <td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? totalGrossStableford : "–"}</td>
                         </tr>
                       </tbody>
                     </table>
