@@ -1553,14 +1553,13 @@ function LordOfTheHolesApp() {
   const [scoreHintMessage, setScoreHintMessage] = useState("");
   const [showSplash, setShowSplash] = useState(true);
   const introAudioRef = useRef(null);
+  const lastPopupSoundKeyRef = useRef("");
   const [clearScoresConfirmOpen, setClearScoresConfirmOpen] = useState(false);
   const [clearScoresSaving, setClearScoresSaving] = useState(false);
   const [clearScoresError, setClearScoresError] = useState("");
   const [standingsPopup, setStandingsPopup] = useState(null);
   const [winnerPopupDismissedKey, setWinnerPopupDismissedKey] = useState(() => readLocalJson("lordOfTheHoles.winnerPopupDismissedKey", ""));
   const [roundHonorDismissedKeys, setRoundHonorDismissedKeys] = useState(() => readLocalJson("lordOfTheHoles.roundHonorDismissedKeys", []));
-  const [forceRoundHonorPopupOpen, setForceRoundHonorPopupOpen] = useState(false);
-  const [forceRoundHonorRole, setForceRoundHonorRole] = useState("");
 
   const displayedActiveRound =
     (selectedActiveRoundId && (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(selectedActiveRoundId))) ||
@@ -1657,38 +1656,13 @@ function LordOfTheHolesApp() {
     () => getRoundHonorCelebration(allPlayers, rounds, allHoles, officialAllScores, roundPlayers, roundHonorDismissedKeys),
     [allPlayers, rounds, allHoles, officialAllScores, roundPlayers, roundHonorDismissedKeys]
   );
-  const simulatedRoundHonorCelebration = useMemo(() => {
-    const scoredStandings = hcpAdjustedStrokeLeaderboard.filter((player) => player.played > 0);
-    const fallbackStandings = playersWithCurrentHandicaps.map((player, index) => ({
-      ...player,
-      played: 18,
-      hcpAdjustedStrokes: 70 + index,
-      hcpAdjustedTotal: 70 + index,
-    }));
-    const standings = scoredStandings.length ? scoredStandings : fallbackStandings;
-    if (!standings.length) return null;
-
-    const roundOrder = Number(displayedActiveRound?.sort_order || 1);
-    const lordCount = roundOrder === 1 ? 1 : 2;
-    const butlerCount = roundOrder === 1 ? 1 : 2;
-
-    return {
-      key: "simulation_round_honor",
-      roundId: displayedActiveRound?.round_id || "simulation",
-      roundName: displayedActiveRound?.round_name || "Test-Runde",
-      roundOrder,
-      lords: standings.slice(0, lordCount),
-      butlers: standings.slice(-butlerCount).reverse(),
-    };
-  }, [hcpAdjustedStrokeLeaderboard, playersWithCurrentHandicaps, displayedActiveRound]);
-  const displayedRoundHonorCelebration = forceRoundHonorPopupOpen ? simulatedRoundHonorCelebration : roundHonorCelebration;
+  const displayedRoundHonorCelebration = roundHonorCelebration;
   const myRoundHonorRole = useMemo(() => {
-    if (forceRoundHonorPopupOpen && forceRoundHonorRole) return forceRoundHonorRole;
     if (!displayedRoundHonorCelebration || !myPlayerId) return "neutral";
     if (displayedRoundHonorCelebration.lords.some((player) => String(player.id) === String(myPlayerId))) return "lord";
     if (displayedRoundHonorCelebration.butlers.some((player) => String(player.id) === String(myPlayerId))) return "shieldbearer";
     return "neutral";
-  }, [displayedRoundHonorCelebration, myPlayerId, forceRoundHonorPopupOpen, forceRoundHonorRole]);
+  }, [displayedRoundHonorCelebration, myPlayerId]);
   const myRoundHonorLord = useMemo(() => {
     if (!displayedRoundHonorCelebration || !myPlayerId) return null;
     return displayedRoundHonorCelebration.lords.find((player) => String(player.id) === String(myPlayerId)) || null;
@@ -1713,6 +1687,25 @@ function LordOfTheHolesApp() {
   const displayedWinnerCelebration = finalWinnerCelebration;
   const displayedWinnerPopupKey = finalWinnerPopupKey;
   const showFinalWinnerPopup = Boolean(displayedWinnerCelebration && displayedWinnerPopupKey !== winnerPopupDismissedKey);
+  const activePopupSoundKey = showSplash
+    ? ""
+    : showFinalWinnerPopup
+      ? `finalWinner:${displayedWinnerPopupKey}`
+      : displayedRoundHonorCelebration
+        ? `roundHonor:${displayedRoundHonorCelebration.key}`
+        : standingsPopup
+          ? `standings:${standingsPopup}`
+          : clearScoresConfirmOpen
+            ? "clearScoresConfirm"
+            : backupSavedMessage
+              ? "backupSaved"
+              : setupSavedMessage
+                ? "setupSaved"
+                : clearScoresError
+                  ? "clearScoresError"
+                  : error
+                    ? "error"
+                    : "";
 
   useEffect(() => {
     if (!scoreablePlayers.some((p) => String(p.id) === String(scoredPlayerId))) setScoredPlayerId(scoreablePlayers[0]?.id || "");
@@ -1739,6 +1732,17 @@ function LordOfTheHolesApp() {
   useEffect(() => {
     writeLocalJson("lordOfTheHoles.roundHonorDismissedKeys", roundHonorDismissedKeys);
   }, [roundHonorDismissedKeys]);
+
+  useEffect(() => {
+    if (!activePopupSoundKey) {
+      lastPopupSoundKeyRef.current = "";
+      return;
+    }
+
+    if (lastPopupSoundKeyRef.current === activePopupSoundKey) return;
+    lastPopupSoundKeyRef.current = activePopupSoundKey;
+    playPopupSound();
+  }, [activePopupSoundKey]);
 
   useEffect(() => {
     pendingScoresRef.current = pendingScores;
@@ -1777,6 +1781,7 @@ function LordOfTheHolesApp() {
   useEffect(() => {
     introAudioRef.current = new Audio("/intro-sound.mp3");
     introAudioRef.current.preload = "auto";
+    introAudioRef.current.loop = false;
   }, []);
 
   useEffect(() => {
@@ -2227,14 +2232,6 @@ function LordOfTheHolesApp() {
             </div>
             <Button disabled={!isAdminUnlocked || setupSaving} onClick={saveFullSetup} className="mt-3 w-full rounded-2xl bg-amber-600 text-amber-50 disabled:opacity-50">{setupSaving ? "Speichere ..." : "Admin-Einstellungen speichern"}</Button>
             <Button disabled={!isAdminUnlocked || backupSaving} onClick={createRoundBackup} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-700/80 text-emerald-50 disabled:opacity-50">{backupSaving ? "Erstelle Backup ..." : "Backup für aktive Runde erstellen"}</Button>
-            <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2.5">
-              <div className="mb-2 text-xs uppercase tracking-[0.18em] text-amber-300/75">Gondors Erlass testen</div>
-              <div className="grid gap-2">
-                <Button disabled={!isAdminUnlocked} onClick={() => { setForceRoundHonorRole("lord"); setForceRoundHonorPopupOpen(true); }} className="w-full rounded-2xl border border-amber-500/40 bg-amber-900/50 text-amber-100 disabled:opacity-50">Test: Herr von Gondor</Button>
-                <Button disabled={!isAdminUnlocked} onClick={() => { setForceRoundHonorRole("shieldbearer"); setForceRoundHonorPopupOpen(true); }} className="w-full rounded-2xl border border-red-500/40 bg-red-950/50 text-red-100 disabled:opacity-50">Test: Schildträger</Button>
-                <Button disabled={!isAdminUnlocked} onClick={() => { setForceRoundHonorRole("neutral"); setForceRoundHonorPopupOpen(true); }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-900 text-amber-100 disabled:opacity-50">Test: Freier Gefährte</Button>
-              </div>
-            </div>
             <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={() => { setClearScoresError(""); setClearScoresConfirmOpen(true); }} className="mt-2 w-full rounded-2xl border border-red-500/50 bg-red-950/60 text-red-100 disabled:opacity-50">Scores löschen</Button>
           </CardContent>
         </Card>
@@ -2273,18 +2270,23 @@ function LordOfTheHolesApp() {
     );
   }
 
-  async function enterRoundFromSplash() {
+  async function playPopupSound() {
     try {
       if (introAudioRef.current) {
+        introAudioRef.current.loop = false;
+        introAudioRef.current.pause();
         introAudioRef.current.currentTime = 0;
         await introAudioRef.current.play();
       }
     } catch {
       // Mobile Browser können Sound blockieren, falls Audio nicht erlaubt ist.
-      // Die App startet trotzdem normal.
-    } finally {
-      setShowSplash(false);
+      // Die App läuft trotzdem normal weiter.
     }
+  }
+
+  async function enterRoundFromSplash() {
+    await playPopupSound();
+    setShowSplash(false);
   }
 
   function openStandingsPopup(type) {
@@ -2613,14 +2615,7 @@ function LordOfTheHolesApp() {
             <div className="p-3">
               <button
                 type="button"
-                onClick={() => {
-                  if (forceRoundHonorPopupOpen) {
-                    setForceRoundHonorPopupOpen(false);
-                    setForceRoundHonorRole("");
-                  } else {
-                    setRoundHonorDismissedKeys((current) => Array.from(new Set([...(current || []), displayedRoundHonorCelebration.key])));
-                  }
-                }}
+                onClick={() => setRoundHonorDismissedKeys((current) => Array.from(new Set([...(current || []), displayedRoundHonorCel
                 className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-3 text-sm font-bold text-amber-50"
               >
                 {roundHonorCloseLabel}
