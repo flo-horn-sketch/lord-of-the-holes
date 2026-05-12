@@ -1558,6 +1558,7 @@ function LordOfTheHolesApp() {
   const [winnerPopupDismissedKey, setWinnerPopupDismissedKey] = useState(() => readLocalJson("lordOfTheHoles.winnerPopupDismissedKey", ""));
   const [roundHonorDismissedKeys, setRoundHonorDismissedKeys] = useState(() => readLocalJson("lordOfTheHoles.roundHonorDismissedKeys", []));
   const [forceRoundHonorPopupOpen, setForceRoundHonorPopupOpen] = useState(false);
+  const [forceRoundHonorRole, setForceRoundHonorRole] = useState("");
 
   const displayedActiveRound =
     (selectedActiveRoundId && (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(selectedActiveRoundId))) ||
@@ -1679,6 +1680,45 @@ function LordOfTheHolesApp() {
     };
   }, [hcpAdjustedStrokeLeaderboard, playersWithCurrentHandicaps, displayedActiveRound]);
   const displayedRoundHonorCelebration = forceRoundHonorPopupOpen ? simulatedRoundHonorCelebration : roundHonorCelebration;
+  const myRoundHonorRole = useMemo(() => {
+    if (forceRoundHonorPopupOpen && forceRoundHonorRole) return forceRoundHonorRole;
+    if (!displayedRoundHonorCelebration || !myPlayerId) return "neutral";
+    if (displayedRoundHonorCelebration.lords.some((player) => String(player.id) === String(myPlayerId))) return "lord";
+    if (displayedRoundHonorCelebration.butlers.some((player) => String(player.id) === String(myPlayerId))) return "shieldbearer";
+    return "neutral";
+  }, [displayedRoundHonorCelebration, myPlayerId, forceRoundHonorPopupOpen, forceRoundHonorRole]);
+  const myRoundHonorLord = useMemo(() => {
+    if (!displayedRoundHonorCelebration || !myPlayerId) return null;
+    return displayedRoundHonorCelebration.lords.find((player) => String(player.id) === String(myPlayerId)) || null;
+  }, [displayedRoundHonorCelebration, myPlayerId]);
+  const myRoundHonorShieldbearer = useMemo(() => {
+    if (!displayedRoundHonorCelebration || !myPlayerId) return null;
+    return displayedRoundHonorCelebration.butlers.find((player) => String(player.id) === String(myPlayerId)) || null;
+  }, [displayedRoundHonorCelebration, myPlayerId]);
+  const assignedLordForMe = useMemo(() => {
+    if (!displayedRoundHonorCelebration || myRoundHonorRole !== "shieldbearer" || !myPlayerId) return null;
+    const shieldbearerIndex = displayedRoundHonorCelebration.butlers.findIndex((player) => String(player.id) === String(myPlayerId));
+    if (shieldbearerIndex < 0) return null;
+    return displayedRoundHonorCelebration.lords[shieldbearerIndex] || displayedRoundHonorCelebration.lords[0] || null;
+  }, [displayedRoundHonorCelebration, myRoundHonorRole, myPlayerId]);
+  const assignedShieldbearerForMe = useMemo(() => {
+    if (!displayedRoundHonorCelebration || myRoundHonorRole !== "lord" || !myPlayerId) return null;
+    const lordIndex = displayedRoundHonorCelebration.lords.findIndex((player) => String(player.id) === String(myPlayerId));
+    if (lordIndex < 0) return null;
+    return displayedRoundHonorCelebration.butlers[lordIndex] || displayedRoundHonorCelebration.butlers[0] || null;
+  }, [displayedRoundHonorCelebration, myRoundHonorRole, myPlayerId]);
+  const roundHonorPersonalMessage =
+    myRoundHonorRole === "lord"
+      ? `Du bist ${displayedRoundHonorCelebration?.lords?.length === 1 ? "Herr" : "einer der Herren"} von Gondor.${assignedShieldbearerForMe ? ` Dein Schildträger ist ${getPlayerLabel(assignedShieldbearerForMe)}.` : ""}`
+      : myRoundHonorRole === "shieldbearer"
+        ? `Du bist Schildträger${assignedLordForMe ? ` von ${getPlayerLabel(assignedLordForMe)}` : ""}. Möge dein Dienst kurz und dein Becher niemals leer sein.`
+        : "Du bleibst freier Gefährte. Kein Schild, keine Krone — nur Ruhm, Spott und ein sicherer Platz am Tisch.";
+  const roundHonorCloseLabel =
+    myRoundHonorRole === "lord"
+      ? "Krone richten ×"
+      : myRoundHonorRole === "shieldbearer"
+        ? "Schild aufnehmen ×"
+        : "Erlass zur Kenntnis nehmen ×";
   const finalWinnerPopupKey = finalWinnerCelebration ? `${finalWinnerCelebration.roundId}_${finalWinnerCelebration.winner?.id || "winner"}` : "";
   const displayedWinnerCelebration = finalWinnerCelebration;
   const displayedWinnerPopupKey = finalWinnerPopupKey;
@@ -2192,7 +2232,14 @@ function LordOfTheHolesApp() {
             </div>
             <Button disabled={!isAdminUnlocked || setupSaving} onClick={saveFullSetup} className="mt-3 w-full rounded-2xl bg-amber-600 text-amber-50 disabled:opacity-50">{setupSaving ? "Speichere ..." : "Admin-Einstellungen speichern"}</Button>
             <Button disabled={!isAdminUnlocked || backupSaving} onClick={createRoundBackup} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-700/80 text-emerald-50 disabled:opacity-50">{backupSaving ? "Erstelle Backup ..." : "Backup für aktive Runde erstellen"}</Button>
-            <Button disabled={!isAdminUnlocked} onClick={() => setForceRoundHonorPopupOpen(true)} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-amber-900/50 text-amber-100 disabled:opacity-50">Herr/Butler-Popup testen</Button>
+            <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2.5">
+              <div className="mb-2 text-xs uppercase tracking-[0.18em] text-amber-300/75">Gondors Erlass testen</div>
+              <div className="grid gap-2">
+                <Button disabled={!isAdminUnlocked} onClick={() => { setForceRoundHonorRole("lord"); setForceRoundHonorPopupOpen(true); }} className="w-full rounded-2xl border border-amber-500/40 bg-amber-900/50 text-amber-100 disabled:opacity-50">Test: Herr von Gondor</Button>
+                <Button disabled={!isAdminUnlocked} onClick={() => { setForceRoundHonorRole("shieldbearer"); setForceRoundHonorPopupOpen(true); }} className="w-full rounded-2xl border border-red-500/40 bg-red-950/50 text-red-100 disabled:opacity-50">Test: Schildträger</Button>
+                <Button disabled={!isAdminUnlocked} onClick={() => { setForceRoundHonorRole("neutral"); setForceRoundHonorPopupOpen(true); }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-900 text-amber-100 disabled:opacity-50">Test: Freier Gefährte</Button>
+              </div>
+            </div>
             <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={() => { setClearScoresError(""); setClearScoresConfirmOpen(true); }} className="mt-2 w-full rounded-2xl border border-red-500/50 bg-red-950/60 text-red-100 disabled:opacity-50">Scores löschen</Button>
           </CardContent>
         </Card>
@@ -2494,6 +2541,9 @@ function LordOfTheHolesApp() {
               <div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/70">{displayedRoundHonorCelebration.roundName} beendet</div>
               <div className="mt-2 font-serif text-2xl font-black text-amber-200">Gondors Erlass</div>
               <div className="mt-1 text-sm text-amber-100/70">Die Runde ist gespielt. Der Hofstaat wird neu geordnet.</div>
+              <div className="mt-4 rounded-2xl border border-amber-300/40 bg-amber-500/10 p-3 text-sm font-semibold text-amber-50">
+                {roundHonorPersonalMessage}
+              </div>
 
               <div className="mt-4 rounded-2xl border border-amber-500/35 bg-black/25 p-3 text-left">
                 <div className="text-xs uppercase tracking-[0.22em] text-amber-300/75">
@@ -2539,13 +2589,14 @@ function LordOfTheHolesApp() {
                 onClick={() => {
                   if (forceRoundHonorPopupOpen) {
                     setForceRoundHonorPopupOpen(false);
+                    setForceRoundHonorRole("");
                   } else {
                     setRoundHonorDismissedKeys((current) => Array.from(new Set([...(current || []), displayedRoundHonorCelebration.key])));
                   }
                 }}
                 className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-3 text-sm font-bold text-amber-50"
               >
-                Schild aufnehmen ×
+                {roundHonorCloseLabel}
               </button>
             </div>
           </div>
