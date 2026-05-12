@@ -784,7 +784,7 @@ function LordOfTheHolesApp() {
   const [connectionStatus, setConnectionStatus] = useState("offline");
   const [error, setError] = useState("");
   const [selectedCourseId, setSelectedCourseId] = useState(cachedState?.selectedCourseId || "");
-  const [selectedActiveRoundId, setSelectedActiveRoundId] = useState(cachedState?.selectedActiveRoundId || "r1");
+  const [selectedActiveRoundId, setSelectedActiveRoundId] = useState(() => readLocalJson("lordOfTheHoles.selectedActiveRoundId", cachedState?.selectedActiveRoundId || "r1"));
   const [myPlayerId, setMyPlayerId] = useState(() => readLocalJson("lordOfTheHoles.myPlayerId", ""));
   const [adminPinInput, setAdminPinInput] = useState("");
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
@@ -950,6 +950,7 @@ function LordOfTheHolesApp() {
   useEffect(() => { writeLocalJson("lordOfTheHoles.winnerPopupDismissedKey", winnerPopupDismissedKey); }, [winnerPopupDismissedKey]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundHonorDismissedKeys", roundHonorDismissedKeys); }, [roundHonorDismissedKeys]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scorecardRoundId", scorecardRoundId); }, [scorecardRoundId]);
+  useEffect(() => { writeLocalJson("lordOfTheHoles.selectedActiveRoundId", selectedActiveRoundId); }, [selectedActiveRoundId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", roundSummaryDismissedKeys); }, [roundSummaryDismissedKeys]);
   useEffect(() => { pendingScoresRef.current = pendingScores; writeLocalJson("lordOfTheHoles.pendingScores", pendingScores); }, [pendingScores]);
   useEffect(() => {
@@ -1000,7 +1001,15 @@ function LordOfTheHolesApp() {
       setRounds(nextRounds);
       setRoundPlayers(data.roundPlayers || []);
       setActiveRound(nextActiveRound);
-      if (!adminEditing) { setSelectedCourseId(nextActiveRound?.course_id || ""); setSelectedActiveRoundId(nextActiveRound?.round_id || fallbackRounds[0].round_id); }
+      if (!adminEditing) {
+        const storedRoundId = readLocalJson("lordOfTheHoles.selectedActiveRoundId", cachedState?.selectedActiveRoundId || "");
+        const validStoredRound = storedRoundId && nextRounds.some((round) => String(round.round_id) === String(storedRoundId));
+        const nextDisplayRound = validStoredRound
+          ? nextRounds.find((round) => String(round.round_id) === String(storedRoundId))
+          : nextActiveRound;
+        setSelectedCourseId(nextDisplayRound?.course_id || nextActiveRound?.course_id || "");
+        setSelectedActiveRoundId(nextDisplayRound?.round_id || nextActiveRound?.round_id || fallbackRounds[0].round_id);
+      }
       applyPlayers(nextActivePlayers, nextAllPlayers, nextCourses);
       setHoles(normalizeHoles(data.activeHoles?.length ? data.activeHoles : data.holes).filter((hole) => !nextActiveRound?.course_id || String(hole.course_id) === String(nextActiveRound.course_id)));
       setAllHoles(normalizeHoles(data.holes));
