@@ -1369,6 +1369,7 @@ function LordOfTheHolesApp() {
   }
 
   async function createRoundBackup() {
+    setSetupSavedMessage("");
     setBackupSavedMessage("");
     const roundToBackup = displayedActiveRound || { round_id: selectedActiveRoundId || "r1", round_name: "Runde" };
     setSaving(true);
@@ -1386,6 +1387,7 @@ function LordOfTheHolesApp() {
   }
 
   async function saveFullSetup() {
+    setBackupSavedMessage("");
     setSetupSavedMessage("");
     const nextAllPlayers = allPlayers.map((p) => {
       const hcpIndexKey = `hcp_index_${p.id}`;
@@ -1475,6 +1477,13 @@ function LordOfTheHolesApp() {
           <button type="button" onClick={() => setMenuOpen((value) => !value)} className="rounded-xl border border-amber-700/40 bg-black/25 px-3 py-1.5 text-lg leading-none text-amber-100" aria-label="Menü öffnen">☰</button>
         </div>
         <div className="relative text-center">
+          <div className="mb-1 flex justify-center">
+            <img
+              src="/apple-touch-icon.png"
+              alt="Lord of the Holes"
+              className="h-14 w-14 rounded-2xl border border-amber-500/30 bg-black/35 object-cover shadow-lg shadow-amber-900/30"
+            />
+          </div>
           <h1 className="font-serif text-3xl font-black tracking-wide text-amber-300 drop-shadow">Lord of the Holes</h1>
           <p className="mt-0.5 text-xs text-amber-100/75">{subtitle}</p>
           {menuOpen && (
