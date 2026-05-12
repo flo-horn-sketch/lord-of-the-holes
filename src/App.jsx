@@ -737,7 +737,7 @@ function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", hel
           aria-label={`${label} auswählen`}
         >
           <div className="font-serif text-3xl font-black leading-none text-amber-200">{shownValue}</div>
-          <div className="text-[9px] uppercase tracking-[0.18em] text-amber-100/50">{label}</div>
+          <div className="text-[9px] uppercase tracking-[0.18em] text-amber-100/50">{!hasValue && defaultValue != null ? "tippen" : label}</div>
         </button>
 
         <button
@@ -1163,6 +1163,7 @@ function LordOfTheHolesApp() {
   const [roundSavedMessage, setRoundSavedMessage] = useState("");
   const [setupSavedMessage, setSetupSavedMessage] = useState("");
   const [backupSavedMessage, setBackupSavedMessage] = useState("");
+  const [scoreHintMessage, setScoreHintMessage] = useState("");
 
   const displayedActiveRound =
     (selectedActiveRoundId && (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(selectedActiveRoundId))) ||
@@ -1483,7 +1484,15 @@ function LordOfTheHolesApp() {
   }
 
   function goToNextHole() {
-    if (activeHole === 18 || !hasCurrentScore) return;
+    if (activeHole === 18) return;
+
+    if (!hasCurrentScore) {
+      setScoreHintMessage("Erst Score eintragen, dann weiter.");
+      window.setTimeout(() => setScoreHintMessage(""), 1800);
+      return;
+    }
+
+    setScoreHintMessage("");
     setActiveHole((h) => Math.min(18, h + 1));
   }
 
@@ -1830,7 +1839,8 @@ function LordOfTheHolesApp() {
                   onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 text-amber-100">Zurück</Button><Button disabled={activeHole === 18 || !hasCurrentScore} onClick={goToNextHole} className="rounded-2xl bg-amber-600 text-amber-50 disabled:opacity-50">Loch {Math.min(18, Number(activeHole || 1) + 1)}</Button></div>
+              {scoreHintMessage ? <div className="mb-2 rounded-xl border border-amber-500/40 bg-amber-950/50 p-2 text-center text-xs font-semibold text-amber-100">{scoreHintMessage}</div> : null}
+              <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 text-amber-100">Zurück</Button><Button disabled={activeHole === 18} onClick={goToNextHole} className={cls("rounded-2xl text-amber-50 disabled:opacity-50", hasCurrentScore ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>Loch {Math.min(18, Number(activeHole || 1) + 1)}</Button></div>
             </div>
           </CardContent>
         </Card>
