@@ -552,7 +552,8 @@ function buildScorecardRows(player, round, holes, scores) {
     const netStableford = getScoreStablefordPoints(score, hole.par, shots);
     const grossStableford = getScoreStablefordPoints(score, hole.par, 0);
     const toPar = strokes == null ? null : strokes - Number(hole.par || 0);
-    const puttLabel = !normalizeBoolean(score?.over_two_putts) ? "–" : Number(score?.putts_count) >= 4 ? "4+ Putt" : "3 Putt";
+    const puttsCount = score?.putts_count === "" || score?.putts_count == null ? null : Number(score.putts_count);
+    const puttLabel = puttsCount == null ? "–" : puttsCount >= 4 ? "4+ Putt" : `${puttsCount} Putt${puttsCount === 1 ? "" : "s"}`;
     return { hole, score, strokes, isPickedUp, isLady: normalizeBoolean(score?.lady), shots, toPar, netStableford, grossStableford, puttLabel };
   });
 }
@@ -624,6 +625,107 @@ function runSelfTests() {
 }
 
 if (typeof window !== "undefined") runSelfTests();
+
+function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", helper = "", status = "", onChange }) {
+  const hasValue = value !== "" && value != null;
+  const selected = hasValue ? Math.max(min, Math.min(max, Number(value || 0))) : min;
+  const shownValue = hasValue ? selected : emptyLabel;
+  const setValue = (nextValue) => onChange(Math.max(min, Math.min(max, Number(nextValue || 0))));
+
+  return (
+    <div className="rounded-2xl border border-amber-700/40 bg-black/25 p-2">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <div>
+          <div className="text-sm font-semibold text-amber-100">{label}</div>
+          {helper ? <div className="text-[11px] text-amber-100/55">{helper}</div> : null}
+        </div>
+        {status ? <div className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-100/75">{status}</div> : null}
+      </div>
+
+      <div className="grid grid-cols-[48px_1fr_48px] items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setValue((hasValue ? selected : min) - 1)}
+          disabled={!hasValue || selected <= min}
+          className="h-12 rounded-xl border border-amber-700/50 bg-stone-950 text-2xl font-black leading-none text-amber-100 disabled:opacity-35"
+          aria-label={`${label} verringern`}
+        >
+          −
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setValue(hasValue ? selected : min)}
+          className="h-12 rounded-xl border border-amber-700/30 bg-stone-950/70 text-center shadow-inner shadow-black/60"
+          aria-label={`${label} auswählen`}
+        >
+          <div className="font-serif text-3xl font-black leading-none text-amber-200">{shownValue}</div>
+          <div className="text-[9px] uppercase tracking-[0.18em] text-amber-100/50">{label}</div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setValue((hasValue ? selected : min) + 1)}
+          disabled={hasValue && selected >= max}
+          className="h-12 rounded-xl border border-amber-700/50 bg-stone-950 text-2xl font-black leading-none text-amber-100 disabled:opacity-35"
+          aria-label={`${label} erhöhen`}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PuttStepper({ value, onChange }) {
+  const selected = Number(value || 0);
+  const snakeLabel = selected >= 4 ? "4+ · 4 €" : selected === 3 ? "3 · 2 €" : selected > 0 ? "keine Snake" : "offen";
+
+  return (
+    <TouchStepper
+      label="Putts"
+      value={value || ""}
+      min={1}
+      max={6}
+      emptyLabel="–"
+      helper="1–6 per Touch"
+      status={snakeLabel}
+      onChange={onChange}
+    />
+  );
+}
+
+function getScoreRelationLabel(score, par) {
+  if (score === "" || score == null) return "offen";
+
+  const diff = Number(score) - Number(par || 0);
+
+  if (diff <= -3) return "Albatros";
+  if (diff === -2) return "Eagle";
+  if (diff === -1) return "Birdie";
+  if (diff === 0) return "Par";
+  if (diff === 1) return "Bogey";
+  if (diff === 2) return "Double Bogey";
+  if (diff === 3) return "Triple Bogey";
+  return `+${diff}`;
+}
+
+function ScoreStepper({ value, par, onChange }) {
+  const startValue = Number(value || par || 4);
+  const relationLabel = getScoreRelationLabel(value, par);
+  return (
+    <TouchStepper
+      label="Score"
+      value={value}
+      min={1}
+      max={12}
+      emptyLabel="–"
+      helper="Schläge per Touch"
+      status={value === "" || value == null ? `Start Par ${par || 4}` : relationLabel}
+      onChange={(nextValue) => onChange(nextValue || startValue)}
+    />
+  );
+}
 
 function LeaderboardTable({ title, players, columns }) {
   return (
@@ -1457,12 +1559,13 @@ function LordOfTheHolesApp() {
                 </div>
               )}
               <div className="mb-3 flex items-center justify-between gap-2"><span className="font-serif text-lg text-amber-200">{getPlayerLabel(entryPlayer)} · Loch {activeHole}</span><span className="text-[11px] text-amber-100/65">Vorgabe <b className="text-amber-200 tracking-[0.18em]">{formatShotMarks(entryPlayerShotsOnActiveHole)}</b></span></div>
-              <label className="mb-1 block text-sm text-amber-100/80">Score</label>
-              <div className="mb-3 grid grid-cols-6 gap-2">
-                {quickScores.map((value) => <button key={value} onClick={() => saveScore({ strokes: value, picked_up: false })} className={cls("rounded-2xl border py-2.5 text-base font-bold", Number(currentScore.strokes) === value && !normalizeBoolean(currentScore.picked_up) ? "border-amber-300 bg-amber-500 text-amber-50" : "border-amber-700/40 bg-black/25 text-amber-100")}>{value}</button>)}
+              <div className="mb-3">
+                <ScoreStepper
+                  value={currentScore.strokes ?? ""}
+                  par={activeHoleData?.par || 4}
+                  onChange={(scoreValue) => saveScore({ strokes: scoreValue, picked_up: false })}
+                />
               </div>
-              <label className="mb-1 block text-sm text-amber-100/80">Oder Score manuell</label>
-              <input inputMode="numeric" value={currentScore.strokes ?? ""} onChange={(e) => saveScore({ strokes: cleanNumericInput(e.target.value) === "" ? "" : Number(cleanNumericInput(e.target.value)), picked_up: false })} placeholder="z. B. 5" className="mb-3 w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2.5 text-amber-50 placeholder:text-amber-100/30" />
               <div className="mb-3 rounded-2xl border border-amber-700/40 bg-black/25 p-2.5"><div className="flex items-center justify-between gap-3"><div><div className="text-sm font-semibold text-amber-100">Loch gestrichen?</div><div className="text-xs text-amber-100/65">Wertet automatisch {pickedUpStrokes} Schläge und 0 Netto-Punkte.</div></div><input type="checkbox" checked={normalizeBoolean(currentScore.picked_up)} onChange={(e) => saveScore(e.target.checked ? { picked_up: true, strokes: pickedUpStrokes } : { picked_up: false })} className="h-5 w-5 accent-amber-500" /></div></div>
               <div className="mb-3 rounded-2xl border border-amber-700/40 bg-black/25 p-2.5">
                 <div className="flex items-center justify-between gap-3">
@@ -1473,9 +1576,11 @@ function LordOfTheHolesApp() {
                   <input type="checkbox" checked={normalizeBoolean(currentScore.lady)} onChange={(e) => saveScore({ lady: e.target.checked })} className="h-5 w-5 accent-amber-500" />
                 </div>
               </div>
-              <div className="mb-3 rounded-2xl border border-amber-700/40 bg-black/25 p-2.5">
-                <div className="mb-3 flex items-center justify-between"><span className="text-sm font-semibold text-amber-100">Snake</span><input type="checkbox" checked={normalizeBoolean(currentScore.over_two_putts)} onChange={(e) => saveScore({ over_two_putts: e.target.checked, putts_count: e.target.checked ? currentScore.putts_count || 3 : "" })} className="h-5 w-5 accent-amber-500" /></div>
-                {normalizeBoolean(currentScore.over_two_putts) && <div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => saveScore({ over_two_putts: true, putts_count: 3 })} className={cls("rounded-2xl border py-2.5 text-sm font-bold", Number(currentScore.putts_count) === 3 ? "border-amber-300 bg-amber-500 text-amber-50" : "border-amber-700/40 bg-stone-950 text-amber-100")}>3 Putt</button><button type="button" onClick={() => saveScore({ over_two_putts: true, putts_count: 4 })} className={cls("rounded-2xl border py-2.5 text-sm font-bold", Number(currentScore.putts_count) >= 4 ? "border-amber-300 bg-amber-500 text-amber-50" : "border-amber-700/40 bg-stone-950 text-amber-100")}>4+ Putt</button></div>}
+              <div className="mb-3">
+                <PuttStepper
+                  value={currentScore.putts_count}
+                  onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })}
+                />
               </div>
               <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 text-amber-100">Zurück</Button><Button disabled={activeHole === 18 || !hasCurrentScore || scoreSaveInFlight} onClick={goToNextHole} className="rounded-2xl bg-amber-600 text-amber-50 disabled:opacity-50">{scoreSaveInFlight ? "Speichere ..." : "Nächstes Loch"}</Button></div>
               {!isScorerEntryMode ? (
