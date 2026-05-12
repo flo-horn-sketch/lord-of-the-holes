@@ -686,12 +686,12 @@ function PuttStepper({ value, onChange }) {
   return (
     <TouchStepper
       label="Putts"
-      value={value || ""}
-      min={1}
+      value={value === 0 ? 0 : value || ""}
+      min={0}
       max={6}
       emptyLabel="2"
       defaultValue={2}
-      helper="Start 2 · erst bei Touch gespeichert"
+      helper=""
       status={snakeLabel}
       onChange={onChange}
     />
@@ -714,7 +714,7 @@ function getScoreRelationLabel(score, par) {
   return `+${diff}`;
 }
 
-function ScoreStepper({ value, par, onChange }) {
+function ScoreStepper({ value, par, pickedUpStrokes, onChange }) {
   const displayScore = value === "" || value == null ? Number(par || 4) : value;
   const relationLabel = getScoreRelationLabel(displayScore, par);
   return (
@@ -725,8 +725,8 @@ function ScoreStepper({ value, par, onChange }) {
       max={12}
       emptyLabel={String(par || 4)}
       defaultValue={Number(par || 4)}
-      helper="0 = gestrichen · erst bei Touch gespeichert"
-      status={value === "" || value == null ? `Start Par ${par || 4}` : relationLabel}
+      helper=""
+      status={value === "" || value == null ? "" : relationLabel}
       formatValue={(nextValue) => (Number(nextValue) === 0 ? "–" : nextValue)}
       onChange={onChange}
     />
@@ -1569,8 +1569,9 @@ function LordOfTheHolesApp() {
                 <ScoreStepper
                   value={normalizeBoolean(currentScore.picked_up) ? 0 : (currentScore.strokes ?? "")}
                   par={activeHoleData?.par || 4}
+                  pickedUpStrokes={pickedUpStrokes}
                   onChange={(scoreValue) => {
-                    if (Number(scoreValue) === 0) {
+                    if (Number(scoreValue) === 0 || Number(scoreValue) >= Number(pickedUpStrokes || 0)) {
                       saveScore({ strokes: pickedUpStrokes, picked_up: true });
                     } else {
                       saveScore({ strokes: scoreValue, picked_up: false });
