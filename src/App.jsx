@@ -746,7 +746,7 @@ function LeaderboardTable({ title, players, columns }) {
     <div className="mb-3 overflow-hidden rounded-2xl border border-amber-700/30 bg-black/20">
       <div className="border-b border-amber-700/30 bg-amber-500/10 px-2.5 py-1.5 font-serif text-lg text-amber-200">{title}</div>
       <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <table className="w-full min-w-[360px] border-collapse text-sm text-amber-50">
+        <table className="w-full min-w-[360px] border-collapse text-sm text-amber-50 landscape:min-w-[520px] landscape:text-xs">
           <thead>
             <tr className="text-left text-xs uppercase tracking-wider text-amber-100">
               <th className="px-2.5 py-1.5">#</th>
@@ -1637,20 +1637,22 @@ function LordOfTheHolesApp() {
 
   function renderLeaderboardView() {
     return (
-      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
-        <Card className="mb-3 rounded-2xl border-amber-700/40 bg-black/35"><CardContent className="p-3 text-sm text-amber-100"><div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Aktuell gespielt</div><div className="mt-1 font-serif text-lg text-amber-200">{displayedActiveRound?.round_name || "Runde 1"}</div><div className="text-amber-100/65">{activeCourse?.course_name || "Kein Kurs ausgewählt"}</div></CardContent></Card>
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
+        <div className="landscape:mx-auto landscape:max-w-none">
+        <Card className="mb-3 rounded-2xl border-amber-700/40 bg-black/35 landscape:rounded-xl"><CardContent className="p-3 text-sm text-amber-100 landscape:p-2"><div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Aktuell gespielt</div><div className="mt-1 font-serif text-lg text-amber-200">{displayedActiveRound?.round_name || "Runde 1"}</div><div className="text-amber-100/65">{activeCourse?.course_name || "Kein Kurs ausgewählt"}</div></CardContent></Card>
         <Card className="mb-3 rounded-2xl border-amber-700/40 bg-[#20170f]/90 shadow-xl"><CardContent className="p-3"><div className="mb-3"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Leaderboard</p><h2 className="font-serif text-lg text-amber-200">Die Gefährten</h2></div>
           <LeaderboardTable title="Klassisches Zählspiel" players={strokePlayLeaderboard} columns={[{ label: "+/−", render: (p) => formatToPar(p.toPar, p.played), emphasize: true }, { label: "Schläge", render: (p) => (p.played ? p.total : "–") }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
           <div id="net-stableford-board" className="scroll-mt-3">
-            <LeaderboardTable title="Netto Stableford" players={netStablefordLeaderboard} columns={[{ label: "Punkte", render: (p) => p.netStableford, emphasize: true }, { label: "SpV", render: (p) => Number(p.course_hcp || 0) }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
+            <LeaderboardTable title="Netto Stableford" players={netStablefordLeaderboard} columns={[{ label: "Punkte", render: (p) => p.netStableford, emphasize: true }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
           </div>
           <div id="hcp-adjusted-board" className="scroll-mt-3">
-            <LeaderboardTable title="Zählspiel HCP adjusted" players={hcpAdjustedStrokeLeaderboard} columns={[{ label: "+/−", render: (p) => formatToPar(p.hcpAdjustedToPar, p.played), emphasize: true }, { label: "Netto", render: (p) => (p.played ? p.hcpAdjustedTotal : "–") }, { label: "HCP", render: (p) => p.hcpShotsUsed }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
+            <LeaderboardTable title="Zählspiel HCP adjusted" players={hcpAdjustedStrokeLeaderboard} columns={[{ label: "+/−", render: (p) => formatToPar(p.hcpAdjustedToPar, p.played), emphasize: true }, { label: "Netto", render: (p) => (p.played ? p.hcpAdjustedTotal : "–") }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
           </div>
           <LeaderboardTable title="Brutto Punkte" players={grossStablefordLeaderboard} columns={[{ label: "Punkte", render: (p) => p.grossStableford, emphasize: true }, { label: "Schläge", render: (p) => (p.played ? p.total : "–") }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
           <LeaderboardTable title="Putt-Kasse" players={puttPenaltyLeaderboard} columns={[{ label: "3 Putts", render: (p) => `${p.threePutts} × 2 €` }, { label: "4+ Putts", render: (p) => `${p.fourPlusPutts} × 4 €` }, { label: "Gesamt", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} />
           <LeaderboardTable title="Ladys" players={ladyLeaderboard} columns={[{ label: "Anzahl", render: (p) => Number(p.ladyCount || 0), emphasize: true }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
         </CardContent></Card>
+        </div>
       </motion.section>
     );
   }
