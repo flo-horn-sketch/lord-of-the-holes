@@ -1443,7 +1443,7 @@ function LordOfTheHolesApp() {
       <>
         {error && <Card className="mb-3 rounded-2xl border-amber-700/40 bg-amber-950/50"><CardContent className="p-3 text-sm text-amber-100">{error}</CardContent></Card>}
         {roundSavedMessage && <Card className="mb-3 rounded-2xl border-emerald-700/40 bg-emerald-950/40"><CardContent className="p-3 text-sm text-emerald-100">{roundSavedMessage}</CardContent></Card>}
-        {setupSavedMessage && <Card className="mb-3 rounded-2xl border-emerald-700/40 bg-emerald-950/40"><CardContent className="p-3 text-sm text-emerald-100">{setupSavedMessage}</CardContent></Card>}
+        
       </>
     );
   }
@@ -1748,6 +1748,24 @@ function LordOfTheHolesApp() {
         {renderCurrentTabs()}
         {renderActiveView()}
       </main>
+      {setupSavedMessage ? (
+        <div className="fixed inset-x-3 top-4 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/50 bg-emerald-950/95 p-3 text-emerald-50 shadow-2xl shadow-black/60 backdrop-blur">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="font-serif text-lg text-emerald-100">Gespeichert</div>
+              <div className="mt-0.5 text-sm text-emerald-100/85">{setupSavedMessage}</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSetupSavedMessage("")}
+              className="rounded-xl border border-emerald-400/40 bg-black/20 px-3 py-1 text-sm font-bold text-emerald-50"
+              aria-label="Meldung schließen"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
