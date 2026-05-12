@@ -1168,42 +1168,6 @@ function TournamentStandings({ players, rounds, holes, scores, activeRoundId = "
             </table>
           </div>
         )}
-
-        <div className="mt-6 mb-4">
-          <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Putt-Kasse</p>
-          <h3 className="font-serif text-lg text-amber-200">Gesamt über Runde 1–4</h3>
-          <p className="mt-1 text-sm text-amber-100/70">3 Putts zählen 2 €, 4+ Putts zählen 4 €.</p>
-        </div>
-
-        <div className="overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <table className="w-full min-w-[760px] border-collapse text-sm text-amber-50">
-            <thead>
-              <tr className="text-left text-xs uppercase tracking-wider text-amber-100">
-                <th className="px-2.5 py-1.5">#</th>
-                <th className="px-2.5 py-1.5">Spieler</th>
-                {puttKasseRounds.map((round) => <th key={round.round_id} className="px-2.5 py-1.5 text-right">{round.round_name}</th>)}
-                <th className="px-2.5 py-1.5 text-right">3 Putts</th>
-                <th className="px-2.5 py-1.5 text-right">4+ Putts</th>
-                <th className="px-2.5 py-1.5 text-right">Gesamt</th>
-              </tr>
-            </thead>
-            <tbody>
-              {puttStandings.map((player, index) => (
-                <tr key={player.id} className="border-t border-amber-700/20">
-                  <td className="px-2.5 py-1.5 text-amber-200/75">{index + 1}</td>
-                  <td className="px-2.5 py-1.5 font-semibold text-amber-100">{getPlayerLabel(player)}</td>
-                  {puttKasseRounds.map((round) => {
-                    const result = player.roundResults.find((item) => item.round_id === round.round_id);
-                    return <td key={round.round_id} className="px-2.5 py-1.5 text-right text-amber-100">{result?.amount ? `${result.amount} €` : "–"}</td>;
-                  })}
-                  <td className="px-2.5 py-1.5 text-right text-amber-100">{player.totalThreePutts} × 2 €</td>
-                  <td className="px-2.5 py-1.5 text-right text-amber-100">{player.totalFourPlusPutts} × 4 €</td>
-                  <td className="px-2.5 py-1.5 text-right font-serif text-xl font-bold text-amber-300">{player.totalAmount} €</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </CardContent>
     </Card>
   );
@@ -2088,7 +2052,6 @@ function LordOfTheHolesApp() {
             </div>
             <LeaderboardTable title="Brutto Punkte" players={grossStablefordLeaderboard} columns={[{ label: "Punkte", render: (p) => p.grossStableford, emphasize: true }, { label: "Schläge", render: (p) => (p.played ? p.total : "–") }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
             <LeaderboardTable title="Putt-Kasse" players={puttPenaltyLeaderboard} columns={[{ label: "3 Putts", render: (p) => `${p.threePutts} × 2 €` }, { label: "4+ Putts", render: (p) => `${p.fourPlusPutts} × 4 €` }, { label: "Gesamt", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} />
-            <LeaderboardTable title="Ladys" players={ladyLeaderboard} columns={[{ label: "Anzahl", render: (p) => Number(p.ladyCount || 0), emphasize: true }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
           </CardContent></Card>
         </div>
       </motion.section>
