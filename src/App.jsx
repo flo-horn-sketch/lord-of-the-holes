@@ -1076,7 +1076,7 @@ function LordOfTheHolesApp() {
 
   function renderCurrentTabs() {
     if (mainMenu !== "current") return null;
-    return tton onClick={() => setView("score")} className={cls("rounded-xl px-1 py-2.5 text-sm font-bold", view === "score" ? "bg-amber-600 text-amber-50" : "bg-stone-800 text-amber-100")}>Score</Button><Button onClick={() => setView("leaderboard")} className={cls("rounded-xl px-1 py-2.5 text-sm font-bold", view === "leaderboard" ? "bg-amber-600 text-amber-50" : "bg-stone-800 text-amber-100")}>Board</Button></div>;
+    return <div className="mb-2 grid grid-cols-2 gap-2"><Button onClick={() => setView("score")} className={cls("rounded-xl px-1 py-2.5 text-sm font-bold", view === "score" ? "bg-amber-600 text-amber-50" : "bg-stone-800 text-amber-100")}>Score</Button><Button onClick={() => setView("leaderboard")} className={cls("rounded-xl px-1 py-2.5 text-sm font-bold", view === "leaderboard" ? "bg-amber-600 text-amber-50" : "bg-stone-800 text-amber-100")}>Board</Button></div>;
   }
 
   function renderTournamentView() {
@@ -1119,17 +1119,111 @@ function LordOfTheHolesApp() {
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
         <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm">
           <CardContent className="p-2">
-            <div className={cls("mb-2 rounded-xl border bg-black/25 p-1.5", hasScoreMismatch ? "border-red-500/60" : "border-amber-700/30")}><div className="flex items-center justify-between gap-2"><div><div className="text-[10px] uppercase tracking-[0.18em] text-amber-300/75">Aktuell gespielt</div><div className="font-serif text-base leading-tight text-amber-200">{displayedActiveRound?.round_name || "Runde 1"}</div><div className="text-[10px] text-amber-100/65">{activeCourse?.course_name || "Kein Kurs ausgewählt"}</div></div>{hasScoreMismatch && <div className="rounded-full border border-red-400/502 grid grid-cols-[1fr_auto] items-center gap-2"><div><p className="text-[10px] uppercase tracking-[0.18em] text-amber-300/75">Aktives Loch</p><h2 className="font-serif text-3xl font-black leading-none text-amber-200">{activeHole}</h2></div><div className="grid grid-cols-3 gap-1 rounded-xl border border-amber-700/50 bg-black/30 p-1.5 text-center text-[11px] text-amber-50"><div><div className="text-amber-100/70">Par</div><b className="text-amber-200">{activeHoleData.par}</b></div><div><div className="text-amber-100/70">HCP</div><b className="text-amber-200">{activeHoleData.hcp}</b></div><div><div className="text-amber-100/70">m</div><b className="text-amber-200">{activeHoleData.meters}</b></div></div></div>
-            {myCurrentStats ? <div className="mb-2 w-full rounded-xl border border-amber-700/30 bg-black/25 p-1.5 text-left"><div className="mb-1 flex items-center justify-between gap-2"><div className="text-[10px] uppercase tracking-[0.18em] text-amber-300/75">Mein Stand</div><div className="font-serif text-xs text-amber-200">{getPlayerLabel(myCurrentStats)}</div></div><div className="grid grid-cols-2 gap-2 text-center text-sm"><button type="button" onClick={() => setStandingsPopup("hcpAdjusted")} className="rounded-xl bg-amber-50/5 p-1.5 text-amber-50 transition active:scale-[0.99]"><div className="text-amber-100">Strokes</div><b className="text-lg text-amber-200">{myCurrentStats.played ?0/70">Tatsächlich {myCurrentStats.played ? myCurrentStats.total : "–"} · Platz {myHcpAdjustedStrokeRank || "–"}</div></button><button type="button" onClick={() => setStandingsPopup("netStableford")} className="rounded-xl bg-amber-50/5 p-1.5 text-amber-50 transition active:scale-[0.99]"><div className="text-amber-100">Netto Stbl</div><b className="text-lg text-amber-200">{myCurrentStats.netStableford}</b><div className="mt-0.5 text-[11px] text-amber-100/70">SpV {Number(myCurrentSta className="mb-3 rounded-xl border border-amber-700/30 bg-black/20 p-2 text-xs text-amber-100/75">Unter Einstellungen kannst du festlegen, wer du bist. Danach erscheint hier dein aktueller Score.</div>}
+            <div className={cls("mb-2 rounded-xl border bg-black/25 p-1.5", hasScoreMismatch ? "border-red-500/60" : "border-amber-700/30")}>
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-amber-300/75">Aktuell gespielt</div>
+                  <div className="font-serif text-base leading-tight text-amber-200">{displayedActiveRound?.round_name || "Runde 1"}</div>
+                  <div className="text-[10px] text-amber-100/65">{activeCourse?.course_name || "Kein Kurs ausgewählt"}</div>
+                </div>
+                {hasScoreMismatch ? (
+                  <div className="rounded-full border border-red-400/50 bg-red-950/50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-red-100">Abweichung</div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="mb-2 grid grid-cols-[1fr_auto] items-center gap-2">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.18em] text-amber-300/75">Aktives Loch</p>
+                <h2 className="font-serif text-3xl font-black leading-none text-amber-200">{activeHole}</h2>
+              </div>
+              <div className="grid grid-cols-3 gap-1 rounded-xl border border-amber-700/50 bg-black/30 p-1.5 text-center text-[11px] text-amber-50">
+                <div><div className="text-amber-100/70">Par</div><b className="text-amber-200">{activeHoleData.par}</b></div>
+                <div><div className="text-amber-100/70">HCP</div><b className="text-amber-200">{activeHoleData.hcp}</b></div>
+                <div><div className="text-amber-100/70">m</div><b className="text-amber-200">{activeHoleData.meters}</b></div>
+              </div>
+            </div>
+
+            {myCurrentStats ? (
+              <div className="mb-2 w-full rounded-xl border border-amber-700/30 bg-black/25 p-1.5 text-left">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-amber-300/75">Mein Stand</div>
+                  <div className="font-serif text-xs text-amber-200">{getPlayerLabel(myCurrentStats)}</div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-center text-xs">
+                  <button type="button" onClick={() => setStandingsPopup("hcpAdjusted")} className="rounded-xl bg-amber-50/5 p-1.5 text-amber-50 transition active:scale-[0.99]">
+                    <div className="text-amber-100">Strokes</div>
+                    <b className="text-base text-amber-200">{myCurrentStats.played ? myCurrentStats.hcpAdjustedTotal : "–"}</b>
+                    <div className="mt-0.5 text-[10px] text-amber-100/70">Tats. {myCurrentStats.played ? myCurrentStats.total : "–"} · Platz {myHcpAdjustedStrokeRank || "–"}</div>
+                  </button>
+                  <button type="button" onClick={() => setStandingsPopup("netStableford")} className="rounded-xl bg-amber-50/5 p-1.5 text-amber-50 transition active:scale-[0.99]">
+                    <div className="text-amber-100">Netto Stbl</div>
+                    <b className="text-base text-amber-200">{myCurrentStats.netStableford}</b>
+                    <div className="mt-0.5 text-[10px] text-amber-100/70">SpV {Number(myCurrentStats.course_hcp || 0)} · Platz {myNetStablefordRank || "–"}</div>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mb-2 rounded-xl border border-amber-700/30 bg-black/20 p-1.5 text-[10px] text-amber-100/75">Unter Einstellungen kannst du festlegen, wer du bist.</div>
+            )}
+
             <div className={cls("rounded-2xl border bg-amber-50/5 p-2", hasScoreMismatch ? "border-red-500/70 ring-1 ring-red-500/40" : "border-amber-700/40")}>
-              {myCurrentPlayer && <div className="mb-2 grid grid-cols-2 gap-2 rounded-xl border border-amber-700/30 bg-black/25 p-1"><button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-xl px-2 py-1.5 text-xs font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/60")}>{getPlayerLabel(scoredPlayer) || "Spieler"} {hasSelectedPlayerScoreMismatch ? "⚠" : ""}</button><button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl px-2 py-1.5 text-xs font-bold", isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasOwnScoreMismatch && "ring-1 ring-red-400/60")}>Mein Score {hasOwnScoreMismatch ? "⚠" : ""}</button></div>}
-              {visibleScoreMismatchMessages.length ? <div className="mb-2 rounded-2xl border border-red-500/50 bg-red-950/40 p-2 text-sm text-red-100"><span className="underline underline-offset-4">Palantír meldet Abweichung</span><div className="mt-1 space-y-0.5">{visibleScoreMismatchMessages.map((message) => <div key={message}>{message}</div>)}</div></div> : null}
-              <div className="mb-2 flex items-center justify-between gap-2"><span className="font-serif text-base text-amber-200">{getPlayerLabel(entryPlayer)} · Loch {activeHole}</span><span className="text-[10px] text-amber-100/65">Vorgabe <b className="text-amber-200 tracking-[0.18em]">{formatShotMarks(entryPlayerShotsOnActiveHole)}</b></span></div>
-              <div className="mb-2"><ScoreStepper value={normalizeBoolean(currentScore.picked_up) ? 0 : currentScore.strokes ?? ""} par={activeHoleData?.par || 4} pickedUpStrokes={pickedUpStrokes} onChange={(scoreValue) => Number(scoreValue) === 0 || Number(scoreValue) >= Number(pickedUpStrokes || 0) ? saveScore({ strokes: pickedUpStrokes, picked_up: true }) : saveScore({ strokes: scoreValue, picked_up: false })} /></div>
-              <div className="mb-2"><PuttStepper value={currentScore.putts_count} onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })} /></div>
-              <div className="mb-2 rounded-xl border border-amber-700/40 bg-black/25 p-1.5"><div className="flex items-center justify-between gap-2"><div><div className="text-xs font-semibold text-amber-100">Lady</div><div className="text-[10px] text-amber-100/65">Markiert eine Lady.</div></div><input type="checkbox" checked={normalizeBoolean(currentScore.lady)} onChange={(e) => saveScore({ lady: e.target.checked })} className="h-4 w-4 accent-amber-500" /></div></div>
-              {scoreHintMessage ? <div className="mb-2 rounded-xl border border-amber-500/40 bg-amber-950/50 p-2 text-center text-xs font-semibold text-amber-100">{scoreHintMessage}</div> : null}
-              <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 py-2 text-amber-100">Zurück</Button><Button disabled={activeHole === 18} onClick={goToNextHole} className={cls("rounded-2xl py-2 text-amber-50 disabled:opacity-50", hasCurrentScore && hasCurrentPutts ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>Loch {Math.min(18, Number(activeHole || 1) + 1)}</Button></div>
+              {myCurrentPlayer ? (
+                <div className="mb-2 grid grid-cols-2 gap-2 rounded-xl border border-amber-700/30 bg-black/25 p-1">
+                  <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-xl px-2 py-1.5 text-xs font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/60")}>
+                    {getPlayerLabel(scoredPlayer) || "Spieler"} {hasSelectedPlayerScoreMismatch ? "⚠" : ""}
+                  </button>
+                  <button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl px-2 py-1.5 text-xs font-bold", isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasOwnScoreMismatch && "ring-1 ring-red-400/60")}>
+                    Mein Score {hasOwnScoreMismatch ? "⚠" : ""}
+                  </button>
+                </div>
+              ) : null}
+
+              {visibleScoreMismatchMessages.length ? (
+                <div className="mb-2 rounded-xl border border-red-500/50 bg-red-950/40 p-1.5 text-xs text-red-100">
+                  <span className="underline underline-offset-4">Palantír meldet Abweichung</span>
+                  <div className="mt-1 space-y-0.5">{visibleScoreMismatchMessages.map((message) => <div key={message}>{message}</div>)}</div>
+                </div>
+              ) : null}
+
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="font-serif text-base text-amber-200">{getPlayerLabel(entryPlayer)} · Loch {activeHole}</span>
+                <span className="text-[10px] text-amber-100/65">Vorgabe <b className="text-amber-200 tracking-[0.18em]">{formatShotMarks(entryPlayerShotsOnActiveHole)}</b></span>
+              </div>
+
+              <div className="mb-2">
+                <ScoreStepper
+                  value={normalizeBoolean(currentScore.picked_up) ? 0 : currentScore.strokes ?? ""}
+                  par={activeHoleData?.par || 4}
+                  pickedUpStrokes={pickedUpStrokes}
+                  onChange={(scoreValue) =>
+                    Number(scoreValue) === 0 || Number(scoreValue) >= Number(pickedUpStrokes || 0)
+                      ? saveScore({ strokes: pickedUpStrokes, picked_up: true })
+                      : saveScore({ strokes: scoreValue, picked_up: false })
+                  }
+                />
+              </div>
+
+              <div className="mb-2">
+                <PuttStepper value={currentScore.putts_count} onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })} />
+              </div>
+
+              <div className="mb-2 rounded-xl border border-amber-700/40 bg-black/25 p-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <div className="text-xs font-semibold text-amber-100">Lady</div>
+                    <div className="text-[10px] text-amber-100/65">Markiert eine Lady.</div>
+                  </div>
+                  <input type="checkbox" checked={normalizeBoolean(currentScore.lady)} onChange={(e) => saveScore({ lady: e.target.checked })} className="h-4 w-4 accent-amber-500" />
+                </div>
+              </div>
+
+              {scoreHintMessage ? <div className="mb-2 rounded-xl border border-amber-500/40 bg-amber-950/50 p-1.5 text-center text-xs font-semibold text-amber-100">{scoreHintMessage}</div> : null}
+
+              <div className="grid grid-cols-2 gap-2">
+                <Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 py-2 text-amber-100">Zurück</Button>
+                <Button disabled={activeHole === 18} onClick={goToNextHole} className={cls("rounded-2xl py-2 text-amber-50 disabled:opacity-50", hasCurrentScore && hasCurrentPutts ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>Loch {Math.min(18, Number(activeHole || 1) + 1)}</Button>
+              </div>
             </div>
           </CardContent>
         </Card>
