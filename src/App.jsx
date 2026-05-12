@@ -275,7 +275,7 @@ function getMismatchesForRound(scores, roundId, players = []) {
   return holeNumbers.flatMap((holeNumber) => getMismatchesForHole(scores, roundId, holeNumber, players));
 }
 
-function runSelfTestsn runSelfTests() {
+function runSelfTests() {
   const failures = [];
   const assert = (name, condition) => {
     if (!condition) failures.push(name);
@@ -858,7 +858,8 @@ function LordOfTheHolesApp() {
   const fallbackResponsibleMismatch = responsibleHoleMismatches[0] || null;
   const scoreMismatchMessage = selectedPlayerMismatch?.message || "";
   const ownScoreMismatchMessage = ownPlayerMismatch?.message || "";
-  const visibleScoreMismatchMessage = scoreMismatchMessage || ownScoreMismatchMessage || fallbackResponsibleMismatch?.message || "";
+  const visibleScoreMismatchMessages = responsibleHoleMismatches.map((item) => item.message);
+  const visibleScoreMismatchMessage = visibleScoreMismatchMessages[0] || "";
   const hasScoreMismatch = responsibleHoleMismatches.length > 0;
   const hasSelectedPlayerScoreMismatch = Boolean(scoreMismatchMessage);
   const hasOwnScoreMismatch = Boolean(ownScoreMismatchMessage);
@@ -1337,7 +1338,12 @@ function LordOfTheHolesApp() {
               )}
               {visibleScoreMismatchMessage && (
                 <div className="mb-3 rounded-2xl border border-red-500/50 bg-red-950/40 p-2.5 text-sm text-red-100">
-                  Achtung: Offizieller Score und Eigenkontrolle unterscheiden sich. {selectedPlayerMismatch ? getPlayerLabel(selectedPlayerMismatch.player) + ": " : ownPlayerMismatch ? getPlayerLabel(ownPlayerMismatch.player) + ": " : fallbackResponsibleMismatch ? getPlayerLabel(fallbackResponsibleMismatch.player) + ": " : ""}{visibleScoreMismatchMessage}
+                  Achtung: Offizieller Score und Eigenkontrolle unterscheiden sich.
+                    <div className="mt-1 space-y-0.5">
+                      {visibleScoreMismatchMessages.map((message) => (
+                        <div key={message}>{message}</div>
+                      ))}
+                    </div>
                 </div>
               )}
               <div className="mb-3 flex items-center justify-between gap-2"><span className="font-serif text-lg text-amber-200">{getPlayerLabel(entryPlayer)} · Loch {activeHole}</span><span className="text-[11px] text-amber-100/65">Vorgabe <b className="text-amber-200 tracking-[0.18em]">{formatShotMarks(entryPlayerShotsOnActiveHole)}</b></span></div>
