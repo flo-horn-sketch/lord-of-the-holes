@@ -1116,6 +1116,8 @@ function LordOfTheHolesApp() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [setupSaving, setSetupSaving] = useState(false);
+  const [backupSaving, setBackupSaving] = useState(false);
   const [scoreSaveInFlight, setScoreSaveInFlight] = useState(false);
   const pendingScoreSaveRef = useRef(Promise.resolve(true));
   const scoreSaveSequenceRef = useRef(0);
@@ -1372,7 +1374,7 @@ function LordOfTheHolesApp() {
     setSetupSavedMessage("");
     setBackupSavedMessage("");
     const roundToBackup = displayedActiveRound || { round_id: selectedActiveRoundId || "r1", round_name: "Runde" };
-    setSaving(true);
+    setBackupSaving(true);
     try {
       const result = await callSheetApi({ action: "createRoundBackup", round_id: roundToBackup.round_id });
       setConnectionStatus("online");
@@ -1382,7 +1384,7 @@ function LordOfTheHolesApp() {
       setConnectionStatus("offline");
       setError(err.message || "Backup konnte nicht erstellt werden.");
     } finally {
-      setSaving(false);
+      setBackupSaving(false);
     }
   }
 
@@ -1477,15 +1479,14 @@ function LordOfTheHolesApp() {
           <button type="button" onClick={() => setMenuOpen((value) => !value)} className="rounded-xl border border-amber-700/40 bg-black/25 px-3 py-1.5 text-lg leading-none text-amber-100" aria-label="Menü öffnen">☰</button>
         </div>
         <div className="relative text-center">
-          <div className="mb-1 flex justify-center">
+          <div className="mx-auto mb-2 h-24 overflow-hidden rounded-3xl border border-amber-500/25 bg-black/35 shadow-xl shadow-black/40">
             <img
               src="/apple-touch-icon.png"
               alt="Lord of the Holes"
-              className="h-14 w-14 rounded-2xl border border-amber-500/30 bg-black/35 object-cover shadow-lg shadow-amber-900/30"
+              className="h-full w-full object-cover object-center opacity-95"
             />
           </div>
-          <h1 className="font-serif text-3xl font-black tracking-wide text-amber-300 drop-shadow">Lord of the Holes</h1>
-          <p className="mt-0.5 text-xs text-amber-100/75">{subtitle}</p>
+          <p className="mt-0.5 text-xs uppercase tracking-[0.22em] text-amber-100/75">{subtitle}</p>
           {menuOpen && (
             <div className="absolute right-0 top-[58px] z-30 w-64 overflow-hidden rounded-2xl border border-amber-700/40 bg-stone-950/95 text-left shadow-2xl shadow-black/70 backdrop-blur">
               {[
@@ -1587,8 +1588,8 @@ function LordOfTheHolesApp() {
                 );
               })}
             </div>
-            <Button disabled={!isAdminUnlocked} onClick={saveFullSetup} className="mt-3 w-full rounded-2xl bg-amber-600 text-amber-50 disabled:opacity-50">{saving ? "Speichere ..." : "Admin-Einstellungen speichern"}</Button>
-            <Button disabled={!isAdminUnlocked || saving} onClick={createRoundBackup} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-700/80 text-emerald-50 disabled:opacity-50">{saving ? "Bitte warten ..." : "Backup für aktive Runde erstellen"}</Button>
+            <Button disabled={!isAdminUnlocked || setupSaving} onClick={saveFullSetup} className="mt-3 w-full rounded-2xl bg-amber-600 text-amber-50 disabled:opacity-50">{setupSaving ? "Speichere ..." : "Admin-Einstellungen speichern"}</Button>
+            <Button disabled={!isAdminUnlocked || backupSaving} onClick={createRoundBackup} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-700/80 text-emerald-50 disabled:opacity-50">{backupSaving ? "Erstelle Backup ..." : "Backup für aktive Runde erstellen"}</Button>
           </CardContent>
         </Card>
       </motion.section>
