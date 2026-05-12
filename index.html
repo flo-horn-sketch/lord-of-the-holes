@@ -14,82 +14,11 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
-    <style>
-      html,
-      body {
-        margin: 0;
-        min-height: 100%;
-        background: #0c0a09;
-      }
-
-      #initial-splash {
-        position: fixed;
-        inset: 0;
-        z-index: 9999;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background:
-          radial-gradient(circle at 30% 10%, rgba(245, 158, 11, 0.22), transparent 35%),
-          radial-gradient(circle at 80% 15%, rgba(220, 38, 38, 0.16), transparent 30%),
-          linear-gradient(180deg, #0c0a09, #000000);
-        color: #fcd34d;
-        font-family: Georgia, "Times New Roman", serif;
-      }
-
-      #initial-splash-inner {
-        text-align: center;
-        padding: 32px;
-      }
-
-      #initial-splash img {
-        width: 112px;
-        height: 112px;
-        border-radius: 28px;
-        object-fit: cover;
-        border: 1px solid rgba(245, 158, 11, 0.35);
-        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65);
-      }
-
-      #initial-splash-title {
-        margin-top: 16px;
-        font-size: 24px;
-        font-weight: 900;
-        letter-spacing: 0.04em;
-      }
-
-      #initial-splash-subtitle {
-        margin-top: 6px;
-        font-size: 10px;
-        letter-spacing: 0.22em;
-        text-transform: uppercase;
-        color: rgba(254, 243, 199, 0.6);
-        font-family: Arial, sans-serif;
-      }
-    </style>
-
     <script src="https://cdn.tailwindcss.com"></script>
   </head>
 
   <body>
-    <div id="initial-splash">
-      <div id="initial-splash-inner">
-        <img src="/apple-touch-icon.png" alt="Lord of the Holes" />
-        <div id="initial-splash-title">Lord of the Holes</div>
-        <div id="initial-splash-subtitle">Scoring</div>
-      </div>
-    </div>
-
     <div id="root"></div>
-
-    <script>
-      window.addEventListener("load", function () {
-        setTimeout(function () {
-          var splash = document.getElementById("initial-splash");
-          if (splash) splash.remove();
-        }, 3000);
-      });
-    </script>
 
     <script type="module" src="/src/main.jsx"></script>
   </body>
