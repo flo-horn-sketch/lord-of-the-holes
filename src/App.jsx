@@ -1130,6 +1130,7 @@ function LordOfTheHolesApp() {
   const [adminEditing, setAdminEditing] = useState(false);
   const [roundSavedMessage, setRoundSavedMessage] = useState("");
   const [setupSavedMessage, setSetupSavedMessage] = useState("");
+  const [backupSavedMessage, setBackupSavedMessage] = useState("");
 
   const displayedActiveRound =
     (selectedActiveRoundId && (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(selectedActiveRoundId))) ||
@@ -1367,6 +1368,23 @@ function LordOfTheHolesApp() {
     setActiveHole((h) => Math.min(18, h + 1));
   }
 
+  async function createRoundBackup() {
+    setBackupSavedMessage("");
+    const roundToBackup = displayedActiveRound || { round_id: selectedActiveRoundId || "r1", round_name: "Runde" };
+    setSaving(true);
+    try {
+      const result = await callSheetApi({ action: "createRoundBackup", round_id: roundToBackup.round_id });
+      setConnectionStatus("online");
+      setError("");
+      setBackupSavedMessage(result?.backup_sheet_name ? `Backup erstellt: ${result.backup_sheet_name}` : `${roundToBackup.round_name || "Runde"} wurde gesichert.`);
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Backup konnte nicht erstellt werden.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function saveFullSetup() {
     setSetupSavedMessage("");
     const nextAllPlayers = allPlayers.map((p) => {
@@ -1561,6 +1579,7 @@ function LordOfTheHolesApp() {
               })}
             </div>
             <Button disabled={!isAdminUnlocked} onClick={saveFullSetup} className="mt-3 w-full rounded-2xl bg-amber-600 text-amber-50 disabled:opacity-50">{saving ? "Speichere ..." : "Admin-Einstellungen speichern"}</Button>
+            <Button disabled={!isAdminUnlocked || saving} onClick={createRoundBackup} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-700/80 text-emerald-50 disabled:opacity-50">{saving ? "Bitte warten ..." : "Backup für aktive Runde erstellen"}</Button>
           </CardContent>
         </Card>
       </motion.section>
@@ -1760,6 +1779,24 @@ function LordOfTheHolesApp() {
               onClick={() => setSetupSavedMessage("")}
               className="rounded-xl border border-emerald-400/40 bg-black/20 px-3 py-1 text-sm font-bold text-emerald-50"
               aria-label="Meldung schließen"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {backupSavedMessage ? (
+        <div className="fixed inset-x-3 top-4 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/50 bg-emerald-950/95 p-3 text-emerald-50 shadow-2xl shadow-black/60 backdrop-blur">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="font-serif text-lg text-emerald-100">Backup erstellt</div>
+              <div className="mt-0.5 text-sm text-emerald-100/85">{backupSavedMessage}</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setBackupSavedMessage("")}
+              className="rounded-xl border border-emerald-400/40 bg-black/20 px-3 py-1 text-sm font-bold text-emerald-50"
+              aria-label="Backup-Meldung schließen"
             >
               ×
             </button>
