@@ -637,6 +637,48 @@ function buildFinalNetStandings(players, rounds, holes, scores) {
   return [...championshipGroup, ...placementGroup];
 }
 
+function getFinalWinnerCelebration(players, rounds, holes, scores, roundPlayers) {
+  const finalRound = getFinalRound(rounds);
+  if (!finalRound?.round_id || !finalRound?.course_id) return null;
+
+  const finalHoles = getRoundHoles(finalRound, holes);
+  if (!finalHoles.length) return null;
+
+  const finalPlayers = getRoundPlayers(finalRound.round_id, players, roundPlayers);
+  if (!finalPlayers.length) return null;
+
+  const finalScores = (scores || []).filter(
+    (score) =>
+      String(score.round_id) === String(finalRound.round_id) &&
+      score.strokes !== "" &&
+      score.strokes != null
+  );
+
+  const allFinalScoresComplete = finalPlayers.every((player) =>
+    finalHoles.every((hole) =>
+      finalScores.some(
+        (score) =>
+          String(score.player_id) === String(player.id) &&
+          Number(score.hole_number) === Number(hole.hole_number)
+      )
+    )
+  );
+
+  if (!allFinalScoresComplete) return null;
+
+  const finalStandings = buildFinalNetStandings(players, rounds, holes, scores);
+  const winner = finalStandings.find((player) => Number(player.finalRank) === 1) || finalStandings[0] || null;
+  if (!winner) return null;
+
+  return {
+    roundId: finalRound.round_id,
+    winner,
+    winnerName: winner.character_name || winner.display_name || winner.id,
+    winnerLabel: getPlayerLabel(winner),
+    finalHcpAdjustedStrokes: winner.finalHcpAdjustedStrokes,
+  };
+}
+
 function buildScorecardRows(player, round, holes, scores) {
   const roundHoles = getRoundHoles(round, holes);
   const roundScores = (scores || []).filter((s) => String(s.round_id) === String(round?.round_id) && String(s.player_id) === String(player?.id));
@@ -1437,6 +1479,7 @@ function LordOfTheHolesApp() {
   const [clearScoresSaving, setClearScoresSaving] = useState(false);
   const [clearScoresError, setClearScoresError] = useState("");
   const [standingsPopup, setStandingsPopup] = useState(null);
+  const [winnerPopupDismissedKey, setWinnerPopupDismissedKey] = useState(() => readLocalJson("lordOfTheHoles.winnerPopupDismissedKey", ""));
 
   const displayedActiveRound =
     (selectedActiveRoundId && (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(selectedActiveRoundId))) ||
@@ -1525,6 +1568,12 @@ function LordOfTheHolesApp() {
     const index = netStablefordLeaderboard.findIndex((player) => String(player.id) === String(myPlayerId));
     return index >= 0 ? index + 1 : null;
   }, [netStablefordLeaderboard, myPlayerId]);
+  const finalWinnerCelebration = useMemo(
+    () => getFinalWinnerCelebration(allPlayers, rounds, allHoles, officialAllScores, roundPlayers),
+    [allPlayers, rounds, allHoles, officialAllScores, roundPlayers]
+  );
+  const finalWinnerPopupKey = finalWinnerCelebration ? `${finalWinnerCelebration.roundId}_${finalWinnerCelebration.winner?.id || "winner"}` : "";
+  const showFinalWinnerPopup = Boolean(finalWinnerCelebration && finalWinnerPopupKey !== winnerPopupDismissedKey);
 
   useEffect(() => {
     if (!scoreablePlayers.some((p) => String(p.id) === String(scoredPlayerId))) setScoredPlayerId(scoreablePlayers[0]?.id || "");
@@ -1543,6 +1592,10 @@ function LordOfTheHolesApp() {
   useEffect(() => {
     writeLocalJson("lordOfTheHoles.scoredPlayerId", scoredPlayerId);
   }, [scoredPlayerId]);
+
+  useEffect(() => {
+    writeLocalJson("lordOfTheHoles.winnerPopupDismissedKey", winnerPopupDismissedKey);
+  }, [winnerPopupDismissedKey]);
 
   useEffect(() => {
     pendingScoresRef.current = pendingScores;
@@ -2319,6 +2372,31 @@ function LordOfTheHolesApp() {
         </div>
       ) : null}
       {renderPopupStandingsTable()}
+      {showFinalWinnerPopup ? (
+        <div className="fixed inset-0 z-[96] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-400/60 bg-stone-950 text-center text-amber-50 shadow-2xl shadow-black/80">
+            <div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.28),transparent_45%),linear-gradient(180deg,rgba(120,53,15,0.55),rgba(12,10,9,1))] p-5">
+              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-amber-300/50 bg-black/30 text-3xl shadow-xl shadow-amber-950/40">♛</div>
+              <div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/70">Finale beendet</div>
+              <div className="mt-2 font-serif text-2xl font-black text-amber-200">Lord of the Holes 2026 ist</div>
+              <div className="mt-2 font-serif text-4xl font-black text-amber-300 drop-shadow">{finalWinnerCelebration?.winnerName}</div>
+              <div className="mt-2 text-sm text-amber-100/70">{finalWinnerCelebration?.winnerLabel}</div>
+              <div className="mt-3 rounded-2xl border border-amber-500/35 bg-black/25 p-2 text-sm text-amber-100">
+                Final Strokes HCP: <b className="text-amber-200">{finalWinnerCelebration?.finalHcpAdjustedStrokes ?? "–"}</b>
+              </div>
+            </div>
+            <div className="p-3">
+              <button
+                type="button"
+                onClick={() => setWinnerPopupDismissedKey(finalWinnerPopupKey)}
+                className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-3 text-sm font-bold text-amber-50"
+              >
+                Krone anerkennen ×
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {clearScoresConfirmOpen ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-3xl border border-red-500/60 bg-stone-950 p-4 text-red-50 shadow-2xl shadow-black/70">
