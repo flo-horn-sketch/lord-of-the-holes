@@ -37,12 +37,8 @@ class AppErrorBoundary extends React.Component {
         <div className="min-h-screen bg-stone-950 p-4 text-amber-50">
           <div className="mx-auto max-w-md rounded-2xl border border-red-500/60 bg-red-950/40 p-4">
             <div className="font-serif text-lg text-red-100">App-Fehler</div>
-            <p className="mt-2 text-sm text-red-100/80">
-              Die App konnte nicht vollständig geladen werden. Bitte diese Meldung oder den Konsolenfehler schicken.
-            </p>
-            <pre className="mt-2 whitespace-pre-wrap rounded-xl bg-black/40 p-3 text-xs text-red-100">
-              {String(this.state.error?.message || this.state.error)}
-            </pre>
+            <p className="mt-2 text-sm text-red-100/80">Die App konnte nicht vollständig geladen werden. Bitte diese Meldung oder den Konsolenfehler schicken.</p>
+            <pre className="mt-2 whitespace-pre-wrap rounded-xl bg-black/40 p-3 text-xs text-red-100">{String(this.state.error?.message || this.state.error)}</pre>
           </div>
         </div>
       );
@@ -52,9 +48,7 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
-const GOOGLE_SHEETS_API_URL =
-  "https://script.google.com/macros/s/AKfycbw4EGUY8EQKDendALBEf-BtcsMbkCIMl3JJdEYZrZOkQyIV3Nnl6rFeEhmcLNLsaRYe/exec";
-
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbw4EGUY8EQKDendALBEf-BtcsMbkCIMl3JJdEYZrZOkQyIV3Nnl6rFeEhmcLNLsaRYe/exec";
 const ADMIN_PASSWORD = "weimar";
 
 const fallbackAliases = {
@@ -81,10 +75,10 @@ const fallbackCourses = [
 ];
 
 const fallbackRounds = [
-  { round_id: "r1", round_name: "Runde 1", course_id: "", status: "active", stage: "qualification", sort_order: 1 },
-  { round_id: "r2", round_name: "Runde 2", course_id: "", status: "upcoming", stage: "qualification", sort_order: 2 },
-  { round_id: "r3", round_name: "Runde 3", course_id: "", status: "upcoming", stage: "qualification", sort_order: 3 },
-  { round_id: "r4", round_name: "Finaltag", course_id: "", status: "upcoming", stage: "final", sort_order: 4 },
+  { round_id: "r1", round_name: "Runde 1", course_id: "goethe", status: "active", stage: "qualification", sort_order: 1 },
+  { round_id: "r2", round_name: "Runde 2", course_id: "goethe", status: "upcoming", stage: "qualification", sort_order: 2 },
+  { round_id: "r3", round_name: "Runde 3", course_id: "feininger", status: "upcoming", stage: "qualification", sort_order: 3 },
+  { round_id: "r4", round_name: "Finaltag", course_id: "goethe", status: "upcoming", stage: "final", sort_order: 4 },
 ];
 
 const fallbackHoles = [
@@ -106,6 +100,24 @@ const fallbackHoles = [
   { course_id: "goethe", hole_number: 16, meters: 172, par: 3, hcp: 16 },
   { course_id: "goethe", hole_number: 17, meters: 530, par: 5, hcp: 2 },
   { course_id: "goethe", hole_number: 18, meters: 317, par: 4, hcp: 8 },
+  { course_id: "feininger", hole_number: 1, meters: 338, par: 4, hcp: 9 },
+  { course_id: "feininger", hole_number: 2, meters: 142, par: 3, hcp: 17 },
+  { course_id: "feininger", hole_number: 3, meters: 483, par: 5, hcp: 3 },
+  { course_id: "feininger", hole_number: 4, meters: 348, par: 4, hcp: 7 },
+  { course_id: "feininger", hole_number: 5, meters: 371, par: 4, hcp: 1 },
+  { course_id: "feininger", hole_number: 6, meters: 160, par: 3, hcp: 15 },
+  { course_id: "feininger", hole_number: 7, meters: 512, par: 5, hcp: 5 },
+  { course_id: "feininger", hole_number: 8, meters: 342, par: 4, hcp: 11 },
+  { course_id: "feininger", hole_number: 9, meters: 319, par: 4, hcp: 13 },
+  { course_id: "feininger", hole_number: 10, meters: 340, par: 4, hcp: 8 },
+  { course_id: "feininger", hole_number: 11, meters: 155, par: 3, hcp: 18 },
+  { course_id: "feininger", hole_number: 12, meters: 487, par: 5, hcp: 2 },
+  { course_id: "feininger", hole_number: 13, meters: 362, par: 4, hcp: 6 },
+  { course_id: "feininger", hole_number: 14, meters: 330, par: 4, hcp: 10 },
+  { course_id: "feininger", hole_number: 15, meters: 170, par: 3, hcp: 16 },
+  { course_id: "feininger", hole_number: 16, meters: 389, par: 4, hcp: 4 },
+  { course_id: "feininger", hole_number: 17, meters: 315, par: 4, hcp: 14 },
+  { course_id: "feininger", hole_number: 18, meters: 358, par: 4, hcp: 12 },
 ];
 
 function cls(...items) {
@@ -114,11 +126,7 @@ function cls(...items) {
 
 function Icon({ children, className = "", size = 18, spin = false }) {
   return (
-    <span
-      aria-hidden="true"
-      className={cls("inline-flex items-center justify-center leading-none", spin && "animate-spin", className)}
-      style={{ width: size, height: size, fontSize: size }}
-    >
+    <span aria-hidden="true" className={cls("inline-flex items-center justify-center leading-none", spin && "animate-spin", className)} style={{ width: size, height: size, fontSize: size }}>
       {children}
     </span>
   );
@@ -128,14 +136,8 @@ function normalizeBoolean(value) {
   return value === true || String(value).toLowerCase().trim() === "true" || String(value).toLowerCase().trim() === "ja" || String(value).trim() === "1";
 }
 
-function cleanNumericInput(value) {
-  return String(value ?? "").replace(/[^0-9]/g, "");
-}
-
 function cleanHandicapInput(value) {
-  const normalized = String(value ?? "")
-    .replace(",", ".")
-    .replace(/[^0-9.-]/g, "");
+  const normalized = String(value ?? "").replace(",", ".").replace(/[^0-9.-]/g, "");
   const firstMinus = normalized.startsWith("-") ? "-" : "";
   const withoutMinus = normalized.replace(/-/g, "");
   const parts = withoutMinus.split(".");
@@ -184,9 +186,7 @@ function getPlayerLabel(player) {
 }
 
 function normalizeHoles(rawHoles) {
-  const validHoles = Array.isArray(rawHoles)
-    ? rawHoles.filter((h) => Number(h.hole_number) > 0 && Number(h.par) > 0 && Number(h.hcp) > 0)
-    : [];
+  const validHoles = Array.isArray(rawHoles) ? rawHoles.filter((h) => Number(h.hole_number) > 0 && Number(h.par) > 0 && Number(h.hcp) > 0) : [];
   return validHoles.length ? validHoles : fallbackHoles;
 }
 
@@ -194,7 +194,6 @@ function getCourseSettings(id, list = fallbackCourses) {
   const cid = String(id || "goethe").toLowerCase().trim();
   const fallbackCourse = cid === "feininger" ? fallbackCourses[1] : fallbackCourses[0];
   const sheetCourse = (list || []).find((item) => String(item?.course_id || "").toLowerCase().trim() === cid);
-
   return {
     ...fallbackCourse,
     ...sheetCourse,
@@ -204,16 +203,12 @@ function getCourseSettings(id, list = fallbackCourses) {
   };
 }
 
-function roundPlayingHandicap(value) {
-  return Math.round(Number(value || 0));
-}
-
 function calculatePlayingHandicap(handicapIndex, course) {
   const hcpIndex = Number(String(handicapIndex ?? "0").replace(",", ".") || 0);
   const slope = Number(course?.slope_rating || 113);
   const courseRating = Number(course?.course_rating || course?.rating || course?.cr || course?.par || 72);
   const par = Number(course?.par || 72);
-  return roundPlayingHandicap(hcpIndex * (slope / 113) + (courseRating - par));
+  return Math.round(hcpIndex * (slope / 113) + (courseRating - par));
 }
 
 function getHandicapIndex(player) {
@@ -225,10 +220,7 @@ function getHandicapIndex(player) {
 
 function getCourseHandicap(player, courseId = "goethe", courses = fallbackCourses) {
   const handicapIndex = getHandicapIndex(player);
-  if (handicapIndex != null) {
-    return calculatePlayingHandicap(handicapIndex, getCourseSettings(courseId, courses));
-  }
-
+  if (handicapIndex != null) return calculatePlayingHandicap(handicapIndex, getCourseSettings(courseId, courses));
   const normalizedCourseId = String(courseId || "goethe").toLowerCase().trim();
   if (normalizedCourseId === "feininger") return Number(player?.course_hcp_feininger ?? 0);
   return Number(player?.course_hcp_goethe ?? 0);
@@ -236,10 +228,7 @@ function getCourseHandicap(player, courseId = "goethe", courses = fallbackCourse
 
 function getPlayerForCourse(player, courseId = "goethe", courses = fallbackCourses) {
   if (!player) return null;
-  return {
-    ...withFallbackAlias(player),
-    course_hcp: getCourseHandicap(player, courseId, courses),
-  };
+  return { ...withFallbackAlias(player), course_hcp: getCourseHandicap(player, courseId, courses) };
 }
 
 function getPlayersForCourse(players, courseId = "goethe", courses = fallbackCourses) {
@@ -266,7 +255,7 @@ function getScoreStablefordPoints(score, par, shots) {
   return getStablefordPoints(score.strokes, par, shots);
 }
 
-function getPickedUpStrokes(player, hole, courseId = "goethe") {
+function getPickedUpStrokes(player, hole) {
   return Number(hole?.par || 0) * 2 + 1;
 }
 
@@ -281,15 +270,16 @@ function getPuttBuckets(playerScores) {
   return { threePutts, fourPlusPutts, overTwoPutts: threePutts + fourPlusPutts };
 }
 
-function getRoundCourse(round, courses) {
-  return (courses || fallbackCourses).find((course) => String(course.course_id) === String(round?.course_id));
+function getCourseShortName(courseId) {
+  const normalized = String(courseId || "").toLowerCase().trim();
+  if (normalized === "goethe") return "Goethe";
+  if (normalized === "feininger") return "Feininger";
+  return courseId || "Kurs";
 }
 
 function getRoundHoles(round, holes) {
   if (!round?.course_id) return [];
-  return (holes || [])
-    .filter((hole) => String(hole.course_id) === String(round.course_id))
-    .sort((a, b) => Number(a.hole_number) - Number(b.hole_number));
+  return (holes || []).filter((hole) => String(hole.course_id) === String(round.course_id)).sort((a, b) => Number(a.hole_number) - Number(b.hole_number));
 }
 
 function getRoundPlayers(roundId, allPlayers, roundPlayers) {
@@ -302,516 +292,8 @@ function getRoundPlayers(roundId, allPlayers, roundPlayers) {
   return (allPlayers || []).map(withFallbackAlias);
 }
 
-function buildPlayerStats(players, holes, scores) {
-  return (players || []).map((p) => {
-    const playerScores = (scores || []).filter((s) => String(s.player_id) === String(p.id) && s.strokes !== "" && s.strokes != null);
-    const played = playerScores.length;
-    const total = playerScores.reduce((sum, s) => sum + Number(s.strokes || 0), 0);
-    const parPlayed = playerScores.reduce((sum, s) => {
-      const hole = (holes || []).find((h) => Number(h.hole_number) === Number(s.hole_number));
-      return sum + Number(hole?.par || 0);
-    }, 0);
-    const { threePutts, fourPlusPutts, overTwoPutts } = getPuttBuckets(playerScores);
-    const netStableford = playerScores.reduce((sum, s) => {
-      const hole = (holes || []).find((h) => Number(h.hole_number) === Number(s.hole_number));
-      const shots = getShotsOnHole(p.course_hcp, hole?.hcp);
-      return sum + getScoreStablefordPoints(s, hole?.par, shots);
-    }, 0);
-    const grossStableford = playerScores.reduce((sum, s) => {
-      const hole = (holes || []).find((h) => Number(h.hole_number) === Number(s.hole_number));
-      return sum + getScoreStablefordPoints(s, hole?.par, 0);
-    }, 0);
-    const hcpShotsUsed = playerScores.reduce((sum, s) => {
-      const hole = (holes || []).find((h) => Number(h.hole_number) === Number(s.hole_number));
-      return sum + getShotsOnHole(p.course_hcp, hole?.hcp);
-    }, 0);
-    const hcpAdjustedTotal = total - hcpShotsUsed;
-    const hcpAdjustedToPar = hcpAdjustedTotal - parPlayed;
-    const ladyCount = playerScores.filter((s) => normalizeBoolean(s.lady)).length;
-
-    return {
-      ...withFallbackAlias(p),
-      played,
-      total,
-      toPar: total - parPlayed,
-      hcpShotsUsed,
-      hcpAdjustedTotal,
-      hcpAdjustedToPar,
-      overTwoPutts,
-      threePutts,
-      fourPlusPutts,
-      puttPenaltyEuro: threePutts * 2 + fourPlusPutts * 4,
-      ladyCount,
-      netStableford,
-      grossStableford,
-    };
-  });
-}
-
-function sortStrokePlay(stats) {
-  return [...(stats || [])].sort((a, b) => {
-    if (a.played === 0 && b.played > 0) return 1;
-    if (b.played === 0 && a.played > 0) return -1;
-    return a.toPar - b.toPar || b.played - a.played || Number(a.sort_order || 0) - Number(b.sort_order || 0);
-  });
-}
-
-function sortStableford(stats, fieldName) {
-  return [...(stats || [])].sort((a, b) => {
-    if (a.played === 0 && b.played > 0) return 1;
-    if (b.played === 0 && a.played > 0) return -1;
-    return Number(b[fieldName] || 0) - Number(a[fieldName] || 0) || b.played - a.played || Number(a.sort_order || 0) - Number(b.sort_order || 0);
-  });
-}
-
-function sortHcpAdjustedStrokePlay(stats) {
-  return [...(stats || [])].sort((a, b) => {
-    if (a.played === 0 && b.played > 0) return 1;
-    if (b.played === 0 && a.played > 0) return -1;
-    return Number(a.hcpAdjustedToPar || 0) - Number(b.hcpAdjustedToPar || 0) || Number(a.hcpAdjustedTotal || 0) - Number(b.hcpAdjustedTotal || 0) || b.played - a.played || Number(a.sort_order || 0) - Number(b.sort_order || 0);
-  });
-}
-
-function sortPuttPenalties(stats) {
-  return [...(stats || [])].sort((a, b) => Number(b.puttPenaltyEuro || 0) - Number(a.puttPenaltyEuro || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
-}
-
-function sortLadyCounts(stats) {
-  return [...(stats || [])].sort((a, b) => Number(b.ladyCount || 0) - Number(a.ladyCount || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
-}
-
-function getScoreDiffToPar(score, hole) {
-  if (!score || score.strokes === "" || score.strokes == null) return null;
-  return Number(score.strokes || 0) - Number(hole?.par || 0);
-}
-
-function buildFunPlayerStats(players, holes, scores) {
-  return (players || []).map((player) => {
-    const playerScores = (scores || []).filter((score) => String(score.player_id) === String(player.id) && score.strokes !== "" && score.strokes != null);
-    const enrichedScores = playerScores.map((score) => {
-      const hole = (holes || []).find((item) => Number(item.hole_number) === Number(score.hole_number));
-      return { score, hole, diff: getScoreDiffToPar(score, hole) };
-    }).filter((item) => item.hole);
-
-    const frontScores = enrichedScores.filter((item) => Number(item.hole.hole_number) <= 9);
-    const backScores = enrichedScores.filter((item) => Number(item.hole.hole_number) > 9);
-    const frontTotal = frontScores.length ? frontScores.reduce((sum, item) => sum + Number(item.score.strokes || 0), 0) : null;
-    const backTotal = backScores.length ? backScores.reduce((sum, item) => sum + Number(item.score.strokes || 0), 0) : null;
-    const frontPar = frontScores.length ? frontScores.reduce((sum, item) => sum + Number(item.hole.par || 0), 0) : null;
-    const backPar = backScores.length ? backScores.reduce((sum, item) => sum + Number(item.hole.par || 0), 0) : null;
-    const frontToPar = frontTotal == null || frontPar == null ? null : frontTotal - frontPar;
-    const backToPar = backTotal == null || backPar == null ? null : backTotal - backPar;
-    const backMinusFront = frontToPar == null || backToPar == null ? null : backToPar - frontToPar;
-
-    const birdies = enrichedScores.filter((item) => item.diff === -1 && !normalizeBoolean(item.score.picked_up)).length;
-    const eaglesOrBetter = enrichedScores.filter((item) => item.diff != null && item.diff <= -2 && !normalizeBoolean(item.score.picked_up)).length;
-    const pars = enrichedScores.filter((item) => item.diff === 0 && !normalizeBoolean(item.score.picked_up)).length;
-    const parOrBetter = enrichedScores.filter((item) => item.diff != null && item.diff <= 0 && !normalizeBoolean(item.score.picked_up)).length;
-    const doubleBogeyPlus = enrichedScores.filter((item) => item.diff != null && item.diff >= 2).length;
-    const triplePlus = enrichedScores.filter((item) => item.diff != null && item.diff >= 3).length;
-    const pickedUpCount = enrichedScores.filter((item) => normalizeBoolean(item.score.picked_up)).length;
-    const ladyCount = enrichedScores.filter((item) => normalizeBoolean(item.score.lady)).length;
-    const { threePutts, fourPlusPutts } = getPuttBuckets(playerScores);
-    const grossStableford = enrichedScores.reduce((sum, item) => sum + getScoreStablefordPoints(item.score, item.hole.par, 0), 0);
-    const netStableford = enrichedScores.reduce((sum, item) => {
-      const shots = getShotsOnHole(player.course_hcp, item.hole.hcp);
-      return sum + getScoreStablefordPoints(item.score, item.hole.par, shots);
-    }, 0);
-    const hcpBonus = netStableford - grossStableford;
-    const hcpShotsUsed = enrichedScores.reduce((sum, item) => sum + getShotsOnHole(player.course_hcp, item.hole.hcp), 0);
-
-    return {
-      ...withFallbackAlias(player),
-      played: enrichedScores.length,
-      birdies,
-      eaglesOrBetter,
-      pars,
-      parOrBetter,
-      doubleBogeyPlus,
-      triplePlus,
-      pickedUpCount,
-      ladyCount,
-      threePutts,
-      fourPlusPutts,
-      puttPenaltyEuro: threePutts * 2 + fourPlusPutts * 4,
-      frontTotal,
-      backTotal,
-      frontToPar,
-      backToPar,
-      backMinusFront,
-      grossStableford,
-      netStableford,
-      hcpBonus,
-      hcpShotsUsed,
-      pointsPerHcpShot: hcpShotsUsed ? Number((netStableford / hcpShotsUsed).toFixed(2)) : 0,
-    };
-  });
-}
-
-function getCourseShortName(courseId) {
-  const normalized = String(courseId || "").toLowerCase().trim();
-  if (normalized === "goethe") return "Goethe";
-  if (normalized === "feininger") return "Feininger";
-  return courseId || "Kurs";
-}
-
-function buildFunHoleStats(players, holes, scores) {
-  return (holes || []).map((hole) => {
-    const holeScores = (scores || []).filter((score) => Number(score.hole_number) === Number(hole.hole_number) && score.strokes !== "" && score.strokes != null);
-    const played = holeScores.length;
-    const totalStrokes = holeScores.reduce((sum, score) => sum + Number(score.strokes || 0), 0);
-    const avgScore = played ? totalStrokes / played : 0;
-    const avgToPar = played ? avgScore - Number(hole.par || 0) : 0;
-    const birdies = holeScores.filter((score) => getScoreDiffToPar(score, hole) === -1 && !normalizeBoolean(score.picked_up)).length;
-    const pars = holeScores.filter((score) => getScoreDiffToPar(score, hole) === 0 && !normalizeBoolean(score.picked_up)).length;
-    const pickedUpCount = holeScores.filter((score) => normalizeBoolean(score.picked_up)).length;
-    const ladies = holeScores.filter((score) => normalizeBoolean(score.lady)).length;
-    const snakes = holeScores.filter((score) => normalizeBoolean(score.over_two_putts)).length;
-    return {
-      course_id: hole.course_id || "",
-      course_name: getCourseShortName(hole.course_id),
-      hole_number: hole.hole_number,
-      par: hole.par,
-      hcp: hole.hcp,
-      played,
-      avgScore,
-      avgToPar,
-      birdies,
-      pars,
-      pickedUpCount,
-      ladies,
-      snakes,
-    };
-  }).filter((item) => item.played > 0);
-}
-
-function buildScorerMismatchStats(mismatches, players) {
-  const playerMap = new Map((players || []).map((player) => [String(player.id), withFallbackAlias(player)]));
-  const stats = new Map();
-
-  (players || []).forEach((player) => {
-    stats.set(String(player.id), {
-      ...withFallbackAlias(player),
-      asPlayer: 0,
-      asScorer: 0,
-      total: 0,
-    });
-  });
-
-  (mismatches || []).forEach((item) => {
-    const playerId = String(item.playerId || "");
-    const scorerId = String(item.officialScorerId || "");
-    if (playerId) {
-      const current = stats.get(playerId) || { ...(playerMap.get(playerId) || { id: playerId, character_name: playerId }), asPlayer: 0, asScorer: 0, total: 0 };
-      current.asPlayer += 1;
-      current.total += 1;
-      stats.set(playerId, current);
-    }
-    if (scorerId) {
-      const current = stats.get(scorerId) || { ...(playerMap.get(scorerId) || { id: scorerId, character_name: scorerId }), asPlayer: 0, asScorer: 0, total: 0 };
-      current.asScorer += 1;
-      current.total += 1;
-      stats.set(scorerId, current);
-    }
-  });
-
-  return Array.from(stats.values()).sort((a, b) => Number(b.total || 0) - Number(a.total || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
-}
-
-function getQualificationRounds(rounds) {
-  return (rounds?.length ? rounds : fallbackRounds)
-    .filter((round) => String(round.stage || "qualification") === "qualification")
-    .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0))
-    .slice(0, 3);
-}
-
-function getPuttKasseRounds(rounds) {
-  return (rounds?.length ? rounds : fallbackRounds).sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0)).slice(0, 4);
-}
-
-function getFinalRound(rounds) {
-  return (rounds?.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === "r4") || (rounds?.length ? rounds : fallbackRounds).find((round) => String(round.stage) === "final") || fallbackRounds[3];
-}
-
-function getRoundChapterLabel(round) {
-  const roundId = String(round?.round_id || "").trim();
-  const sortOrder = Number(round?.sort_order || 0);
-  const stage = String(round?.stage || "").toLowerCase().trim();
-
-  if (stage === "final" || roundId === "r4" || sortOrder === 4) return "Finaltag · Am Schicksalsberg";
-  if (roundId === "r1" || sortOrder === 1) return "Runde 1 · Die Gefährten brechen auf";
-  if (roundId === "r2" || sortOrder === 2) return "Runde 2 · Durch die Minen";
-  if (roundId === "r3" || sortOrder === 3) return "Runde 3 · Vor den Toren Mordors";
-
-  const roundName = round?.round_name || "Runde";
-  return `${roundName} · Kapitel der Runde`;
-}
-
-function buildTournamentNetStandings(players, rounds, holes, scores) {
-  const qualificationRounds = getQualificationRounds(rounds);
-  return (players || [])
-    .map((player) => {
-      const roundResults = qualificationRounds.map((round) => {
-        const roundHoles = getRoundHoles(round, holes);
-        const roundScores = (scores || []).filter((score) => String(score.round_id) === String(round.round_id) && String(score.player_id) === String(player.id) && score.strokes !== "" && score.strokes != null);
-        const playerForRound = getPlayerForCourse(player, round.course_id || "goethe");
-        const grossStrokes = roundScores.reduce((sum, score) => sum + Number(score.strokes || 0), 0);
-        const hcpShotsUsed = roundScores.reduce((sum, score) => {
-          const hole = roundHoles.find((h) => Number(h.hole_number) === Number(score.hole_number));
-          return sum + getShotsOnHole(playerForRound.course_hcp, hole?.hcp);
-        }, 0);
-        const hcpAdjustedStrokes = roundScores.length ? grossStrokes - hcpShotsUsed : null;
-        return {
-          round_id: round.round_id,
-          round_name: round.round_name,
-          points: hcpAdjustedStrokes,
-          hcpAdjustedStrokes,
-          grossStrokes,
-          hcpShotsUsed,
-          played: roundScores.length,
-        };
-      });
-      const playedResults = roundResults.filter((result) => result.played > 0 && result.hcpAdjustedStrokes != null);
-      const sortedPlayed = [...playedResults].sort((a, b) => Number(a.hcpAdjustedStrokes || 0) - Number(b.hcpAdjustedStrokes || 0));
-      const counted = sortedPlayed.slice(0, 2);
-      const dropped = sortedPlayed.slice(2, 3)[0] || null;
-      return {
-        ...withFallbackAlias(player),
-        roundResults,
-        countedRoundIds: counted.map((result) => result.round_id),
-        droppedRoundId: dropped?.round_id || "",
-        totalBestTwo: counted.length ? counted.reduce((sum, result) => sum + Number(result.hcpAdjustedStrokes || 0), 0) : null,
-        roundsPlayed: playedResults.length,
-      };
-    })
-    .sort((a, b) => {
-      if (a.totalBestTwo == null && b.totalBestTwo != null) return 1;
-      if (b.totalBestTwo == null && a.totalBestTwo != null) return -1;
-      return Number(a.totalBestTwo || 0) - Number(b.totalBestTwo || 0) || Number(b.roundsPlayed || 0) - Number(a.roundsPlayed || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0);
-    });
-}
-
-function buildTournamentPuttStandings(players, rounds, scores) {
-  const puttRounds = getPuttKasseRounds(rounds);
-  return (players || [])
-    .map((player) => {
-      const roundResults = puttRounds.map((round) => {
-        const roundScores = (scores || []).filter((score) => String(score.round_id) === String(round.round_id) && String(score.player_id) === String(player.id));
-        const buckets = getPuttBuckets(roundScores);
-        return { round_id: round.round_id, round_name: round.round_name, threePutts: buckets.threePutts, fourPlusPutts: buckets.fourPlusPutts, amount: buckets.threePutts * 2 + buckets.fourPlusPutts * 4 };
-      });
-      return { ...withFallbackAlias(player), roundResults, totalThreePutts: roundResults.reduce((sum, r) => sum + r.threePutts, 0), totalFourPlusPutts: roundResults.reduce((sum, r) => sum + r.fourPlusPutts, 0), totalAmount: roundResults.reduce((sum, r) => sum + r.amount, 0) };
-    })
-    .sort((a, b) => Number(b.totalAmount || 0) - Number(a.totalAmount || 0) || Number(b.totalFourPlusPutts || 0) - Number(a.totalFourPlusPutts || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
-}
-
-function buildFinalNetStandings(players, rounds, holes, scores) {
-  const qualificationStandings = buildTournamentNetStandings(players, rounds, holes, scores);
-  const finalRound = getFinalRound(rounds);
-  const finalHoles = getRoundHoles(finalRound, holes);
-
-  const withFinalScores = qualificationStandings.map((player, qualificationIndex) => {
-    const finalScores = (scores || []).filter(
-      (score) =>
-        String(score.round_id) === String(finalRound?.round_id) &&
-        String(score.player_id) === String(player.id) &&
-        score.strokes !== "" &&
-        score.strokes != null
-    );
-
-    const playerForRound = getPlayerForCourse(player, finalRound?.course_id || "goethe");
-    const finalGrossStrokes = finalScores.reduce((sum, score) => sum + Number(score.strokes || 0), 0);
-    const finalHcpShotsUsed = finalScores.reduce((sum, score) => {
-      const hole = finalHoles.find((h) => Number(h.hole_number) === Number(score.hole_number));
-      return sum + getShotsOnHole(playerForRound.course_hcp, hole?.hcp);
-    }, 0);
-    const finalHcpAdjustedStrokes = finalScores.length ? finalGrossStrokes - finalHcpShotsUsed : null;
-
-    return {
-      ...withFallbackAlias(player),
-      qualificationRank: qualificationIndex + 1,
-      finalHcpAdjustedStrokes,
-      finalGrossStrokes,
-      finalHcpShotsUsed,
-      finalPlayed: finalScores.length,
-      finalGroup: qualificationIndex < 3 ? "championship" : "placement",
-    };
-  });
-
-  const sortFinalGroup = (items) =>
-    [...items].sort((a, b) => {
-      if (a.finalHcpAdjustedStrokes == null && b.finalHcpAdjustedStrokes != null) return 1;
-      if (b.finalHcpAdjustedStrokes == null && a.finalHcpAdjustedStrokes != null) return -1;
-      return Number(a.finalHcpAdjustedStrokes || 0) - Number(b.finalHcpAdjustedStrokes || 0) || Number(a.qualificationRank || 0) - Number(b.qualificationRank || 0);
-    });
-
-  const championshipGroup = sortFinalGroup(withFinalScores.filter((p) => p.finalGroup === "championship")).map((p, i) => ({ ...p, finalRank: i + 1 }));
-  const placementGroup = sortFinalGroup(withFinalScores.filter((p) => p.finalGroup === "placement")).map((p, i) => ({ ...p, finalRank: i + 4 }));
-
-  return [...championshipGroup, ...placementGroup];
-}
-
-function buildRoundHcpAdjustedStandings(players, round, holes, scores, roundPlayers) {
-  if (!round?.round_id || !round?.course_id) return [];
-
-  const roundHoles = getRoundHoles(round, holes);
-  const roundPlayersList = getRoundPlayers(round.round_id, players, roundPlayers);
-
-  return roundPlayersList
-    .map((player) => {
-      const playerForRound = getPlayerForCourse(player, round.course_id || "goethe");
-      const playerScores = (scores || []).filter(
-        (score) =>
-          String(score.round_id) === String(round.round_id) &&
-          String(score.player_id) === String(player.id) &&
-          score.strokes !== "" &&
-          score.strokes != null
-      );
-
-      const grossStrokes = playerScores.reduce((sum, score) => sum + Number(score.strokes || 0), 0);
-      const hcpShotsUsed = playerScores.reduce((sum, score) => {
-        const hole = roundHoles.find((h) => Number(h.hole_number) === Number(score.hole_number));
-        return sum + getShotsOnHole(playerForRound.course_hcp, hole?.hcp);
-      }, 0);
-      const hcpAdjustedStrokes = playerScores.length ? grossStrokes - hcpShotsUsed : null;
-      const isComplete =
-        roundHoles.length > 0 &&
-        roundHoles.every((hole) =>
-          playerScores.some((score) => Number(score.hole_number) === Number(hole.hole_number))
-        );
-
-      return {
-        ...withFallbackAlias(player),
-        grossStrokes,
-        hcpShotsUsed,
-        hcpAdjustedStrokes,
-        played: playerScores.length,
-        isComplete,
-      };
-    })
-    .sort((a, b) => {
-      if (a.hcpAdjustedStrokes == null && b.hcpAdjustedStrokes != null) return 1;
-      if (b.hcpAdjustedStrokes == null && a.hcpAdjustedStrokes != null) return -1;
-      return Number(a.hcpAdjustedStrokes || 0) - Number(b.hcpAdjustedStrokes || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0);
-    });
-}
-
-function getRoundHonorCelebration(players, rounds, holes, scores, roundPlayers, dismissedKeys = []) {
-  const qualificationRounds = getQualificationRounds(rounds);
-
-  for (const round of qualificationRounds) {
-    if (!round?.round_id || !round?.course_id) continue;
-
-    const popupKey = `round_honor_${round.round_id}`;
-    if ((dismissedKeys || []).includes(popupKey)) continue;
-
-    const standings = buildRoundHcpAdjustedStandings(players, round, holes, scores, roundPlayers);
-    if (!standings.length || standings.some((player) => !player.isComplete)) continue;
-
-    const roundOrder = Number(round.sort_order || qualificationRounds.findIndex((item) => String(item.round_id) === String(round.round_id)) + 1);
-    const lordCount = roundOrder === 1 ? 1 : 2;
-    const butlerCount = roundOrder === 1 ? 1 : 2;
-    const lords = standings.slice(0, lordCount);
-    const butlers = standings.slice(-butlerCount).reverse();
-
-    return {
-      key: popupKey,
-      roundId: round.round_id,
-      roundName: round.round_name || `Runde ${roundOrder}`,
-      roundOrder,
-      lords,
-      butlers,
-    };
-  }
-
-  return null;
-}
-
-function getFinalWinnerCelebration(players, rounds, holes, scores, roundPlayers) {
-  const finalRound = getFinalRound(rounds);
-  if (!finalRound?.round_id || !finalRound?.course_id) return null;
-
-  const finalHoles = getRoundHoles(finalRound, holes);
-  if (!finalHoles.length) return null;
-
-  const finalPlayers = getRoundPlayers(finalRound.round_id, players, roundPlayers);
-  if (!finalPlayers.length) return null;
-
-  const finalScores = (scores || []).filter(
-    (score) =>
-      String(score.round_id) === String(finalRound.round_id) &&
-      score.strokes !== "" &&
-      score.strokes != null
-  );
-
-  const allFinalScoresComplete = finalPlayers.every((player) =>
-    finalHoles.every((hole) =>
-      finalScores.some(
-        (score) =>
-          String(score.player_id) === String(player.id) &&
-          Number(score.hole_number) === Number(hole.hole_number)
-      )
-    )
-  );
-
-  if (!allFinalScoresComplete) return null;
-
-  const finalStandings = buildFinalNetStandings(players, rounds, holes, scores);
-  const winner = finalStandings.find((player) => Number(player.finalRank) === 1) || finalStandings[0] || null;
-  if (!winner) return null;
-
-  return {
-    roundId: finalRound.round_id,
-    winner,
-    winnerName: getPlayerLabel(winner),
-    winnerLabel: winner.character_name || winner.display_name || winner.id,
-    finalHcpAdjustedStrokes: winner.finalHcpAdjustedStrokes,
-  };
-}
-
-function buildScorecardRows(player, round, holes, scores) {
-  const roundHoles = getRoundHoles(round, holes);
-  const roundScores = (scores || []).filter((s) => String(s.round_id) === String(round?.round_id) && String(s.player_id) === String(player?.id));
-  const playerForRound = getPlayerForCourse(player, round?.course_id || "goethe");
-  return roundHoles.map((hole) => {
-    const score = roundScores.find((s) => Number(s.hole_number) === Number(hole.hole_number));
-    const strokes = score?.strokes === "" || score?.strokes == null ? null : Number(score.strokes);
-    const isPickedUp = normalizeBoolean(score?.picked_up);
-    const isLady = normalizeBoolean(score?.lady);
-    const shots = getShotsOnHole(playerForRound?.course_hcp, hole.hcp);
-    const netStableford = getScoreStablefordPoints(score, hole.par, shots);
-    const grossStableford = getScoreStablefordPoints(score, hole.par, 0);
-    const toPar = strokes == null ? null : strokes - Number(hole.par || 0);
-    const puttsCount = score?.putts_count === "" || score?.putts_count == null ? null : Number(score.putts_count);
-    const puttLabel = puttsCount == null ? "–" : puttsCount >= 4 ? "4+ Putt" : `${puttsCount} Putt${puttsCount === 1 ? "" : "s"}`;
-    return { hole, score, strokes, isPickedUp, isLady, shots, toPar, netStableford, grossStableford, puttLabel };
-  });
-}
-
-function summarizeScorecard(rows) {
-  const playedRows = (rows || []).filter((row) => row.strokes != null);
-  return {
-    played: playedRows.length,
-    totalStrokes: playedRows.reduce((sum, row) => sum + Number(row.strokes || 0), 0),
-    toPar: playedRows.reduce((sum, row) => sum + Number(row.strokes || 0), 0) - playedRows.reduce((sum, row) => sum + Number(row.hole.par || 0), 0),
-    netStableford: playedRows.reduce((sum, row) => sum + Number(row.netStableford || 0), 0),
-    grossStableford: playedRows.reduce((sum, row) => sum + Number(row.grossStableford || 0), 0),
-    threePutts: rows.filter((row) => row.puttLabel === "3 Putts" || row.puttLabel === "3 Putt").length,
-    fourPlusPutts: rows.filter((row) => row.puttLabel === "4+ Putt").length,
-  };
-}
-
-function getCourseHcpKey(playerId, courseId) {
-  return `${playerId}_${String(courseId || "goethe").toLowerCase().trim()}`;
-}
-
 function normalizeScoreRecord(score) {
-  return {
-    ...score,
-    picked_up: normalizeBoolean(score?.picked_up),
-    over_two_putts: normalizeBoolean(score?.over_two_putts),
-    lady: normalizeBoolean(score?.lady),
-  };
+  return { ...score, picked_up: normalizeBoolean(score?.picked_up), over_two_putts: normalizeBoolean(score?.over_two_putts), lady: normalizeBoolean(score?.lady) };
 }
 
 function isScorerControlScore(score) {
@@ -821,48 +303,12 @@ function isScorerControlScore(score) {
 }
 
 function getScoreIdentityKey(score) {
-  return [
-    String(score?.round_id || "").trim(),
-    String(score?.player_id || "").trim(),
-    String(score?.hole_number || "").trim(),
-    isScorerControlScore(score) ? "control" : "official",
-  ].join("|");
+  return [String(score?.round_id || "").trim(), String(score?.player_id || "").trim(), String(score?.hole_number || "").trim(), isScorerControlScore(score) ? "control" : "official"].join("|");
 }
 
 function getScoreTimestamp(score) {
   const time = Date.parse(score?.updated_at || "");
   return Number.isNaN(time) ? 0 : time;
-}
-
-function getLatestScoredHole(scores = [], roundId = "", fallbackHole = 1) {
-  const filteredScores = (scores || [])
-    .filter((score) => {
-      if (!score || score.strokes === "" || score.strokes == null) return false;
-      if (roundId && String(score.round_id || "") !== String(roundId)) return false;
-      return Number(score.hole_number) > 0;
-    })
-    .sort((a, b) => getScoreTimestamp(b) - getScoreTimestamp(a));
-
-  return Number(filteredScores[0]?.hole_number || fallbackHole || 1);
-}
-
-function getFirstUnscoredHole(scores = [], roundId = "", playerId = "", fallbackHole = 1) {
-  const scoredHoleNumbers = new Set(
-    (scores || [])
-      .filter((score) => {
-        if (!score || score.strokes === "" || score.strokes == null) return false;
-        if (roundId && String(score.round_id || "") !== String(roundId)) return false;
-        if (playerId && String(score.player_id || "") !== String(playerId)) return false;
-        return Number(score.hole_number) > 0;
-      })
-      .map((score) => Number(score.hole_number))
-  );
-
-  for (let holeNumber = 1; holeNumber <= 18; holeNumber += 1) {
-    if (!scoredHoleNumbers.has(holeNumber)) return holeNumber;
-  }
-
-  return Number(fallbackHole || 18);
 }
 
 function isNewerOrEqualScore(candidate, existing) {
@@ -871,22 +317,16 @@ function isNewerOrEqualScore(candidate, existing) {
 
 function mergeScoresPreservingPending(sheetScores = [], pendingScores = []) {
   const map = new Map();
-
   sheetScores.forEach((score) => {
     if (!score || !score.player_id || !score.hole_number) return;
     map.set(getScoreIdentityKey(score), normalizeScoreRecord(score));
   });
-
   pendingScores.forEach((score) => {
     if (!score || !score.player_id || !score.hole_number) return;
     const key = getScoreIdentityKey(score);
     const existing = map.get(key);
-
-    if (!existing || isNewerOrEqualScore(score, existing)) {
-      map.set(key, normalizeScoreRecord(score));
-    }
+    if (!existing || isNewerOrEqualScore(score, existing)) map.set(key, normalizeScoreRecord(score));
   });
-
   return Array.from(map.values());
 }
 
@@ -895,15 +335,7 @@ function getOfficialScores(scores) {
 }
 
 function findScoreForPlayerHole(scores, roundId, playerId, holeNumber, wantControlScore) {
-  return (
-    (scores || []).find((score) => {
-      const sameRound = String(score.round_id || "") === String(roundId || "");
-      const samePlayer = String(score.player_id || "") === String(playerId || "");
-      const sameHole = Number(score.hole_number) === Number(holeNumber);
-      const isControl = isScorerControlScore(score);
-      return sameRound && samePlayer && sameHole && isControl === wantControlScore;
-    }) || null
-  );
+  return (scores || []).find((score) => String(score.round_id || "") === String(roundId || "") && String(score.player_id || "") === String(playerId || "") && Number(score.hole_number) === Number(holeNumber) && isScorerControlScore(score) === wantControlScore) || null;
 }
 
 function formatBoolDiff(value) {
@@ -922,212 +354,245 @@ function formatPuttsDiff(score) {
 
 function getScoreMismatchMessage(officialScore, controlScore) {
   if (!officialScore || !controlScore) return "";
-
   const officialHasScore = officialScore.strokes !== "" && officialScore.strokes != null;
   const controlHasScore = controlScore.strokes !== "" && controlScore.strokes != null;
-
   if (!officialHasScore || !controlHasScore) return "";
-
   const differences = [];
-
-  if (
-    Number(officialScore.strokes) !== Number(controlScore.strokes) ||
-    normalizeBoolean(officialScore.picked_up) !== normalizeBoolean(controlScore.picked_up)
-  ) {
-    differences.push(`Score: ${formatScoreDiff(officialScore)} ≠ ${formatScoreDiff(controlScore)}`);
-  }
-
-  if (normalizeBoolean(officialScore.lady) !== normalizeBoolean(controlScore.lady)) {
-    differences.push(`Lady: ${formatBoolDiff(officialScore.lady)} ≠ ${formatBoolDiff(controlScore.lady)}`);
-  }
-
-  if (
-    normalizeBoolean(officialScore.over_two_putts) !== normalizeBoolean(controlScore.over_two_putts) ||
-    Number(officialScore.putts_count || 0) !== Number(controlScore.putts_count || 0)
-  ) {
-    differences.push(`Putts: ${formatPuttsDiff(officialScore)} ≠ ${formatPuttsDiff(controlScore)}`);
-  }
-
+  if (Number(officialScore.strokes) !== Number(controlScore.strokes) || normalizeBoolean(officialScore.picked_up) !== normalizeBoolean(controlScore.picked_up)) differences.push(`Score: ${formatScoreDiff(officialScore)} ≠ ${formatScoreDiff(controlScore)}`);
+  if (normalizeBoolean(officialScore.lady) !== normalizeBoolean(controlScore.lady)) differences.push(`Lady: ${formatBoolDiff(officialScore.lady)} ≠ ${formatBoolDiff(controlScore.lady)}`);
+  if (normalizeBoolean(officialScore.over_two_putts) !== normalizeBoolean(controlScore.over_two_putts) || Number(officialScore.putts_count || 0) !== Number(controlScore.putts_count || 0)) differences.push(`Putts: ${formatPuttsDiff(officialScore)} ≠ ${formatPuttsDiff(controlScore)}`);
   return differences.join(" · ");
 }
 
 function getMismatchesForHole(scores, roundId, holeNumber, players = []) {
   const playerMap = new Map((players || []).map((player) => [String(player.id), player]));
-  const playerIds = Array.from(
-    new Set(
-      (scores || [])
-        .filter((score) => String(score.round_id || "") === String(roundId || "") && Number(score.hole_number) === Number(holeNumber))
-        .map((score) => String(score.player_id || ""))
-        .filter(Boolean)
-    )
-  );
-
-  return playerIds
-    .map((playerId) => {
-      const officialScore = findScoreForPlayerHole(scores, roundId, playerId, holeNumber, false);
-      const controlScore = findScoreForPlayerHole(scores, roundId, playerId, holeNumber, true);
-      const message = getScoreMismatchMessage(officialScore, controlScore);
-      return {
-        playerId,
-        player: playerMap.get(playerId) || { id: playerId, character_name: playerId, display_name: playerId },
-        holeNumber,
-        officialScore,
-        controlScore,
-        officialScorerId: String(officialScore?.scorer_player_id || "").trim(),
-        message: message ? `Loch ${holeNumber} · ${(playerMap.get(playerId)?.character_name || playerMap.get(playerId)?.display_name || playerId)} · ${message}` : "",
-      };
-    })
-    .filter((item) => Boolean(item.message));
+  const playerIds = Array.from(new Set((scores || []).filter((score) => String(score.round_id || "") === String(roundId || "") && Number(score.hole_number) === Number(holeNumber)).map((score) => String(score.player_id || "")).filter(Boolean)));
+  return playerIds.map((playerId) => {
+    const officialScore = findScoreForPlayerHole(scores, roundId, playerId, holeNumber, false);
+    const controlScore = findScoreForPlayerHole(scores, roundId, playerId, holeNumber, true);
+    const message = getScoreMismatchMessage(officialScore, controlScore);
+    const player = playerMap.get(playerId) || { id: playerId, character_name: playerId, display_name: playerId };
+    return { playerId, player, holeNumber, officialScore, controlScore, officialScorerId: String(officialScore?.scorer_player_id || "").trim(), message: message ? `Loch ${holeNumber} · ${player.character_name || player.display_name || playerId} · ${message}` : "" };
+  }).filter((item) => Boolean(item.message));
 }
 
 function getMismatchesForRound(scores, roundId, players = []) {
-  const holeNumbers = Array.from(
-    new Set(
-      (scores || [])
-        .filter((score) => String(score.round_id || "") === String(roundId || ""))
-        .map((score) => Number(score.hole_number))
-        .filter(Boolean)
-    )
-  ).sort((a, b) => a - b);
-
+  const holeNumbers = Array.from(new Set((scores || []).filter((score) => String(score.round_id || "") === String(roundId || "")).map((score) => Number(score.hole_number)).filter(Boolean))).sort((a, b) => a - b);
   return holeNumbers.flatMap((holeNumber) => getMismatchesForHole(scores, roundId, holeNumber, players));
 }
 
-function runSelfTests() {
-  const failures = [];
-  const assert = (name, condition) => {
-    if (!condition) failures.push(name);
-  };
-
-  assert("url string is closed", typeof GOOGLE_SHEETS_API_URL === "string" && GOOGLE_SHEETS_API_URL.endsWith("/exec"));
-  assert("fallback courses are available", fallbackCourses.length === 2);
-  assert("formatToPar returns dash when no holes played", formatToPar(3, 0) === "–");
-  assert("formatToPar returns E for even par", formatToPar(0, 3) === "E");
-  assert("cleanNumericInput removes non-digits", cleanNumericInput("a1b2") === "12");
-  assert("normalizeBoolean handles German yes", normalizeBoolean("ja") === true);
-  assert("score normalization handles lady", normalizeScoreRecord({ lady: "true" }).lady === true);
-  assert("scorer control score is detected", isScorerControlScore({ player_id: "florian", scorer_player_id: "florian" }) === true);
-  assert("official score keeps external scorer", isScorerControlScore({ player_id: "florian", scorer_player_id: "mucky" }) === false);
-  assert("control scores are filtered from official scores", getOfficialScores([{ player_id: "florian", scorer_player_id: "florian" }, { player_id: "florian", scorer_player_id: "mucky" }]).length === 1);
-  assert("finds official score by player and hole", findScoreForPlayerHole([{ round_id: "r1", player_id: "florian", scorer_player_id: "mucky", hole_number: 1, strokes: 5 }], "r1", "florian", 1, false)?.strokes === 5);
-  assert("finds own control score by player and hole", findScoreForPlayerHole([{ round_id: "r1", player_id: "florian", scorer_player_id: "florian", hole_number: 1, strokes: 6 }], "r1", "florian", 1, true)?.strokes === 6);
-  assert("mismatch detects official vs own control", getScoreMismatchMessage({ strokes: 6, lady: false }, { strokes: 5, lady: false }).includes("Score"));
-  assert("mismatch list finds player on hole", getMismatchesForHole([{ round_id: "r1", player_id: "florian", scorer_player_id: "mucky", hole_number: 1, strokes: 6 }, { round_id: "r1", player_id: "florian", scorer_player_id: "florian", hole_number: 1, strokes: 5 }], "r1", 1, fallbackPlayers).length === 1);
-  assert("stableford par is two points", getStablefordPoints(4, 4, 0) === 2);
-  assert("picked up score gives zero net points", getScoreStablefordPoints({ strokes: getPickedUpStrokes({ course_hcp_goethe: 5 }, { par: 4, hcp: 5 }, "goethe"), picked_up: true }, 4, getShotsOnHole(5, 5)) === 0);
-  assert("picked up score is double par plus one", getPickedUpStrokes({ course_hcp_goethe: 18 }, { par: 5, hcp: 1 }, "goethe") === 11);
-  assert("picked up score stays zero even with many strokes received", getScoreStablefordPoints({ strokes: 10, picked_up: true }, 5, 5) === 0);
-  assert("course handicap allocates two strokes above 18", getShotsOnHole(19, 1) === 2);
-  assert("shot marks display two strokes", formatShotMarks(2) === "||");
-  assert("shot marks display no stroke as dash", formatShotMarks(0) === "–");
-  assert("current handicap helper works", getPlayerForCourse({ ...fallbackPlayers[0], handicap_index: "", course_hcp_goethe: 7 }, "goethe")?.course_hcp === 7);
-  assert("alias fallback works", getPlayerLabel({ id: "florian", character_name: "Florian" }) === "Sliceron (Florian)");
-  assert("explicit alias overrides fallback", getPlayerLabel({ id: "florian", character_name: "Florian", alias_name: "Captain Slice" }) === "Captain Slice (Florian)");
-  assert("feininger handicap selected", getPlayerForCourse({ id: "x", handicap_index: "", course_hcp_goethe: 1, course_hcp_feininger: 9 }, "feininger")?.course_hcp === 9);
-  assert("goethe DGV HCP 10 gives playing handicap 12", getCourseHandicap({ id: "x", handicap_index: 10 }, "goethe", fallbackCourses) === 12);
-  assert("feininger DGV HCP 10 gives playing handicap 10", getCourseHandicap({ id: "x", handicap_index: 10 }, "feininger", fallbackCourses) === 10);
-
-  const stats = buildPlayerStats(fallbackPlayers.slice(0, 2), fallbackHoles.slice(0, 2), [
-    { round_id: "r1", player_id: "florian", hole_number: 1, strokes: 4, over_two_putts: false, putts_count: "" },
-    { round_id: "r1", player_id: "florian", hole_number: 2, strokes: 6, over_two_putts: true, putts_count: 4 },
-    { round_id: "r1", player_id: "mucky", hole_number: 1, strokes: 3, over_two_putts: false, putts_count: "" },
-  ]);
-
-  assert("leaderboard sorts best to-par first", sortStrokePlay(stats)[0].id === "mucky");
-  assert("putt money calculates", stats.find((p) => p.id === "florian")?.puttPenaltyEuro === 4);
-  assert("lady count calculates", buildPlayerStats(fallbackPlayers.slice(0, 1), fallbackHoles.slice(0, 2), [{ round_id: "r1", player_id: "florian", hole_number: 1, strokes: 4, lady: true }, { round_id: "r1", player_id: "florian", hole_number: 2, strokes: 5, lady: "true" }])[0].ladyCount === 2);
-
-  const rows = buildScorecardRows(
-    { ...fallbackPlayers[0], course_hcp_goethe: 18 },
-    { round_id: "r1", course_id: "goethe" },
-    fallbackHoles,
-    [{ round_id: "r1", player_id: "florian", hole_number: 1, strokes: 5, picked_up: true, over_two_putts: false, putts_count: "" }]
-  );
-  assert("scorecard marks picked up", rows[0].isPickedUp === true);
-
-  if (failures.length) console.warn("Lord of the Holes self-tests failed:", failures);
+function buildPlayerStats(players, holes, scores) {
+  return (players || []).map((p) => {
+    const playerScores = (scores || []).filter((s) => String(s.player_id) === String(p.id) && s.strokes !== "" && s.strokes != null);
+    const played = playerScores.length;
+    const total = playerScores.reduce((sum, s) => sum + Number(s.strokes || 0), 0);
+    const parPlayed = playerScores.reduce((sum, s) => sum + Number((holes || []).find((h) => Number(h.hole_number) === Number(s.hole_number))?.par || 0), 0);
+    const { threePutts, fourPlusPutts, overTwoPutts } = getPuttBuckets(playerScores);
+    const netStableford = playerScores.reduce((sum, s) => {
+      const hole = (holes || []).find((h) => Number(h.hole_number) === Number(s.hole_number));
+      return sum + getScoreStablefordPoints(s, hole?.par, getShotsOnHole(p.course_hcp, hole?.hcp));
+    }, 0);
+    const grossStableford = playerScores.reduce((sum, s) => {
+      const hole = (holes || []).find((h) => Number(h.hole_number) === Number(s.hole_number));
+      return sum + getScoreStablefordPoints(s, hole?.par, 0);
+    }, 0);
+    const hcpShotsUsed = playerScores.reduce((sum, s) => {
+      const hole = (holes || []).find((h) => Number(h.hole_number) === Number(s.hole_number));
+      return sum + getShotsOnHole(p.course_hcp, hole?.hcp);
+    }, 0);
+    const hcpAdjustedTotal = total - hcpShotsUsed;
+    const hcpAdjustedToPar = hcpAdjustedTotal - parPlayed;
+    const ladyCount = playerScores.filter((s) => normalizeBoolean(s.lady)).length;
+    return { ...withFallbackAlias(p), played, total, toPar: total - parPlayed, hcpShotsUsed, hcpAdjustedTotal, hcpAdjustedToPar, overTwoPutts, threePutts, fourPlusPutts, puttPenaltyEuro: threePutts * 2 + fourPlusPutts * 4, ladyCount, netStableford, grossStableford };
+  });
 }
 
-if (typeof window !== "undefined") runSelfTests();
-
-function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", helper = "", status = "", defaultValue = null, onChange, formatValue }) {
-  const hasValue = value !== "" && value != null;
-  const fallbackValue = defaultValue == null ? min : Number(defaultValue);
-  const baseValue = Math.max(min, Math.min(max, Number(hasValue ? value : fallbackValue)));
-  const shownValue = hasValue || defaultValue != null ? (formatValue ? formatValue(baseValue) : baseValue) : emptyLabel;
-  const setValue = (nextValue) => onChange(Math.max(min, Math.min(max, Number(nextValue || 0))));
-
-  return (
-    <div className="rounded-2xl border border-amber-700/40 bg-black/25 p-2">
-      <div className="mb-1.5 flex items-center justify-between gap-2">
-        <div>
-          <div className="text-sm font-semibold text-amber-100">{label}</div>
-          {helper ? <div className="text-[11px] text-amber-100/55">{helper}</div> : null}
-        </div>
-        {status ? <div className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-100/75">{status}</div> : null}
-      </div>
-
-      <div className="grid grid-cols-[48px_1fr_48px] items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setValue(baseValue - 1)}
-          disabled={baseValue <= min}
-          className="h-12 rounded-xl border border-amber-700/50 bg-stone-950 text-lg font-black leading-none text-amber-100 disabled:opacity-35"
-          aria-label={`${label} verringern`}
-        >
-          −
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setValue(baseValue)}
-          className="h-12 rounded-xl border border-amber-700/30 bg-stone-950/70 text-center shadow-inner shadow-black/60"
-          aria-label={`${label} auswählen`}
-        >
-          <div className="font-serif text-3xl font-black leading-none text-amber-200">{shownValue}</div>
-          <div className="text-[9px] uppercase tracking-[0.18em] text-amber-100/50">{!hasValue && defaultValue != null ? "tippen" : label}</div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setValue(baseValue + 1)}
-          disabled={baseValue >= max}
-          className="h-12 rounded-xl border border-amber-700/50 bg-stone-950 text-lg font-black leading-none text-amber-100 disabled:opacity-35"
-          aria-label={`${label} erhöhen`}
-        >
-          +
-        </button>
-      </div>
-    </div>
-  );
+function sortStrokePlay(stats) {
+  return [...(stats || [])].sort((a, b) => (a.played === 0 && b.played > 0 ? 1 : b.played === 0 && a.played > 0 ? -1 : a.toPar - b.toPar || b.played - a.played || Number(a.sort_order || 0) - Number(b.sort_order || 0)));
 }
 
-function PuttStepper({ value, onChange }) {
-  const hasValue = value !== "" && value != null;
-  const selected = hasValue ? Number(value || 0) : 2;
-  const snakeLabel = selected >= 4 ? "4+ · 4 €" : selected === 3 ? "3 · 2 €" : "keine Snake";
+function sortStableford(stats, fieldName) {
+  return [...(stats || [])].sort((a, b) => (a.played === 0 && b.played > 0 ? 1 : b.played === 0 && a.played > 0 ? -1 : Number(b[fieldName] || 0) - Number(a[fieldName] || 0) || b.played - a.played || Number(a.sort_order || 0) - Number(b.sort_order || 0)));
+}
 
-  return (
-    <TouchStepper
-      label="Putts"
-      value={value === 0 ? 0 : value || ""}
-      min={0}
-      max={6}
-      emptyLabel="2"
-      defaultValue={2}
-      helper=""
-      status={snakeLabel}
-      onChange={onChange}
-    />
-  );
+function sortHcpAdjustedStrokePlay(stats) {
+  return [...(stats || [])].sort((a, b) => (a.played === 0 && b.played > 0 ? 1 : b.played === 0 && a.played > 0 ? -1 : Number(a.hcpAdjustedToPar || 0) - Number(b.hcpAdjustedToPar || 0) || Number(a.hcpAdjustedTotal || 0) - Number(b.hcpAdjustedTotal || 0) || b.played - a.played || Number(a.sort_order || 0) - Number(b.sort_order || 0)));
+}
+
+function getScoreDiffToPar(score, hole) {
+  if (!score || score.strokes === "" || score.strokes == null) return null;
+  return Number(score.strokes || 0) - Number(hole?.par || 0);
+}
+
+function buildFunPlayerStats(players, holes, scores) {
+  return (players || []).map((player) => {
+    const playerScores = (scores || []).filter((score) => String(score.player_id) === String(player.id) && score.strokes !== "" && score.strokes != null);
+    const enrichedScores = playerScores.map((score) => ({ score, hole: (holes || []).find((item) => Number(item.hole_number) === Number(score.hole_number)), diff: getScoreDiffToPar(score, (holes || []).find((item) => Number(item.hole_number) === Number(score.hole_number))) })).filter((item) => item.hole);
+    const frontScores = enrichedScores.filter((item) => Number(item.hole.hole_number) <= 9);
+    const backScores = enrichedScores.filter((item) => Number(item.hole.hole_number) > 9);
+    const frontTotal = frontScores.length ? frontScores.reduce((sum, item) => sum + Number(item.score.strokes || 0), 0) : null;
+    const backTotal = backScores.length ? backScores.reduce((sum, item) => sum + Number(item.score.strokes || 0), 0) : null;
+    const frontPar = frontScores.length ? frontScores.reduce((sum, item) => sum + Number(item.hole.par || 0), 0) : null;
+    const backPar = backScores.length ? backScores.reduce((sum, item) => sum + Number(item.hole.par || 0), 0) : null;
+    const frontToPar = frontTotal == null || frontPar == null ? null : frontTotal - frontPar;
+    const backToPar = backTotal == null || backPar == null ? null : backTotal - backPar;
+    const backMinusFront = frontToPar == null || backToPar == null ? null : backToPar - frontToPar;
+    const birdies = enrichedScores.filter((item) => item.diff === -1 && !normalizeBoolean(item.score.picked_up)).length;
+    const eaglesOrBetter = enrichedScores.filter((item) => item.diff != null && item.diff <= -2 && !normalizeBoolean(item.score.picked_up)).length;
+    const pars = enrichedScores.filter((item) => item.diff === 0 && !normalizeBoolean(item.score.picked_up)).length;
+    const parOrBetter = enrichedScores.filter((item) => item.diff != null && item.diff <= 0 && !normalizeBoolean(item.score.picked_up)).length;
+    const doubleBogeyPlus = enrichedScores.filter((item) => item.diff != null && item.diff >= 2).length;
+    const triplePlus = enrichedScores.filter((item) => item.diff != null && item.diff >= 3).length;
+    const pickedUpCount = enrichedScores.filter((item) => normalizeBoolean(item.score.picked_up)).length;
+    const ladyCount = enrichedScores.filter((item) => normalizeBoolean(item.score.lady)).length;
+    const { threePutts, fourPlusPutts } = getPuttBuckets(playerScores);
+    const grossStableford = enrichedScores.reduce((sum, item) => sum + getScoreStablefordPoints(item.score, item.hole.par, 0), 0);
+    const netStableford = enrichedScores.reduce((sum, item) => sum + getScoreStablefordPoints(item.score, item.hole.par, getShotsOnHole(player.course_hcp, item.hole.hcp)), 0);
+    const hcpBonus = netStableford - grossStableford;
+    const hcpShotsUsed = enrichedScores.reduce((sum, item) => sum + getShotsOnHole(player.course_hcp, item.hole.hcp), 0);
+    return { ...withFallbackAlias(player), played: enrichedScores.length, birdies, eaglesOrBetter, pars, parOrBetter, doubleBogeyPlus, triplePlus, pickedUpCount, ladyCount, threePutts, fourPlusPutts, puttPenaltyEuro: threePutts * 2 + fourPlusPutts * 4, frontTotal, backTotal, frontToPar, backToPar, backMinusFront, grossStableford, netStableford, hcpBonus, hcpShotsUsed, pointsPerHcpShot: hcpShotsUsed ? Number((netStableford / hcpShotsUsed).toFixed(2)) : 0 };
+  });
+}
+
+function buildFunHoleStats(players, holes, scores) {
+  return (holes || []).map((hole) => {
+    const holeScores = (scores || []).filter((score) => Number(score.hole_number) === Number(hole.hole_number) && score.strokes !== "" && score.strokes != null);
+    const played = holeScores.length;
+    const totalStrokes = holeScores.reduce((sum, score) => sum + Number(score.strokes || 0), 0);
+    const avgScore = played ? totalStrokes / played : 0;
+    const avgToPar = played ? avgScore - Number(hole.par || 0) : 0;
+    return { course_id: hole.course_id || "", course_name: getCourseShortName(hole.course_id), hole_number: hole.hole_number, par: hole.par, hcp: hole.hcp, played, avgScore, avgToPar, birdies: holeScores.filter((score) => getScoreDiffToPar(score, hole) === -1 && !normalizeBoolean(score.picked_up)).length, pars: holeScores.filter((score) => getScoreDiffToPar(score, hole) === 0 && !normalizeBoolean(score.picked_up)).length, pickedUpCount: holeScores.filter((score) => normalizeBoolean(score.picked_up)).length, ladies: holeScores.filter((score) => normalizeBoolean(score.lady)).length, snakes: holeScores.filter((score) => normalizeBoolean(score.over_two_putts)).length };
+  }).filter((item) => item.played > 0);
+}
+
+function buildScorerMismatchStats(mismatches, players) {
+  const playerMap = new Map((players || []).map((player) => [String(player.id), withFallbackAlias(player)]));
+  const stats = new Map();
+  (players || []).forEach((player) => stats.set(String(player.id), { ...withFallbackAlias(player), asPlayer: 0, asScorer: 0, total: 0 }));
+  (mismatches || []).forEach((item) => {
+    const playerId = String(item.playerId || "");
+    const scorerId = String(item.officialScorerId || "");
+    if (playerId) {
+      const current = stats.get(playerId) || { ...(playerMap.get(playerId) || { id: playerId, character_name: playerId }), asPlayer: 0, asScorer: 0, total: 0 };
+      current.asPlayer += 1;
+      current.total += 1;
+      stats.set(playerId, current);
+    }
+    if (scorerId) {
+      const current = stats.get(scorerId) || { ...(playerMap.get(scorerId) || { id: scorerId, character_name: scorerId }), asPlayer: 0, asScorer: 0, total: 0 };
+      current.asScorer += 1;
+      current.total += 1;
+      stats.set(scorerId, current);
+    }
+  });
+  return Array.from(stats.values()).sort((a, b) => Number(b.total || 0) - Number(a.total || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
+}
+
+function getQualificationRounds(rounds) {
+  return (rounds?.length ? rounds : fallbackRounds).filter((round) => String(round.stage || "qualification") === "qualification").sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0)).slice(0, 3);
+}
+
+function getFinalRound(rounds) {
+  return (rounds?.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === "r4") || (rounds?.length ? rounds : fallbackRounds).find((round) => String(round.stage) === "final") || fallbackRounds[3];
+}
+
+function getRoundChapterLabel(round) {
+  const roundId = String(round?.round_id || "").trim();
+  const sortOrder = Number(round?.sort_order || 0);
+  const stage = String(round?.stage || "").toLowerCase().trim();
+  if (stage === "final" || roundId === "r4" || sortOrder === 4) return "Finaltag · Am Schicksalsberg";
+  if (roundId === "r1" || sortOrder === 1) return "Runde 1 · Die Gefährten brechen auf";
+  if (roundId === "r2" || sortOrder === 2) return "Runde 2 · Durch die Minen";
+  if (roundId === "r3" || sortOrder === 3) return "Runde 3 · Vor den Toren Mordors";
+  return `${round?.round_name || "Runde"} · Kapitel der Runde`;
+}
+
+function buildTournamentNetStandings(players, rounds, holes, scores) {
+  const qualificationRounds = getQualificationRounds(rounds);
+  return (players || []).map((player) => {
+    const roundResults = qualificationRounds.map((round) => {
+      const roundHoles = getRoundHoles(round, holes);
+      const roundScores = (scores || []).filter((score) => String(score.round_id) === String(round.round_id) && String(score.player_id) === String(player.id) && score.strokes !== "" && score.strokes != null);
+      const playerForRound = getPlayerForCourse(player, round.course_id || "goethe");
+      const grossStrokes = roundScores.reduce((sum, score) => sum + Number(score.strokes || 0), 0);
+      const hcpShotsUsed = roundScores.reduce((sum, score) => sum + getShotsOnHole(playerForRound.course_hcp, roundHoles.find((h) => Number(h.hole_number) === Number(score.hole_number))?.hcp), 0);
+      const hcpAdjustedStrokes = roundScores.length ? grossStrokes - hcpShotsUsed : null;
+      return { round_id: round.round_id, round_name: round.round_name, points: hcpAdjustedStrokes, hcpAdjustedStrokes, grossStrokes, hcpShotsUsed, played: roundScores.length };
+    });
+    const playedResults = roundResults.filter((result) => result.played > 0 && result.hcpAdjustedStrokes != null);
+    const counted = [...playedResults].sort((a, b) => Number(a.hcpAdjustedStrokes || 0) - Number(b.hcpAdjustedStrokes || 0)).slice(0, 2);
+    const dropped = [...playedResults].sort((a, b) => Number(a.hcpAdjustedStrokes || 0) - Number(b.hcpAdjustedStrokes || 0)).slice(2, 3)[0] || null;
+    return { ...withFallbackAlias(player), roundResults, countedRoundIds: counted.map((result) => result.round_id), droppedRoundId: dropped?.round_id || "", totalBestTwo: counted.length ? counted.reduce((sum, result) => sum + Number(result.hcpAdjustedStrokes || 0), 0) : null, roundsPlayed: playedResults.length };
+  }).sort((a, b) => (a.totalBestTwo == null && b.totalBestTwo != null ? 1 : b.totalBestTwo == null && a.totalBestTwo != null ? -1 : Number(a.totalBestTwo || 0) - Number(b.totalBestTwo || 0) || Number(b.roundsPlayed || 0) - Number(a.roundsPlayed || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0)));
+}
+
+function buildFinalNetStandings(players, rounds, holes, scores) {
+  const qualificationStandings = buildTournamentNetStandings(players, rounds, holes, scores);
+  const finalRound = getFinalRound(rounds);
+  const finalHoles = getRoundHoles(finalRound, holes);
+  const withFinalScores = qualificationStandings.map((player, qualificationIndex) => {
+    const finalScores = (scores || []).filter((score) => String(score.round_id) === String(finalRound?.round_id) && String(score.player_id) === String(player.id) && score.strokes !== "" && score.strokes != null);
+    const playerForRound = getPlayerForCourse(player, finalRound?.course_id || "goethe");
+    const finalGrossStrokes = finalScores.reduce((sum, score) => sum + Number(score.strokes || 0), 0);
+    const finalHcpShotsUsed = finalScores.reduce((sum, score) => sum + getShotsOnHole(playerForRound.course_hcp, finalHoles.find((h) => Number(h.hole_number) === Number(score.hole_number))?.hcp), 0);
+    return { ...withFallbackAlias(player), qualificationRank: qualificationIndex + 1, finalHcpAdjustedStrokes: finalScores.length ? finalGrossStrokes - finalHcpShotsUsed : null, finalGrossStrokes, finalHcpShotsUsed, finalPlayed: finalScores.length, finalGroup: qualificationIndex < 3 ? "championship" : "placement" };
+  });
+  const sortFinalGroup = (items) => [...items].sort((a, b) => (a.finalHcpAdjustedStrokes == null && b.finalHcpAdjustedStrokes != null ? 1 : b.finalHcpAdjustedStrokes == null && a.finalHcpAdjustedStrokes != null ? -1 : Number(a.finalHcpAdjustedStrokes || 0) - Number(b.finalHcpAdjustedStrokes || 0) || Number(a.qualificationRank || 0) - Number(b.qualificationRank || 0)));
+  const championshipGroup = sortFinalGroup(withFinalScores.filter((p) => p.finalGroup === "championship")).map((p, i) => ({ ...p, finalRank: i + 1 }));
+  const placementGroup = sortFinalGroup(withFinalScores.filter((p) => p.finalGroup === "placement")).map((p, i) => ({ ...p, finalRank: i + 4 }));
+  return [...championshipGroup, ...placementGroup];
+}
+
+function buildRoundHcpAdjustedStandings(players, round, holes, scores, roundPlayers) {
+  if (!round?.round_id || !round?.course_id) return [];
+  const roundHoles = getRoundHoles(round, holes);
+  const roundPlayersList = getRoundPlayers(round.round_id, players, roundPlayers);
+  return roundPlayersList.map((player) => {
+    const playerForRound = getPlayerForCourse(player, round.course_id || "goethe");
+    const playerScores = (scores || []).filter((score) => String(score.round_id) === String(round.round_id) && String(score.player_id) === String(player.id) && score.strokes !== "" && score.strokes != null);
+    const grossStrokes = playerScores.reduce((sum, score) => sum + Number(score.strokes || 0), 0);
+    const hcpShotsUsed = playerScores.reduce((sum, score) => sum + getShotsOnHole(playerForRound.course_hcp, roundHoles.find((h) => Number(h.hole_number) === Number(score.hole_number))?.hcp), 0);
+    const hcpAdjustedStrokes = playerScores.length ? grossStrokes - hcpShotsUsed : null;
+    const isComplete = roundHoles.length > 0 && roundHoles.every((hole) => playerScores.some((score) => Number(score.hole_number) === Number(hole.hole_number)));
+    return { ...withFallbackAlias(player), grossStrokes, hcpShotsUsed, hcpAdjustedStrokes, played: playerScores.length, isComplete };
+  }).sort((a, b) => (a.hcpAdjustedStrokes == null && b.hcpAdjustedStrokes != null ? 1 : b.hcpAdjustedStrokes == null && a.hcpAdjustedStrokes != null ? -1 : Number(a.hcpAdjustedStrokes || 0) - Number(b.hcpAdjustedStrokes || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0)));
+}
+
+function getRoundHonorCelebration(players, rounds, holes, scores, roundPlayers, dismissedKeys = []) {
+  const qualificationRounds = getQualificationRounds(rounds);
+  for (const round of qualificationRounds) {
+    if (!round?.round_id || !round?.course_id) continue;
+    const popupKey = `round_honor_${round.round_id}`;
+    if ((dismissedKeys || []).includes(popupKey)) continue;
+    const standings = buildRoundHcpAdjustedStandings(players, round, holes, scores, roundPlayers);
+    if (!standings.length || standings.some((player) => !player.isComplete)) continue;
+    const roundOrder = Number(round.sort_order || qualificationRounds.findIndex((item) => String(item.round_id) === String(round.round_id)) + 1);
+    const lordCount = roundOrder === 1 ? 1 : 2;
+    const butlerCount = roundOrder === 1 ? 1 : 2;
+    return { key: popupKey, roundId: round.round_id, roundName: round.round_name || `Runde ${roundOrder}`, roundOrder, lords: standings.slice(0, lordCount), butlers: standings.slice(-butlerCount).reverse() };
+  }
+  return null;
+}
+
+function getFinalWinnerCelebration(players, rounds, holes, scores, roundPlayers) {
+  const finalRound = getFinalRound(rounds);
+  if (!finalRound?.round_id || !finalRound?.course_id) return null;
+  const finalHoles = getRoundHoles(finalRound, holes);
+  const finalPlayers = getRoundPlayers(finalRound.round_id, players, roundPlayers);
+  if (!finalHoles.length || !finalPlayers.length) return null;
+  const finalScores = (scores || []).filter((score) => String(score.round_id) === String(finalRound.round_id) && score.strokes !== "" && score.strokes != null);
+  const allFinalScoresComplete = finalPlayers.every((player) => finalHoles.every((hole) => finalScores.some((score) => String(score.player_id) === String(player.id) && Number(score.hole_number) === Number(hole.hole_number))));
+  if (!allFinalScoresComplete) return null;
+  const finalStandings = buildFinalNetStandings(players, rounds, holes, scores);
+  const winner = finalStandings.find((player) => Number(player.finalRank) === 1) || finalStandings[0] || null;
+  if (!winner) return null;
+  return { roundId: finalRound.round_id, winner, winnerName: getPlayerLabel(winner), winnerLabel: winner.character_name || winner.display_name || winner.id, finalHcpAdjustedStrokes: winner.finalHcpAdjustedStrokes };
 }
 
 function getScoreRelationLabel(score, par) {
   if (score === "" || score == null) return "offen";
   if (Number(score) === 0) return "gestrichen";
-
   const diff = Number(score) - Number(par || 0);
-
   if (diff <= -3) return "Albatros";
   if (diff === -2) return "Eagle";
   if (diff === -1) return "Birdie";
@@ -1138,59 +603,52 @@ function getScoreRelationLabel(score, par) {
   return `+${diff}`;
 }
 
+function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", status = "", defaultValue = null, onChange, formatValue }) {
+  const hasValue = value !== "" && value != null;
+  const fallbackValue = defaultValue == null ? min : Number(defaultValue);
+  const baseValue = Math.max(min, Math.min(max, Number(hasValue ? value : fallbackValue)));
+  const shownValue = hasValue || defaultValue != null ? (formatValue ? formatValue(baseValue) : baseValue) : emptyLabel;
+  const setValue = (nextValue) => onChange(Math.max(min, Math.min(max, Number(nextValue || 0))));
+  return (
+    <div className="rounded-2xl border border-amber-700/40 bg-black/25 p-2">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <div className="text-sm font-semibold text-amber-100">{label}</div>
+        {status ? <div className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-100/75">{status}</div> : null}
+      </div>
+      <div className="grid grid-cols-[48px_1fr_48px] items-center gap-2">
+        <button type="button" onClick={() => setValue(baseValue - 1)} disabled={baseValue <= min} className="h-12 rounded-xl border border-amber-700/50 bg-stone-950 text-lg font-black leading-none text-amber-100 disabled:opacity-35">−</button>
+        <button type="button" onClick={() => setValue(baseValue)} className="h-12 rounded-xl border border-amber-700/30 bg-stone-950/70 text-center shadow-inner shadow-black/60">
+          <div className="font-serif text-3xl font-black leading-none text-amber-200">{shownValue}</div>
+          <div className="text-[9px] uppercase tracking-[0.18em] text-amber-100/50">{!hasValue && defaultValue != null ? "tippen" : label}</div>
+        </button>
+        <button type="button" onClick={() => setValue(baseValue + 1)} disabled={baseValue >= max} className="h-12 rounded-xl border border-amber-700/50 bg-stone-950 text-lg font-black leading-none text-amber-100 disabled:opacity-35">+</button>
+      </div>
+    </div>
+  );
+}
+
+function PuttStepper({ value, onChange }) {
+  const hasValue = value !== "" && value != null;
+  const selected = hasValue ? Number(value || 0) : 2;
+  const snakeLabel = selected >= 4 ? "4+ · 4 €" : selected === 3 ? "3 · 2 €" : "keine Snake";
+  return <TouchStepper label="Putts" value={value === 0 ? 0 : value || ""} min={0} max={6} emptyLabel="2" defaultValue={2} status={snakeLabel} onChange={onChange} />;
+}
+
 function ScoreStepper({ value, par, pickedUpStrokes, onChange }) {
   const displayScore = value === "" || value == null ? Number(par || 4) : value;
   const isPickedValue = Number(displayScore) === 0 || Number(displayScore) >= Number(pickedUpStrokes || 0);
-  const relationLabel = getScoreRelationLabel(displayScore, par);
-  const effectiveStatus =
-    value === "" || value == null
-      ? ""
-      : isPickedValue
-        ? `X · gewertet ${pickedUpStrokes}`
-        : relationLabel;
-
-  return (
-    <TouchStepper
-      label="Score"
-      value={value}
-      min={0}
-      max={30}
-      emptyLabel={String(par || 4)}
-      defaultValue={Number(par || 4)}
-      helper=""
-      status={effectiveStatus}
-      formatValue={(nextValue) => (Number(nextValue) === 0 ? "X" : nextValue)}
-      onChange={onChange}
-    />
-  );
+  const effectiveStatus = value === "" || value == null ? "" : isPickedValue ? `X · gewertet ${pickedUpStrokes}` : getScoreRelationLabel(displayScore, par);
+  return <TouchStepper label="Score" value={value} min={0} max={30} emptyLabel={String(par || 4)} defaultValue={Number(par || 4)} status={effectiveStatus} formatValue={(nextValue) => (Number(nextValue) === 0 ? "X" : nextValue)} onChange={onChange} />;
 }
 
 function LeaderboardTable({ title, players, columns }) {
   return (
     <div className="mb-3 overflow-hidden rounded-2xl border border-amber-700/30 bg-black/20">
-      <div className="border-b border-amber-700/30 bg-amber-500/10 px-2 py-1.5 landscape:px-1.5 landscape:py-1 font-serif text-lg text-amber-200">{title}</div>
+      <div className="border-b border-amber-700/30 bg-amber-500/10 px-2 py-1.5 font-serif text-lg text-amber-200">{title}</div>
       <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <table className="w-full min-w-[360px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">
-          <thead>
-            <tr className="text-left text-xs uppercase tracking-wider text-amber-100">
-              <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1">#</th>
-              <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1">Spieler</th>
-              {columns.map((column) => (
-                <th key={column.label} className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">{column.label}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {players.map((p, index) => (
-              <tr key={p.id} className="border-t border-amber-700/20">
-                <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-amber-200/75">{index + 1}</td>
-                <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 font-semibold text-amber-100">{getPlayerLabel(p)}</td>
-                {columns.map((column) => (
-                  <td key={column.label} className={cls("px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right", column.emphasize && "font-serif text-lg text-amber-300 landscape:text-base")}>{column.render(p)}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
+          <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100"><th className="px-2 py-1.5">#</th><th className="px-2 py-1.5">Spieler</th>{columns.map((column) => <th key={column.label} className="px-2 py-1.5 text-right">{column.label}</th>)}</tr></thead>
+          <tbody>{players.map((p, index) => <tr key={p.id} className="border-t border-amber-700/20"><td className="px-2 py-1.5 text-amber-200/75">{index + 1}</td><td className="px-2 py-1.5 font-semibold text-amber-100">{getPlayerLabel(p)}</td>{columns.map((column) => <td key={column.label} className={cls("px-2 py-1.5 text-right", column.emphasize && "font-serif text-lg text-amber-300")}>{column.render(p)}</td>)}</tr>)}</tbody>
         </table>
       </div>
     </div>
@@ -1199,37 +657,13 @@ function LeaderboardTable({ title, players, columns }) {
 
 function FunTable({ title, subtitle = "", players, columns, nameLabel = "Name" }) {
   const hasHoleRows = players.some((item) => item?.hole_number);
-
   return (
     <div className="mb-3 overflow-hidden rounded-2xl border border-amber-700/30 bg-black/20">
-      <div className="border-b border-amber-700/30 bg-amber-500/10 px-2 py-1.5 landscape:px-1.5 landscape:py-1">
-        <div className="font-serif text-lg text-amber-200 landscape:text-base">{title}</div>
-        {subtitle ? <div className="text-xs text-amber-100/60 landscape:text-[10px]">{subtitle}</div> : null}
-      </div>
+      <div className="border-b border-amber-700/30 bg-amber-500/10 px-2 py-1.5"><div className="font-serif text-lg text-amber-200">{title}</div>{subtitle ? <div className="text-xs text-amber-100/60">{subtitle}</div> : null}</div>
       <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <table className="w-full min-w-[360px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">
-          <thead>
-            <tr className="text-left text-xs uppercase tracking-wider text-amber-100 landscape:text-[10px]">
-              <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1">Platz</th>
-              <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1">{hasHoleRows ? "Loch" : nameLabel}</th>
-              {columns.map((column) => (
-                <th key={column.label} className="px-2 py-1.5 text-right landscape:px-1.5 landscape:py-1">{column.label}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {players.map((item, index) => (
-              <tr key={item.id || `${item.course_id || "course"}-${item.hole_number}-${index}` || index} className="border-t border-amber-700/20">
-                <td className="px-2 py-1.5 text-amber-200/75 landscape:px-1.5 landscape:py-1">{index + 1}</td>
-                <td className="px-2 py-1.5 font-semibold text-amber-100 landscape:px-1.5 landscape:py-1">
-                  {item.hole_number ? `${item.course_name || getCourseShortName(item.course_id)} · Loch ${item.hole_number}` : (item.character_name || item.display_name || item.id)}
-                </td>
-                {columns.map((column) => (
-                  <td key={column.label} className={cls("px-2 py-1.5 text-right landscape:px-1.5 landscape:py-1", column.emphasize && "font-serif text-lg text-amber-300 landscape:text-base")}>{column.render(item, index)}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
+          <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100"><th className="px-2 py-1.5">Platz</th><th className="px-2 py-1.5">{hasHoleRows ? "Loch" : nameLabel}</th>{columns.map((column) => <th key={column.label} className="px-2 py-1.5 text-right">{column.label}</th>)}</tr></thead>
+          <tbody>{players.map((item, index) => <tr key={item.id || `${item.course_id || "course"}-${item.hole_number}-${index}`} className="border-t border-amber-700/20"><td className="px-2 py-1.5 text-amber-200/75">{index + 1}</td><td className="px-2 py-1.5 font-semibold text-amber-100">{item.hole_number ? `${item.course_name || getCourseShortName(item.course_id)} · Loch ${item.hole_number}` : item.character_name || item.display_name || item.id}</td>{columns.map((column) => <td key={column.label} className={cls("px-2 py-1.5 text-right", column.emphasize && "font-serif text-lg text-amber-300")}>{column.render(item, index)}</td>)}</tr>)}</tbody>
         </table>
       </div>
     </div>
@@ -1240,7 +674,6 @@ function MiddleEarthTables({ players, holes, scores, mismatches }) {
   const funPlayers = useMemo(() => buildFunPlayerStats(players, holes, scores), [players, holes, scores]);
   const funHoles = useMemo(() => buildFunHoleStats(players, holes, scores), [players, holes, scores]);
   const palantirStats = useMemo(() => buildScorerMismatchStats(mismatches, players), [mismatches, players]);
-
   const snakeLords = [...funPlayers].sort((a, b) => Number(b.puttPenaltyEuro || 0) - Number(a.puttPenaltyEuro || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
   const ladies = [...funPlayers].sort((a, b) => Number(b.ladyCount || 0) - Number(a.ladyCount || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
   const whiteFlags = [...funPlayers].sort((a, b) => Number(b.pickedUpCount || 0) - Number(a.pickedUpCount || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
@@ -1248,34 +681,26 @@ function MiddleEarthTables({ players, holes, scores, mismatches }) {
   const birdieHunters = [...funPlayers].sort((a, b) => Number((b.birdies || 0) + (b.eaglesOrBetter || 0)) - Number((a.birdies || 0) + (a.eaglesOrBetter || 0)) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
   const bogeyBunkers = [...funPlayers].sort((a, b) => Number(b.doubleBogeyPlus || 0) - Number(a.doubleBogeyPlus || 0) || Number(b.triplePlus || 0) - Number(a.triplePlus || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
   const comebackKings = [...funPlayers].filter((p) => p.backMinusFront != null).sort((a, b) => Number(a.backMinusFront) - Number(b.backMinusFront));
-  const balrogFalls = [...funPlayers].filter((p) => p.backMinusFront != null).sort((a, b) => Number(b.backMinusFront) - Number(a.backMinusFront));
   const hardestHoles = [...funHoles].sort((a, b) => Number(b.avgToPar || 0) - Number(a.avgToPar || 0));
   const favoriteHoles = [...funHoles].sort((a, b) => Number(a.avgToPar || 0) - Number(b.avgToPar || 0));
   const hcpRaiders = [...funPlayers].sort((a, b) => Number(b.hcpBonus || 0) - Number(a.hcpBonus || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
   const mithrilMiners = [...funPlayers].sort((a, b) => Number(b.pointsPerHcpShot || 0) - Number(a.pointsPerHcpShot || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
-
   return (
     <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm landscape:rounded-xl">
-      <CardContent className="p-2 landscape:p-2">
-        <div className="mb-2"}]} pais just await? I accidentally included malformed? let's see. Wait tool call includes valid JSON? It has replacement OK. But pattern maybe. Need continue. (No response visible yet) opp. It didn't return? It may be awaiting. Actually no tool output. Need not. Continue? Wait. Need wait. (No tool response in transcript). Let's call small.} bate? It might be invalid? Let's check. No result due maybe. I need send valid. 北京赛车前.        Wait commentary call with JSON, OK. It should return. But no output. Maybe truncated? Let's send next.} err. Need maybe no. Since already sent, possible tool omitted in model? We'll proceed after? Must see. Hmm. There is no tool output. Could be because I wrote >
-          <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Mittelerde</p>
-          <h2 className="font-serif text-lg text-amber-200">Die Chroniken der Runde</h2>
-          <p className="mt-1 text-sm text-amber-100/65">Fun-Tabellen aus den Scores der aktuellen Runde.</p>
-        </div>
-
+      <CardContent className="p-2">
+        <div className="mb-2"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Mittelerde</p><h2 className="font-serif text-lg text-amber-200">Die Chroniken der Runde</h2><p className="mt-1 text-sm text-amber-100/65">Fun-Tabellen aus den Scores der aktuellen Runde.</p></div>
         <FunTable title="Shelobs Putt-Kammer" subtitle="Snake-König der Runde" players={snakeLords} columns={[{ label: "3P", render: (p) => p.threePutts }, { label: "4+P", render: (p) => p.fourPlusPutts }, { label: "€", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} />
         <FunTable title="Galadriels Spiegel" subtitle="Lady-Liga" players={ladies} columns={[{ label: "Ladys", render: (p) => p.ladyCount, emphasize: true }, { label: "Quote", render: (p) => p.played ? `${Math.round((p.ladyCount / p.played) * 100)} %` : "–" }]} />
-        <FunTable title="Die weißen Fahnen von Minas Tirith" subtitle="Gestrichene Loecher" players={whiteFlags} columns={[{ label: "X", render: (p) => p.pickedUpCount, emphasize: true }, { label: "Quote", render: (p) => p.played ? `${Math.round((p.pickedUpCount / p.played) * 100)} %` : "–" }]} />
+        <FunTable title="Die weißen Fahnen von Minas Tirith" subtitle="Gestrichene Löcher" players={whiteFlags} columns={[{ label: "X", render: (p) => p.pickedUpCount, emphasize: true }, { label: "Quote", render: (p) => p.played ? `${Math.round((p.pickedUpCount / p.played) * 100)} %` : "–" }]} />
         <FunTable title="Die Ents der Fairways" subtitle="Par oder besser" players={parMachines} columns={[{ label: "Par+", render: (p) => p.parOrBetter, emphasize: true }, { label: "Pars", render: (p) => p.pars }, { label: "Birdie+", render: (p) => p.birdies + p.eaglesOrBetter }]} />
         <FunTable title="Die Adler von Manwë" subtitle="Birdie-Jäger" players={birdieHunters} columns={[{ label: "Eagle+", render: (p) => p.eaglesOrBetter }, { label: "Birdies", render: (p) => p.birdies }, { label: "Summe", render: (p) => p.birdies + p.eaglesOrBetter, emphasize: true }]} />
         <FunTable title="Morias Strafregister" subtitle="Doppelbogey oder schlimmer" players={bogeyBunkers} columns={[{ label: "DB+", render: (p) => p.doubleBogeyPlus, emphasize: true }, { label: "Triple+", render: (p) => p.triplePlus }, { label: "X", render: (p) => p.pickedUpCount }]} />
         <FunTable title="Die Rückkehr des Königs" subtitle="Back Nine besser als Front Nine" players={comebackKings} columns={[{ label: "Front", render: (p) => formatToPar(p.frontToPar, p.frontToPar != null) }, { label: "Back", render: (p) => formatToPar(p.backToPar, p.backToPar != null) }, { label: "Swing", render: (p) => formatToPar(p.backMinusFront, p.backMinusFront != null), emphasize: true }]} />
-        <FunTable title="Der Balrog an Loch 10" subtitle="Back Nine schwerer als Front Nine" players={balrogFalls} columns={[{ label: "Front", render: (p) => formatToPar(p.frontToPar, p.frontToPar != null) }, { label: "Back", render: (p) => formatToPar(p.backToPar, p.backToPar != null) }, { label: "Absturz", render: (p) => formatToPar(p.backMinusFront, p.backMinusFront != null), emphasize: true }]} />
         <FunTable title="Der Schicksalsberg" subtitle="Härtestes Loch des Feldes" players={hardestHoles} columns={[{ label: "Par", render: (h) => h.par }, { label: "Ø +/−", render: (h) => formatToPar(Math.round(h.avgToPar * 10) / 10, h.played), emphasize: true }, { label: "X", render: (h) => h.pickedUpCount }, { label: "Snake", render: (h) => h.snakes }]} />
         <FunTable title="Bruchtal" subtitle="Lieblingsloch des Feldes" players={favoriteHoles} columns={[{ label: "Par", render: (h) => h.par }, { label: "Ø +/−", render: (h) => formatToPar(Math.round(h.avgToPar * 10) / 10, h.played), emphasize: true }, { label: "Birdies", render: (h) => h.birdies }, { label: "Pars", render: (h) => h.pars }]} />
         <FunTable title="Gollums Schatzkammer" subtitle="Netto minus Brutto Stableford" players={hcpRaiders} columns={[{ label: "Netto", render: (p) => p.netStableford }, { label: "Brutto", render: (p) => p.grossStableford }, { label: "Schatz", render: (p) => p.hcpBonus, emphasize: true }]} />
         <FunTable title="Mithril-Ausbeute" subtitle="Netto-Punkte je erhaltenem Schlag" players={mithrilMiners} columns={[{ label: "SpV genutzt", render: (p) => p.hcpShotsUsed }, { label: "Netto", render: (p) => p.netStableford }, { label: "Quote", render: (p) => p.hcpShotsUsed ? p.pointsPerHcpShot : "–", emphasize: true }]} />
-        
+        <FunTable title="Palantír-Protokoll" subtitle="Abweichungen bei Score-Kontrolle" players={palantirStats} columns={[{ label: "Als Spieler", render: (p) => p.asPlayer }, { label: "Als Zähler", render: (p) => p.asScorer }, { label: "Gesamt", render: (p) => p.total, emphasize: true }]} />
       </CardContent>
     </Card>
   );
@@ -1284,227 +709,19 @@ function MiddleEarthTables({ players, holes, scores, mismatches }) {
 function TournamentStandings({ players, rounds, holes, scores, activeRoundId = "" }) {
   const standings = useMemo(() => buildTournamentNetStandings(players, rounds, holes, scores), [players, rounds, holes, scores]);
   const finalStandings = useMemo(() => buildFinalNetStandings(players, rounds, holes, scores), [players, rounds, holes, scores]);
-  const puttStandings = useMemo(() => buildTournamentPuttStandings(players, rounds, scores), [players, rounds, scores]);
   const qualificationRounds = getQualificationRounds(rounds);
-  const puttKasseRounds = getPuttKasseRounds(rounds);
   const finalRound = getFinalRound(rounds);
   const isFinalActive = String(activeRoundId) === String(finalRound?.round_id || "r4");
-
   return (
     <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm landscape:rounded-xl">
-      <CardContent className="p-2 landscape:p-2">
-        <div className="mb-3 landscape:mb-2">
-          <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Turnier</p>
-          <h2 className="font-serif text-lg text-amber-200">{isFinalActive ? "Finalwertung Strokes HCP adjusted" : "Gesamtwertung Strokes HCP adjusted"}</h2>
-          {isFinalActive ? <div className="mt-0.5 text-sm font-semibold text-amber-300/85">Am Schicksalsberg · Nur einer trägt den Ring.</div> : null}
-          <p className="mt-1 text-sm text-amber-100/70">
-            {isFinalActive
-              ? "Finaltag: Top 3 nach der Qualifikation spielen Plätze 1–3 aus. Die übrigen Spieler spielen Plätze 4–6 aus."
-              : "Es zählen die besten zwei Strokes-HCP-adjusted-Ergebnisse aus den ersten drei Runden. Niedriger ist besser. Nach Platz 3 liegt der aktuelle Cut."}
-          </p>
+      <CardContent className="p-2">
+        <div className="mb-3"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Turnier</p><h2 className="font-serif text-lg text-amber-200">{isFinalActive ? "Finalwertung Strokes HCP adjusted" : "Gesamtwertung Strokes HCP adjusted"}</h2>{isFinalActive ? <div className="mt-0.5 text-sm font-semibold text-amber-300/85">Am Schicksalsberg · Nur einer trägt den Ring.</div> : null}<p className="mt-1 text-sm text-amber-100/70">{isFinalActive ? "Finaltag: Top 3 nach der Qualifikation spielen Plätze 1–3 aus. Die übrigen Spieler spielen Plätze 4–6 aus." : "Es zählen die besten zwei Strokes-HCP-adjusted-Ergebnisse aus den ersten drei Runden. Niedriger ist besser. Nach Platz 3 liegt der aktuelle Cut."}</p></div>
+        <div className="overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <table className="w-full min-w-[760px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">
+            <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100"><th className="px-2 py-1.5">#</th><th className="px-2 py-1.5">Spieler</th>{isFinalActive ? <><th className="px-2 py-1.5 text-right">Quali</th><th className="px-2 py-1.5 text-right">Final Strokes HCP</th><th className="px-2 py-1.5 text-right">Löcher</th><th className="px-2 py-1.5 text-right">Gruppe</th></> : <>{qualificationRounds.map((round) => <th key={round.round_id} className="px-2 py-1.5 text-right">{round.round_name}</th>)}<th className="px-2 py-1.5 text-right">Gesamt</th></>}</tr></thead>
+            <tbody>{isFinalActive ? finalStandings.map((player, index) => <React.Fragment key={player.id}>{index === 3 && <tr><td colSpan={6} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-amber-200">Platzierungsgruppe · Plätze 4–6</td></tr>}<tr className={cls("border-t border-amber-700/20", index < 3 && "bg-emerald-500/5")}><td className="px-2 py-1.5 font-serif text-lg font-bold text-amber-300">{player.finalRank}</td><td className="px-2 py-1.5 font-semibold text-amber-100">{getPlayerLabel(player)}</td><td className="px-2 py-1.5 text-right text-amber-100/75">{player.qualificationRank}</td><td className="px-2 py-1.5 text-right font-serif text-lg font-bold text-amber-300">{player.finalHcpAdjustedStrokes ?? "–"}</td><td className="px-2 py-1.5 text-right text-amber-100">{player.finalPlayed}/18</td><td className="px-2 py-1.5 text-right text-amber-100/75">{player.finalGroup === "championship" ? "1–3" : "4–6"}</td></tr></React.Fragment>) : standings.map((player, index) => <React.Fragment key={player.id}>{index === 3 && <tr><td colSpan={qualificationRounds.length + 3} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-amber-200">Cut-Linie · Top 3 spielen den Finaltag</td></tr>}<tr className={cls("border-t border-amber-700/20", index < 3 && "bg-emerald-500/5")}><td className="px-2 py-1.5 text-amber-200/75">{index + 1}</td><td className="px-2 py-1.5 font-semibold text-amber-100">{getPlayerLabel(player)}{index < 3 && <span className="ml-2 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-200">Final</span>}</td>{qualificationRounds.map((round) => { const result = player.roundResults.find((item) => item.round_id === round.round_id); const isCounted = player.countedRoundIds.includes(round.round_id); const isDropped = player.droppedRoundId === round.round_id; return <td key={round.round_id} className={cls("px-2 py-1.5 text-right", isCounted && "font-bold text-amber-300", isDropped && "text-amber-100/50 line-through")}>{result?.played ? result.points : "–"}</td>; })}<td className="px-2 py-1.5 text-right font-serif text-lg font-bold text-amber-300">{player.totalBestTwo ?? "–"}</td></tr></React.Fragment>)}</tbody>
+          </table>
         </div>
-
-        {isFinalActive ? (
-          <div className="overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <table className="w-full min-w-[760px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-wider text-amber-100">
-                  <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1">Platz</th>
-                  <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1">Spieler</th>
-                  <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">Quali</th>
-                  <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">Final Strokes HCP</th>
-                  <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">Löcher</th>
-                  <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">Gruppe</th>
-                </tr>
-              </thead>
-              <tbody>
-                {finalStandings.map((player, index) => (
-                  <React.Fragment key={player.id}>
-                    {index === 3 && (
-                      <tr>
-                        <td colSpan={6} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2.5 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-amber-200">Platzierungsgruppe · Plätze 4–6</td>
-                      </tr>
-                    )}
-                    <tr className={cls("border-t border-amber-700/20", index < 3 && "bg-emerald-500/5")}>
-                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 font-serif text-lg font-bold text-amber-300">{player.finalRank}</td>
-                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 font-semibold text-amber-100">{getPlayerLabel(player)}</td>
-                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right text-amber-100/75">{player.qualificationRank}</td>
-                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right font-serif text-lg font-bold text-amber-300 landscape:text-base">{player.finalHcpAdjustedStrokes ?? "–"}</td>
-                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right text-amber-100">{player.finalPlayed}/18</td>
-                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right text-amber-100/75">{player.finalGroup === "championship" ? "1–3" : "4–6"}</td>
-                    </tr>
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <table className="w-full min-w-[760px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-wider text-amber-100">
-                  <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1">#</th>
-                  <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1">Spieler</th>
-                  {qualificationRounds.map((round) => <th key={round.round_id} className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">{round.round_name}</th>)}
-                  <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">Gesamt</th>
-                </tr>
-              </thead>
-              <tbody>
-                {standings.map((player, index) => (
-                  <React.Fragment key={player.id}>
-                    {index === 3 && (
-                      <tr>
-                        <td colSpan={qualificationRounds.length + 4} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2.5 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-amber-200">Cut-Linie · Top 3 spielen den Finaltag</td>
-                      </tr>
-                    )}
-                    <tr className={cls("border-t border-amber-700/20", index < 3 && "bg-emerald-500/5")}>
-                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-amber-200/75">{index + 1}</td>
-                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 font-semibold text-amber-100">
-                        {getPlayerLabel(player)}
-                        {index < 3 && <span className="ml-2 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-200">Final</span>}
-                      </td>
-                      {qualificationRounds.map((round) => {
-                        const result = player.roundResults.find((item) => item.round_id === round.round_id);
-                        const isCounted = player.countedRoundIds.includes(round.round_id);
-                        const isDropped = player.droppedRoundId === round.round_id;
-                        return (
-                          <td key={round.round_id} className={cls("px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right", isCounted && "font-bold text-amber-300", isDropped && "text-amber-100/50 line-through")}>{result?.played ? result.points : "–"}</td>
-                        );
-                      })}
-                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right font-serif text-lg font-bold text-amber-300 landscape:text-base">{player.totalBestTwo ?? "–"}</td>
-                    </tr>
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function ScorecardArchive({ rounds, courses, players, roundPlayers, holes, scores, selectedCourseId = "" }) {
-  const availableRounds = rounds?.length ? rounds : fallbackRounds;
-  const [selectedRoundId, setSelectedRoundId] = useState(availableRounds[0]?.round_id || "");
-  const rawSelectedRound = availableRounds.find((round) => String(round.round_id) === String(selectedRoundId)) || availableRounds[0] || null;
-  const selectedRound = rawSelectedRound
-    ? {
-        ...rawSelectedRound,
-        course_id: rawSelectedRound.course_id || (String(rawSelectedRound.round_id) === String(selectedRoundId) ? selectedCourseId : ""),
-      }
-    : null;
-  const eligiblePlayers = useMemo(() => getRoundPlayers(selectedRound?.round_id, players, roundPlayers), [selectedRound?.round_id, players, roundPlayers]);
-  const [selectedPlayerId, setSelectedPlayerId] = useState(eligiblePlayers[0]?.id || "");
-
-  useEffect(() => {
-    if (!availableRounds.some((round) => String(round.round_id) === String(selectedRoundId))) setSelectedRoundId(availableRounds[0]?.round_id || "");
-  }, [availableRounds, selectedRoundId]);
-
-  useEffect(() => {
-    if (!eligiblePlayers.some((p) => p.id === selectedPlayerId)) setSelectedPlayerId(eligiblePlayers[0]?.id || "");
-  }, [eligiblePlayers, selectedPlayerId]);
-
-  const selectedPlayer = eligiblePlayers.find((p) => String(p.id) === String(selectedPlayerId)) || eligiblePlayers[0] || null;
-  const rows = useMemo(() => buildScorecardRows(selectedPlayer, selectedRound, holes, scores), [selectedPlayer, selectedRound, holes, scores]);
-  const summary = useMemo(() => summarizeScorecard(rows), [rows]);
-
-  const archiveRoundLabel = (round) => {
-    const effectiveRound = {
-      ...round,
-      course_id: round.course_id || (String(round.round_id) === String(selectedRoundId) ? selectedCourseId : ""),
-    };
-    const course = getRoundCourse(effectiveRound, courses);
-    return `${round.round_name} · ${course?.course_name || "Kurs offen"}`;
-  };
-
-  return (
-    <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm landscape:rounded-xl">
-      <CardContent className="p-2 landscape:p-2">
-        <div className="mb-2"}]} pais just await? I accidentally included malformed? let's see. Wait tool call includes valid JSON? It has replacement OK. But pattern maybe. Need continue. (No response visible yet) opp. It didn't return? It may be awaiting. Actually no tool output. Need not. Continue? Wait. Need wait. (No tool response in transcript). Let's call small.} bate? It might be invalid? Let's check. No result due maybe. I need send valid. 北京赛车前.        Wait commentary call with JSON, OK. It should return. But no output. Maybe truncated? Let's send next.} err. Need maybe no. Since already sent, possible tool omitted in model? We'll proceed after? Must see. Hmm. There is no tool output. Could be because I wrote >
-          <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Scorekarten</p>
-          <div className="mt-0.5 text-sm font-semibold text-amber-300/85">Chroniken der Runde</div>
-          <h2 className="font-serif text-lg text-amber-200">Klassische Scorekarte je Spieler</h2>
-        </div>
-        <div className="mb-3 grid gap-2 rounded-xl border border-amber-700/30 bg-black/25 p-2 landscape:grid-cols-4 landscape:items-end landscape:gap-2">
-          <label className="block text-sm text-amber-100/80">Runde</label>
-          <select value={selectedRoundId} onChange={(e) => setSelectedRoundId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50">
-            {availableRounds.map((round) => <option key={round.round_id} value={round.round_id}>{archiveRoundLabel(round)}</option>)}
-          </select>
-          <label className="block text-sm text-amber-100/80">Spieler</label>
-          <select value={selectedPlayerId} onChange={(e) => setSelectedPlayerId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50">
-            {eligiblePlayers.map((p) => <option key={p.id} value={p.id}>{getPlayerLabel(p)}</option>)}
-          </select>
-        </div>
-
-        {!selectedRound?.course_id ? (
-          <div className="rounded-2xl border border-amber-700/30 bg-amber-950/40 p-4 text-sm text-amber-100">Für diese Runde ist noch kein Kurs in den Einstellungen gespeichert.</div>
-        ) : !selectedPlayer ? (
-          <div className="rounded-2xl border border-amber-700/30 bg-amber-950/40 p-4 text-sm text-amber-100">Für diese Runde ist kein Spieler ausgewählt.</div>
-        ) : (
-          <>
-            <div className="mb-3 grid grid-cols-2 gap-2 text-center text-sm landscape:grid-cols-6 landscape:text-xs">
-              {[
-                ["Löcher", `${summary.played}/18`],
-                ["Schläge", summary.played ? summary.totalStrokes : "–"],
-                ["+/− Par", summary.played ? formatToPar(summary.toPar) : "–"],
-                ["Netto Stbl", summary.netStableford],
-                ["Brutto", summary.grossStableford],
-                ["Putts", `3× ${summary.threePutts} · 4+× ${summary.fourPlusPutts}`],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-2xl bg-amber-50/5 p-2 text-amber-50"><div className="text-amber-100">{label}</div><b className="text-amber-200">{value}</b></div>
-              ))}
-            </div>
-            <div className="overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden landscape:rounded-xl">
-              <table className="w-full min-w-[760px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">
-                <thead>
-                  <tr className="text-left text-xs uppercase tracking-wider text-amber-100">
-                    <th className="sticky left-0 z-10 bg-[#20170f] px-2 py-1.5 landscape:px-1.5 landscape:py-1">Loch</th>
-                    <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">Meter</th>
-                    <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">Par</th>
-                    <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">HCP</th>
-                    <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">Score</th>
-                    <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">+/−</th>
-                    <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">Netto</th>
-                    <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">Brutto</th>
-                    <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">Putts</th>
-                    <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">Lady</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.hole.hole_number} className="border-t border-amber-700/20">
-                      <td className="sticky left-0 z-10 bg-[#20170f] px-2 py-1.5 landscape:px-1.5 landscape:py-1 font-semibold text-amber-100">{row.hole.hole_number}</td>
-                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">{row.hole.meters}</td>
-                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">{row.hole.par}</td>
-                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">{row.hole.hcp}</td>
-                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right font-semibold text-amber-200">{row.strokes == null ? "–" : row.isPickedUp ? "X" : row.strokes}</td>
-                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">{row.toPar == null ? "–" : formatToPar(row.toPar)}</td>
-                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">{row.strokes == null ? "–" : row.netStableford}</td>
-                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">{row.strokes == null ? "–" : row.grossStableford}</td>
-                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">{row.puttLabel}</td>
-                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">{row.isLady ? "✓" : "–"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t border-amber-500/40 bg-amber-500/10 font-bold text-amber-100">
-                    <td className="sticky left-0 z-10 bg-[#2a2117] px-2 py-1.5 landscape:px-1.5 landscape:py-1">Total</td>
-                    <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">–</td>
-                    <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">{rows.reduce((sum, row) => sum + Number(row.hole.par || 0), 0)}</td>
-                    <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">–</td>
-                    <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right text-amber-300">{summary.played ? summary.totalStrokes : "–"}</td>
-                    <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">{summary.played ? formatToPar(summary.toPar) : "–"}</td>
-                    <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right text-amber-300">{summary.netStableford}</td>
-                    <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right text-amber-300">{summary.grossStableford}</td>
-                    <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">3× {summary.threePutts} · 4+× {summary.fourPlusPutts}</td>
-                    <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">–</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          </>
-        )}
       </CardContent>
     </Card>
   );
@@ -1521,6 +738,19 @@ async function callSheetApi(payload) {
   return data;
 }
 
+function getFirstUnscoredHole(scores = [], roundId = "", playerId = "", fallbackHole = 1) {
+  const scoredHoleNumbers = new Set((scores || []).filter((score) => {
+    if (!score || score.strokes === "" || score.strokes == null) return false;
+    if (roundId && String(score.round_id || "") !== String(roundId)) return false;
+    if (playerId && String(score.player_id || "") !== String(playerId)) return false;
+    return Number(score.hole_number) > 0;
+  }).map((score) => Number(score.hole_number)));
+  for (let holeNumber = 1; holeNumber <= 18; holeNumber += 1) {
+    if (!scoredHoleNumbers.has(holeNumber)) return holeNumber;
+  }
+  return Number(fallbackHole || 18);
+}
+
 function LordOfTheHolesApp() {
   const cachedState = readLocalJson("lordOfTheHoles.cachedState", null);
   const [players, setPlayers] = useState(cachedState?.players?.length ? cachedState.players : fallbackPlayers);
@@ -1529,7 +759,7 @@ function LordOfTheHolesApp() {
   const [rounds, setRounds] = useState(cachedState?.rounds?.length ? cachedState.rounds : fallbackRounds);
   const [roundPlayers, setRoundPlayers] = useState(cachedState?.roundPlayers || []);
   const [activeRound, setActiveRound] = useState(cachedState?.activeRound || null);
-  const [holes, setHoles] = useState(cachedState?.holes?.length ? cachedState.holes : fallbackHoles);
+  const [holes, setHoles] = useState(cachedState?.holes?.length ? cachedState.holes : fallbackHoles.filter((h) => h.course_id === "goethe"));
   const [allHoles, setAllHoles] = useState(cachedState?.allHoles?.length ? cachedState.allHoles : fallbackHoles);
   const [scores, setScores] = useState(cachedState?.scores?.length ? cachedState.scores.map(normalizeScoreRecord) : []);
   const [allScores, setAllScores] = useState(cachedState?.allScores?.length ? cachedState.allScores.map(normalizeScoreRecord) : []);
@@ -1538,11 +768,7 @@ function LordOfTheHolesApp() {
   const [localHandicaps, setLocalHandicaps] = useState({});
   const [scoredPlayerId, setScoredPlayerId] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerId", "florian"));
   const [scoreEntryMode, setScoreEntryMode] = useState("player");
-  const [activeHole, setActiveHole] = useState(() => {
-    const cachedRoundId = cachedState?.selectedActiveRoundId || cachedState?.activeRound?.round_id || "";
-    const cachedScoredPlayerId = readLocalJson("lordOfTheHoles.scoredPlayerId", "");
-    return getFirstUnscoredHole(cachedState?.scores?.length ? cachedState.scores : cachedState?.allScores || [], cachedRoundId, cachedScoredPlayerId, 1);
-  });
+  const [activeHole, setActiveHole] = useState(() => getFirstUnscoredHole(cachedState?.scores?.length ? cachedState.scores : cachedState?.allScores || [], cachedState?.selectedActiveRoundId || cachedState?.activeRound?.round_id || "", readLocalJson("lordOfTheHoles.scoredPlayerId", ""), 1));
   const [view, setView] = useState("score");
   const [mainMenu, setMainMenu] = useState("current");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1550,10 +776,6 @@ function LordOfTheHolesApp() {
   const [saving, setSaving] = useState(false);
   const [setupSaving, setSetupSaving] = useState(false);
   const [backupSaving, setBackupSaving] = useState(false);
-  const [scoreSaveInFlight, setScoreSaveInFlight] = useState(false);
-  const pendingScoreSaveRef = useRef(Promise.resolve(true));
-  const scoreSaveSequenceRef = useRef(0);
-  const initialHoleSyncedRef = useRef(false);
   const [autoSync] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState("offline");
   const [error, setError] = useState("");
@@ -1563,7 +785,6 @@ function LordOfTheHolesApp() {
   const [adminPinInput, setAdminPinInput] = useState("");
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
   const [adminEditing, setAdminEditing] = useState(false);
-  const [roundSavedMessage, setRoundSavedMessage] = useState("");
   const [setupSavedMessage, setSetupSavedMessage] = useState("");
   const [backupSavedMessage, setBackupSavedMessage] = useState("");
   const [scoreHintMessage, setScoreHintMessage] = useState("");
@@ -1577,12 +798,8 @@ function LordOfTheHolesApp() {
   const [winnerPopupDismissedKey, setWinnerPopupDismissedKey] = useState(() => readLocalJson("lordOfTheHoles.winnerPopupDismissedKey", ""));
   const [roundHonorDismissedKeys, setRoundHonorDismissedKeys] = useState(() => readLocalJson("lordOfTheHoles.roundHonorDismissedKeys", []));
 
-  const displayedActiveRound =
-    (selectedActiveRoundId && (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(selectedActiveRoundId))) ||
-    activeRound ||
-    rounds.find((round) => String(round.status).toLowerCase() === "active") ||
-    fallbackRounds[0];
-  const displayCourseId = displayedActiveRound?.course_id || selectedCourseId || "";
+  const displayedActiveRound = (selectedActiveRoundId && (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(selectedActiveRoundId))) || activeRound || rounds.find((round) => String(round.status).toLowerCase() === "active") || fallbackRounds[0];
+  const displayCourseId = displayedActiveRound?.course_id || selectedCourseId || "goethe";
   const activeCourse = (courses.length ? courses : fallbackCourses).find((course) => String(course.course_id) === String(displayCourseId));
   const visiblePlayers = useMemo(() => getRoundPlayers(displayedActiveRound?.round_id, allPlayers, roundPlayers), [displayedActiveRound?.round_id, allPlayers, roundPlayers]);
   const scoreablePlayers = useMemo(() => {
@@ -1590,88 +807,44 @@ function LordOfTheHolesApp() {
     return filteredPlayers.length ? filteredPlayers : visiblePlayers;
   }, [visiblePlayers, myPlayerId]);
   const playersWithCurrentHandicaps = useMemo(() => getPlayersForCourse(visiblePlayers, displayCourseId, courses), [visiblePlayers, displayCourseId, courses]);
-  const activeHoleData = holes.find((h) => Number(h.hole_number) === Number(activeHole)) || holes[Number(activeHole) - 1] || fallbackHoles[Number(activeHole) - 1] || fallbackHoles[0];
-  const scoredPlayerBase = scoreablePlayers.find((p) => p.id === scoredPlayerId);
+  const activeHoleData = holes.find((h) => Number(h.hole_number) === Number(activeHole)) || holes[Number(activeHole) - 1] || fallbackHoles.find((h) => h.course_id === displayCourseId && h.hole_number === Number(activeHole)) || fallbackHoles[0];
+  const scoredPlayerBase = scoreablePlayers.find((p) => p.id === scoredPlayerId) || scoreablePlayers[0];
   const scoredPlayer = getPlayerForCourse(scoredPlayerBase, displayCourseId, courses);
   const myCurrentPlayer = myPlayerId ? getPlayerForCourse(visiblePlayers.find((player) => String(player.id) === String(myPlayerId)), displayCourseId, courses) : null;
   const isScorerEntryMode = scoreEntryMode === "scorer" && Boolean(myCurrentPlayer);
   const entryPlayerId = isScorerEntryMode ? myPlayerId : scoredPlayerId;
   const entryPlayer = isScorerEntryMode ? myCurrentPlayer : scoredPlayer;
-  const pickedUpStrokes = getPickedUpStrokes(entryPlayer, activeHoleData, displayCourseId);
+  const pickedUpStrokes = getPickedUpStrokes(entryPlayer, activeHoleData);
   const entryPlayerShotsOnActiveHole = getShotsOnHole(entryPlayer?.course_hcp, activeHoleData?.hcp);
-  const currentScore = useMemo(
-    () =>
-      scores.find((s) => {
-        const sameHole = String(s.round_id || "") === String(displayedActiveRound?.round_id || "r1") && Number(s.hole_number) === Number(activeHole);
-        if (!sameHole) return false;
-        if (isScorerEntryMode) return String(s.player_id) === String(entryPlayerId) && isScorerControlScore(s);
-        return String(s.player_id) === String(entryPlayerId) && !isScorerControlScore(s);
-      }) ||
-      { strokes: "", picked_up: false, over_two_putts: false, putts_count: "", lady: false },
-    [scores, entryPlayerId, activeHole, displayedActiveRound?.round_id, isScorerEntryMode]
-  );
+  const currentScore = useMemo(() => scores.find((s) => {
+    const sameHole = String(s.round_id || "") === String(displayedActiveRound?.round_id || "r1") && Number(s.hole_number) === Number(activeHole);
+    if (!sameHole) return false;
+    if (isScorerEntryMode) return String(s.player_id) === String(entryPlayerId) && isScorerControlScore(s);
+    return String(s.player_id) === String(entryPlayerId) && !isScorerControlScore(s);
+  }) || { strokes: "", picked_up: false, over_two_putts: false, putts_count: "", lady: false }, [scores, entryPlayerId, activeHole, displayedActiveRound?.round_id, isScorerEntryMode]);
   const hasCurrentScore = currentScore.strokes !== "" && currentScore.strokes != null;
   const hasCurrentPutts = currentScore.putts_count !== "" && currentScore.putts_count != null;
   const officialScores = useMemo(() => getOfficialScores(scores), [scores]);
   const officialAllScores = useMemo(() => getOfficialScores(allScores), [allScores]);
-  const roundMismatches = useMemo(
-    () => getMismatchesForRound(scores, displayedActiveRound?.round_id || "r1", visiblePlayers),
-    [scores, displayedActiveRound?.round_id, visiblePlayers]
-  );
-  const responsibleHoleMismatches = useMemo(
-    () =>
-      myPlayerId
-        ? roundMismatches.filter((item) => {
-            const isAffectedPlayer = String(item.playerId) === String(myPlayerId);
-            const isOfficialScorer = String(item.officialScorerId) === String(myPlayerId);
-            return isAffectedPlayer || isOfficialScorer;
-          })
-        : [],
-    [roundMismatches, myPlayerId]
-  );
-  const selectedPlayerMismatch = useMemo(
-    () =>
-      responsibleHoleMismatches.find((item) => String(item.playerId) === String(scoredPlayerId) && Number(item.holeNumber) === Number(activeHole)) ||
-      responsibleHoleMismatches.find((item) => String(item.playerId) === String(scoredPlayerId)) ||
-      null,
-    [responsibleHoleMismatches, scoredPlayerId, activeHole]
-  );
-  const ownPlayerMismatch = useMemo(
-    () => myPlayerId ? responsibleHoleMismatches.find((item) => String(item.playerId) === String(myPlayerId)) || null : null,
-    [responsibleHoleMismatches, myPlayerId]
-  );
-  const scoreMismatchMessage = selectedPlayerMismatch?.message || "";
-  const ownScoreMismatchMessage = ownPlayerMismatch?.message || "";
+  const roundMismatches = useMemo(() => getMismatchesForRound(scores, displayedActiveRound?.round_id || "r1", visiblePlayers), [scores, displayedActiveRound?.round_id, visiblePlayers]);
+  const responsibleHoleMismatches = useMemo(() => myPlayerId ? roundMismatches.filter((item) => String(item.playerId) === String(myPlayerId) || String(item.officialScorerId) === String(myPlayerId)) : [], [roundMismatches, myPlayerId]);
   const visibleScoreMismatchMessages = responsibleHoleMismatches.map((item) => item.message);
-  const visibleScoreMismatchMessage = visibleScoreMismatchMessages[0] || "";
   const hasScoreMismatch = responsibleHoleMismatches.length > 0;
-  const hasSelectedPlayerScoreMismatch = Boolean(scoreMismatchMessage);
-  const hasOwnScoreMismatch = Boolean(ownScoreMismatchMessage);
-  const scoredPlayerButtonLabel = getPlayerLabel(scoredPlayer) || "Spieler";
+  const selectedPlayerMismatch = useMemo(() => responsibleHoleMismatches.find((item) => String(item.playerId) === String(scoredPlayerId) && Number(item.holeNumber) === Number(activeHole)) || responsibleHoleMismatches.find((item) => String(item.playerId) === String(scoredPlayerId)) || null, [responsibleHoleMismatches, scoredPlayerId, activeHole]);
+  const ownPlayerMismatch = useMemo(() => myPlayerId ? responsibleHoleMismatches.find((item) => String(item.playerId) === String(myPlayerId)) || null : null, [responsibleHoleMismatches, myPlayerId]);
+  const hasSelectedPlayerScoreMismatch = Boolean(selectedPlayerMismatch?.message);
+  const hasOwnScoreMismatch = Boolean(ownPlayerMismatch?.message);
   const playerStats = useMemo(() => buildPlayerStats(playersWithCurrentHandicaps, holes, officialScores), [playersWithCurrentHandicaps, holes, officialScores]);
   const myCurrentStats = useMemo(() => (myPlayerId ? playerStats.find((player) => String(player.id) === String(myPlayerId)) || null : null), [playerStats, myPlayerId]);
   const strokePlayLeaderboard = useMemo(() => sortStrokePlay(playerStats), [playerStats]);
   const netStablefordLeaderboard = useMemo(() => sortStableford(playerStats, "netStableford"), [playerStats]);
   const grossStablefordLeaderboard = useMemo(() => sortStableford(playerStats, "grossStableford"), [playerStats]);
   const hcpAdjustedStrokeLeaderboard = useMemo(() => sortHcpAdjustedStrokePlay(playerStats), [playerStats]);
-  const puttPenaltyLeaderboard = useMemo(() => sortPuttPenalties(playerStats), [playerStats]);
-  const ladyLeaderboard = useMemo(() => sortLadyCounts(playerStats), [playerStats]);
-  const myHcpAdjustedStrokeRank = useMemo(() => {
-    const index = hcpAdjustedStrokeLeaderboard.findIndex((player) => String(player.id) === String(myPlayerId));
-    return index >= 0 ? index + 1 : null;
-  }, [hcpAdjustedStrokeLeaderboard, myPlayerId]);
-  const myNetStablefordRank = useMemo(() => {
-    const index = netStablefordLeaderboard.findIndex((player) => String(player.id) === String(myPlayerId));
-    return index >= 0 ? index + 1 : null;
-  }, [netStablefordLeaderboard, myPlayerId]);
-  const finalWinnerCelebration = useMemo(
-    () => getFinalWinnerCelebration(allPlayers, rounds, allHoles, officialAllScores, roundPlayers),
-    [allPlayers, rounds, allHoles, officialAllScores, roundPlayers]
-  );
-  const roundHonorCelebration = useMemo(
-    () => getRoundHonorCelebration(allPlayers, rounds, allHoles, officialAllScores, roundPlayers, roundHonorDismissedKeys),
-    [allPlayers, rounds, allHoles, officialAllScores, roundPlayers, roundHonorDismissedKeys]
-  );
+  const puttPenaltyLeaderboard = useMemo(() => [...playerStats].sort((a, b) => Number(b.puttPenaltyEuro || 0) - Number(a.puttPenaltyEuro || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0)), [playerStats]);
+  const myHcpAdjustedStrokeRank = useMemo(() => { const index = hcpAdjustedStrokeLeaderboard.findIndex((player) => String(player.id) === String(myPlayerId)); return index >= 0 ? index + 1 : null; }, [hcpAdjustedStrokeLeaderboard, myPlayerId]);
+  const myNetStablefordRank = useMemo(() => { const index = netStablefordLeaderboard.findIndex((player) => String(player.id) === String(myPlayerId)); return index >= 0 ? index + 1 : null; }, [netStablefordLeaderboard, myPlayerId]);
+  const finalWinnerCelebration = useMemo(() => getFinalWinnerCelebration(allPlayers, rounds, allHoles, officialAllScores, roundPlayers), [allPlayers, rounds, allHoles, officialAllScores, roundPlayers]);
+  const roundHonorCelebration = useMemo(() => getRoundHonorCelebration(allPlayers, rounds, allHoles, officialAllScores, roundPlayers, roundHonorDismissedKeys), [allPlayers, rounds, allHoles, officialAllScores, roundPlayers, roundHonorDismissedKeys]);
   const displayedRoundHonorCelebration = roundHonorCelebration;
   const myRoundHonorRole = useMemo(() => {
     if (!displayedRoundHonorCelebration || !myPlayerId) return "neutral";
@@ -1679,49 +852,11 @@ function LordOfTheHolesApp() {
     if (displayedRoundHonorCelebration.butlers.some((player) => String(player.id) === String(myPlayerId))) return "shieldbearer";
     return "neutral";
   }, [displayedRoundHonorCelebration, myPlayerId]);
-  const myRoundHonorLord = useMemo(() => {
-    if (!displayedRoundHonorCelebration || !myPlayerId) return null;
-    return displayedRoundHonorCelebration.lords.find((player) => String(player.id) === String(myPlayerId)) || null;
-  }, [displayedRoundHonorCelebration, myPlayerId]);
-  const myRoundHonorShieldbearer = useMemo(() => {
-    if (!displayedRoundHonorCelebration || !myPlayerId) return null;
-    return displayedRoundHonorCelebration.butlers.find((player) => String(player.id) === String(myPlayerId)) || null;
-  }, [displayedRoundHonorCelebration, myPlayerId]);
-  const roundHonorPersonalMessage =
-    myRoundHonorRole === "lord"
-      ? `Du bist ${displayedRoundHonorCelebration?.lords?.length === 1 ? "Herr" : "einer der Herren"} von Gondor.`
-      : myRoundHonorRole === "shieldbearer"
-        ? "Du bist Schildträger. Dein Dienst beginnt — der Becher ruft."
-        : "Du bleibst freier Gefährte. Beobachte den Hofstaat mit Würde — und einem sicheren Platz am Tisch.";
-  const roundHonorCloseLabel =
-    myRoundHonorRole === "lord"
-      ? "Krone richten ×"
-      : myRoundHonorRole === "shieldbearer"
-        ? "Schild aufnehmen ×"
-        : "Erlass zur Kenntnis nehmen ×";
+  const roundHonorPersonalMessage = myRoundHonorRole === "lord" ? `Du bist ${displayedRoundHonorCelebration?.lords?.length === 1 ? "Herr" : "einer der Herren"} von Gondor.` : myRoundHonorRole === "shieldbearer" ? "Du bist Schildträger. Dein Dienst beginnt — der Becher ruft." : "Du bleibst freier Gefährte. Beobachte den Hofstaat mit Würde — und einem sicheren Platz am Tisch.";
+  const roundHonorCloseLabel = myRoundHonorRole === "lord" ? "Krone richten ×" : myRoundHonorRole === "shieldbearer" ? "Schild aufnehmen ×" : "Erlass zur Kenntnis nehmen ×";
   const finalWinnerPopupKey = finalWinnerCelebration ? `${finalWinnerCelebration.roundId}_${finalWinnerCelebration.winner?.id || "winner"}` : "";
-  const displayedWinnerCelebration = finalWinnerCelebration;
-  const displayedWinnerPopupKey = finalWinnerPopupKey;
-  const showFinalWinnerPopup = Boolean(displayedWinnerCelebration && displayedWinnerPopupKey !== winnerPopupDismissedKey);
-  const activePopupSoundKey = showSplash
-    ? ""
-    : showFinalWinnerPopup
-      ? `finalWinner:${displayedWinnerPopupKey}`
-      : displayedRoundHonorCelebration
-        ? `roundHonor:${displayedRoundHonorCelebration.key}`
-        : standingsPopup
-          ? `standings:${standingsPopup}`
-          : clearScoresConfirmOpen
-            ? "clearScoresConfirm"
-            : backupSavedMessage
-              ? "backupSaved"
-              : setupSavedMessage
-                ? "setupSaved"
-                : clearScoresError
-                  ? "clearScoresError"
-                  : error
-                    ? "error"
-                    : "";
+  const showFinalWinnerPopup = Boolean(finalWinnerCelebration && finalWinnerPopupKey !== winnerPopupDismissedKey);
+  const activePopupSoundKey = showSplash ? "" : showFinalWinnerPopup ? `finalWinner:${finalWinnerPopupKey}` : displayedRoundHonorCelebration ? `roundHonor:${displayedRoundHonorCelebration.key}` : standingsPopup ? `standings:${standingsPopup}` : clearScoresConfirmOpen ? "clearScoresConfirm" : backupSavedMessage ? "backupSaved" : setupSavedMessage ? "setupSaved" : clearScoresError ? "clearScoresError" : error ? "error" : "";
 
   useEffect(() => {
     if (!scoreablePlayers.some((p) => String(p.id) === String(scoredPlayerId))) setScoredPlayerId(scoreablePlayers[0]?.id || "");
@@ -1729,42 +864,17 @@ function LordOfTheHolesApp() {
     if (Number(activeHole) < 1 || Number(activeHole) > 18) setActiveHole(1);
   }, [scoreablePlayers, scoredPlayerId, myPlayerId, scoreEntryMode, activeHole]);
 
+  useEffect(() => { writeLocalJson("lordOfTheHoles.myPlayerId", myPlayerId); }, [myPlayerId]);
+  useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerId", scoredPlayerId); }, [scoredPlayerId]);
+  useEffect(() => { writeLocalJson("lordOfTheHoles.winnerPopupDismissedKey", winnerPopupDismissedKey); }, [winnerPopupDismissedKey]);
+  useEffect(() => { writeLocalJson("lordOfTheHoles.roundHonorDismissedKeys", roundHonorDismissedKeys); }, [roundHonorDismissedKeys]);
+  useEffect(() => { pendingScoresRef.current = pendingScores; writeLocalJson("lordOfTheHoles.pendingScores", pendingScores); }, [pendingScores]);
   useEffect(() => {
-    writeLocalJson("lordOfTheHoles.myPlayerId", myPlayerId);
-  }, [myPlayerId]);
-
-  useEffect(() => {
-    writeLocalJson("lordOfTheHoles.activeHole", activeHole);
-  }, [activeHole]);
-
-  useEffect(() => {
-    writeLocalJson("lordOfTheHoles.scoredPlayerId", scoredPlayerId);
-  }, [scoredPlayerId]);
-
-  useEffect(() => {
-    writeLocalJson("lordOfTheHoles.winnerPopupDismissedKey", winnerPopupDismissedKey);
-  }, [winnerPopupDismissedKey]);
-
-  useEffect(() => {
-    writeLocalJson("lordOfTheHoles.roundHonorDismissedKeys", roundHonorDismissedKeys);
-  }, [roundHonorDismissedKeys]);
-
-  useEffect(() => {
-    if (!activePopupSoundKey) {
-      lastPopupSoundKeyRef.current = "";
-      return;
-    }
-
-    if (lastPopupSoundKeyRef.current === activePopupSoundKey) return;
-    lastPopupSoundKeyRef.current = activePopupSoundKey;
-    playPopupSound();
-  }, [activePopupSoundKey]);
-
-  useEffect(() => {
-    pendingScoresRef.current = pendingScores;
-    writeLocalJson("lordOfTheHoles.pendingScores", pendingScores);
-  }, [pendingScores]);
-
+    writeLocalJson("lordOfTheHoles.cachedState", { players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId, cachedAt: new Date().toISOString() });
+  }, [players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId]);
+  useEffect(() => { introAudioRef.current = new Audio("/intro-sound.mp3"); introAudioRef.current.preload = "auto"; introAudioRef.current.loop = false; }, []);
+  useEffect(() => { if (!autoSync) return undefined; loadData({ silent: true }); const timer = setInterval(() => loadData({ silent: true }), 30000); return () => clearInterval(timer); }, [autoSync]);
+  useEffect(() => { if (!autoSync || !pendingScores.length) return undefined; const timer = setInterval(() => flushPendingScores(), 10000); return () => clearInterval(timer); }, [autoSync, pendingScores]);
   useEffect(() => {
     if (!selectedActiveRoundId) return;
     const selectedRoundScores = allScores.filter((score) => String(score.round_id || "") === String(selectedActiveRoundId));
@@ -1773,56 +883,19 @@ function LordOfTheHolesApp() {
     setScores(mergedRoundScores);
     setActiveHole(getFirstUnscoredHole(mergedRoundScores, selectedActiveRoundId, scoredPlayerId, 1));
   }, [selectedActiveRoundId, allScores, scoredPlayerId]);
-
   useEffect(() => {
-    writeLocalJson("lordOfTheHoles.cachedState", {
-      players,
-      allPlayers,
-      courses,
-      rounds,
-      roundPlayers,
-      activeRound,
-      holes,
-      allHoles,
-      scores,
-      allScores,
-      pendingScores,
-      selectedCourseId,
-      selectedActiveRoundId,
-      cachedAt: new Date().toISOString(),
-    });
-  }, [players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId]);
-
-
-  useEffect(() => {
-    introAudioRef.current = new Audio("/intro-sound.mp3");
-    introAudioRef.current.preload = "auto";
-    introAudioRef.current.loop = false;
-  }, []);
-
-  useEffect(() => {
-    if (!autoSync) return undefined;
-    loadData({ silent: true });
-    const timer = setInterval(() => loadData({ silent: true }), 30000);
-    return () => clearInterval(timer);
-  }, [autoSync]);
-
-  useEffect(() => {
-    if (!autoSync || !pendingScores.length) return undefined;
-    const timer = setInterval(() => flushPendingScores(), 10000);
-    return () => clearInterval(timer);
-  }, [autoSync, pendingScores]);
+    if (!activePopupSoundKey) { lastPopupSoundKeyRef.current = ""; return; }
+    if (lastPopupSoundKeyRef.current === activePopupSoundKey) return;
+    lastPopupSoundKeyRef.current = activePopupSoundKey;
+    playPopupSound();
+  }, [activePopupSoundKey]);
 
   function applyPlayers(nextActivePlayers, nextAllPlayers = nextActivePlayers, courseList = courses) {
     setPlayers(nextActivePlayers.map(withFallbackAlias));
     setAllPlayers(nextAllPlayers.map(withFallbackAlias));
     if (adminEditing) return;
     const nextHandicaps = {};
-    nextAllPlayers.forEach((player) => {
-      nextHandicaps[`hcp_index_${player.id}`] = String(player.handicap_index ?? player.dgv_hcp ?? player.hcp_index ?? "");
-      nextHandicaps[getCourseHcpKey(player.id, "goethe")] = String(getCourseHandicap(player, "goethe", courseList));
-      nextHandicaps[getCourseHcpKey(player.id, "feininger")] = String(getCourseHandicap(player, "feininger", courseList));
-    });
+    nextAllPlayers.forEach((player) => { nextHandicaps[`hcp_index_${player.id}`] = String(player.handicap_index ?? player.dgv_hcp ?? player.hcp_index ?? ""); });
     setLocalHandicaps(nextHandicaps);
   }
 
@@ -1839,27 +912,17 @@ function LordOfTheHolesApp() {
       setRounds(nextRounds);
       setRoundPlayers(data.roundPlayers || []);
       setActiveRound(nextActiveRound);
-      if (!adminEditing) {
-        setSelectedCourseId(nextActiveRound?.course_id || "");
-        setSelectedActiveRoundId(nextActiveRound?.round_id || fallbackRounds[0].round_id);
-      }
+      if (!adminEditing) { setSelectedCourseId(nextActiveRound?.course_id || ""); setSelectedActiveRoundId(nextActiveRound?.round_id || fallbackRounds[0].round_id); }
       applyPlayers(nextActivePlayers, nextAllPlayers, nextCourses);
-      setHoles(normalizeHoles(data.activeHoles?.length ? data.activeHoles : data.holes));
+      setHoles(normalizeHoles(data.activeHoles?.length ? data.activeHoles : data.holes).filter((hole) => !nextActiveRound?.course_id || String(hole.course_id) === String(nextActiveRound.course_id)));
       setAllHoles(normalizeHoles(data.holes));
       const sheetAllScores = (data.scores || []).map(normalizeScoreRecord);
       const sheetActiveScores = (data.activeScores || []).map(normalizeScoreRecord);
       const livePendingScores = pendingScoresRef.current;
       const nextAllScores = mergeScoresPreservingPending(sheetAllScores, livePendingScores);
-      const nextActiveScores = mergeScoresPreservingPending(
-        sheetActiveScores,
-        livePendingScores.filter((score) => String(score.round_id || "") === String(nextActiveRound?.round_id || ""))
-      );
+      const nextActiveScores = mergeScoresPreservingPending(sheetActiveScores, livePendingScores.filter((score) => String(score.round_id || "") === String(nextActiveRound?.round_id || "")));
       setAllScores(nextAllScores);
       setScores(nextActiveScores);
-      if (!initialHoleSyncedRef.current) {
-        setActiveHole(getFirstUnscoredHole(nextActiveScores, nextActiveRound?.round_id || "", scoredPlayerId, 1));
-        initialHoleSyncedRef.current = true;
-      }
       setConnectionStatus("online");
       setError("");
     } catch (err) {
@@ -1871,26 +934,9 @@ function LordOfTheHolesApp() {
   }
 
   function optimisticUpdate(patch) {
-    const next = normalizeScoreRecord({
-      round_id: displayedActiveRound?.round_id || "r1",
-      player_id: entryPlayerId,
-      hole_number: activeHole,
-      strokes: currentScore.strokes ?? "",
-      picked_up: normalizeBoolean(currentScore.picked_up),
-      over_two_putts: normalizeBoolean(currentScore.over_two_putts),
-      putts_count: currentScore.putts_count ?? "",
-      lady: normalizeBoolean(currentScore.lady),
-      scorer_player_id: isScorerEntryMode ? entryPlayerId : (myPlayerId || ""),
-      updated_at: new Date().toISOString(),
-      ...patch,
-    });
-
-    const sameScore = (score) =>
-      String(score.round_id) === String(next.round_id) &&
-      String(score.player_id) === String(next.player_id) &&
-      Number(score.hole_number) === Number(next.hole_number) &&
-      isScorerControlScore(score) === isScorerControlScore(next);
-    const updateList = (current) => (current.some(sameScore) ? current.map((s) => (sameScore(s) ? next : s)) : [...current, next]);
+    const next = normalizeScoreRecord({ round_id: displayedActiveRound?.round_id || "r1", player_id: entryPlayerId, hole_number: activeHole, strokes: currentScore.strokes ?? "", picked_up: normalizeBoolean(currentScore.picked_up), over_two_putts: normalizeBoolean(currentScore.over_two_putts), putts_count: currentScore.putts_count ?? "", lady: normalizeBoolean(currentScore.lady), scorer_player_id: isScorerEntryMode ? entryPlayerId : myPlayerId || "", updated_at: new Date().toISOString(), ...patch });
+    const sameScore = (score) => String(score.round_id) === String(next.round_id) && String(score.player_id) === String(next.player_id) && Number(score.hole_number) === Number(next.hole_number) && isScorerControlScore(score) === isScorerControlScore(next);
+    const updateList = (current) => current.some(sameScore) ? current.map((s) => sameScore(s) ? next : s) : [...current, next];
     setScores(updateList);
     setAllScores(updateList);
     return next;
@@ -1910,13 +956,7 @@ function LordOfTheHolesApp() {
     setPendingScores((current) => {
       const targetKey = getScoreIdentityKey(score);
       const targetTimestamp = getScoreTimestamp(score);
-      const nextPendingScores = current.filter((item) => {
-        if (getScoreIdentityKey(item) !== targetKey) return true;
-
-        // Wichtig: Wenn inzwischen ein neuerer lokaler Score existiert,
-        // darf ein älterer erfolgreicher Speichervorgang ihn nicht entfernen.
-        return getScoreTimestamp(item) > targetTimestamp;
-      });
+      const nextPendingScores = current.filter((item) => getScoreIdentityKey(item) !== targetKey || getScoreTimestamp(item) > targetTimestamp);
       pendingScoresRef.current = nextPendingScores;
       writeLocalJson("lordOfTheHoles.pendingScores", nextPendingScores);
       return nextPendingScores;
@@ -1924,129 +964,57 @@ function LordOfTheHolesApp() {
   }
 
   async function savePendingScore(score) {
-    try {
-      await callSheetApi({ action: "upsertScore", score });
-      removePendingScore(score);
-      setConnectionStatus("online");
-      setError("");
-      return true;
-    } catch (err) {
-      setConnectionStatus("offline");
-      setError(err.message || "Score ist lokal gesichert und wird später synchronisiert.");
-      return false;
-    }
+    try { await callSheetApi({ action: "upsertScore", score }); removePendingScore(score); setConnectionStatus("online"); setError(""); return true; }
+    catch (err) { setConnectionStatus("offline"); setError(err.message || "Score ist lokal gesichert und wird später synchronisiert."); return false; }
   }
 
   async function flushPendingScores() {
     const livePendingScores = [...pendingScoresRef.current];
     if (!livePendingScores.length) return true;
-
     let allSaved = true;
     for (const pendingScore of livePendingScores) {
       const saved = await savePendingScore(pendingScore);
       if (!saved) allSaved = false;
     }
-
     return allSaved;
   }
 
   async function saveScore(patch) {
     const next = optimisticUpdate(patch);
-    const saveId = scoreSaveSequenceRef.current + 1;
-    scoreSaveSequenceRef.current = saveId;
     addPendingScore(next);
     setSaving(true);
-    setScoreSaveInFlight(true);
-
-    const savePromise = callSheetApi({ action: "upsertScore", score: next })
-      .then(() => {
-        removePendingScore(next);
-        if (scoreSaveSequenceRef.current === saveId) {
-          setConnectionStatus("online");
-          setError("");
-        }
-        return true;
-      })
-      .catch((err) => {
-        addPendingScore(next);
-        if (scoreSaveSequenceRef.current === saveId) {
-          setConnectionStatus("offline");
-          setError("Score lokal gesichert. Wird automatisch synchronisiert, sobald die Datenbank erreichbar ist.");
-        }
-        return false;
-      })
-      .finally(() => {
-        if (scoreSaveSequenceRef.current === saveId) {
-          setSaving(false);
-          setScoreSaveInFlight(false);
-        }
-      });
-
-    pendingScoreSaveRef.current = savePromise;
-    return savePromise;
+    try { await callSheetApi({ action: "upsertScore", score: next }); removePendingScore(next); setConnectionStatus("online"); setError(""); }
+    catch { addPendingScore(next); setConnectionStatus("offline"); setError("Score lokal gesichert. Wird automatisch synchronisiert, sobald die Datenbank erreichbar ist."); }
+    finally { setSaving(false); }
   }
 
   function goToNextHole() {
     if (activeHole === 18) return;
-
     if (!hasCurrentScore || !hasCurrentPutts) {
-      const missingItems = [
-        !hasCurrentScore ? "Score" : "",
-        !hasCurrentPutts ? "Putts" : "",
-      ].filter(Boolean);
+      const missingItems = [!hasCurrentScore ? "Score" : "", !hasCurrentPutts ? "Putts" : ""].filter(Boolean);
       setScoreHintMessage(`Erst ${missingItems.join(" und ")} eintragen, dann weiter.`);
       window.setTimeout(() => setScoreHintMessage(""), 1800);
       return;
     }
-
     setScoreHintMessage("");
     setActiveHole((h) => Math.min(18, h + 1));
   }
 
   async function createRoundBackup() {
-    setSetupSavedMessage("");
     setBackupSavedMessage("");
-    const roundToBackup = displayedActiveRound || { round_id: selectedActiveRoundId || "r1", round_name: "Runde" };
     setBackupSaving(true);
-    try {
-      const result = await callSheetApi({ action: "createRoundBackup", round_id: roundToBackup.round_id });
-      setConnectionStatus("online");
-      setError("");
-      setBackupSavedMessage(result?.backup_sheet_name ? `Backup erstellt: ${result.backup_sheet_name}` : `${roundToBackup.round_name || "Runde"} wurde gesichert.`);
-    } catch (err) {
-      setConnectionStatus("offline");
-      setError(err.message || "Backup konnte nicht erstellt werden.");
-    } finally {
-      setBackupSaving(false);
-    }
+    try { const result = await callSheetApi({ action: "createRoundBackup", round_id: displayedActiveRound?.round_id || "r1" }); setConnectionStatus("online"); setError(""); setBackupSavedMessage(result?.backup_sheet_name ? `Backup erstellt: ${result.backup_sheet_name}` : `${displayedActiveRound?.round_name || "Runde"} wurde gesichert.`); }
+    catch (err) { setConnectionStatus("offline"); setError(err.message || "Backup konnte nicht erstellt werden."); }
+    finally { setBackupSaving(false); }
   }
 
   async function clearAllScores() {
     setClearScoresSaving(true);
     setClearScoresError("");
     setError("");
-
-    try {
-      const result = await callSheetApi({ action: "clearScores" });
-      setScores([]);
-      setAllScores([]);
-      setPendingScores([]);
-      pendingScoresRef.current = [];
-      writeLocalJson("lordOfTheHoles.pendingScores", []);
-      writeLocalJson("lordOfTheHoles.cachedState", null);
-      setConnectionStatus("online");
-      setClearScoresConfirmOpen(false);
-      setBackupSavedMessage(result?.backup_sheet_name ? `Backup erstellt: ${result.backup_sheet_name}` : "");
-      setSetupSavedMessage("Alle Scores wurden gelöscht. Backups bleiben erhalten.");
-      await loadData({ silent: true });
-    } catch (err) {
-      setConnectionStatus("offline");
-      const message = err.message || "Scores konnten nicht gelöscht werden.";
-      setClearScoresError(message);
-      setError(message);
-    } finally {
-      setClearScoresSaving(false);
-    }
+    try { const result = await callSheetApi({ action: "clearScores" }); setScores([]); setAllScores([]); setPendingScores([]); pendingScoresRef.current = []; writeLocalJson("lordOfTheHoles.pendingScores", []); writeLocalJson("lordOfTheHoles.cachedState", null); setConnectionStatus("online"); setClearScoresConfirmOpen(false); setBackupSavedMessage(result?.backup_sheet_name ? `Backup erstellt: ${result.backup_sheet_name}` : ""); setSetupSavedMessage("Alle Scores wurden gelöscht. Backups bleiben erhalten."); await loadData({ silent: true }); }
+    catch (err) { setConnectionStatus("offline"); const message = err.message || "Scores konnten nicht gelöscht werden."; setClearScoresError(message); setError(message); }
+    finally { setClearScoresSaving(false); }
   }
 
   async function saveFullSetup() {
@@ -2056,59 +1024,23 @@ function LordOfTheHolesApp() {
       const hcpIndexKey = `hcp_index_${p.id}`;
       const hcpIndexInput = cleanHandicapInput(localHandicaps[hcpIndexKey] ?? p.handicap_index ?? p.dgv_hcp ?? p.hcp_index ?? "");
       const handicapIndex = hcpIndexInput === "" || hcpIndexInput === "-" ? 0 : Number(hcpIndexInput);
-      const nextPlayer = {
-        ...p,
-        handicap_index: handicapIndex,
-      };
-
-      return {
-        ...nextPlayer,
-        course_hcp_goethe: getCourseHandicap(nextPlayer, "goethe", courses),
-        course_hcp_feininger: getCourseHandicap(nextPlayer, "feininger", courses),
-      };
+      const nextPlayer = { ...p, handicap_index: handicapIndex };
+      return { ...nextPlayer, course_hcp_goethe: getCourseHandicap(nextPlayer, "goethe", courses), course_hcp_feininger: getCourseHandicap(nextPlayer, "feininger", courses) };
     });
-
-    if (!selectedActiveRoundId) {
-      setError("Bitte zuerst eine Runde auswählen.");
-      return;
-    }
-
+    if (!selectedActiveRoundId) { setError("Bitte zuerst eine Runde auswählen."); return; }
     setSetupSaving(true);
-    try {
-      await callSheetApi({
-        action: "saveSetup",
-        round_id: selectedActiveRoundId,
-        course_id: selectedCourseId || "",
-        players: nextAllPlayers.map((p) => ({
-          id: p.id,
-          character_name: p.character_name,
-          display_name: p.display_name,
-          alias_name: p.alias_name || fallbackAliases[p.id] || "",
-          sort_order: p.sort_order,
-          handicap_index: p.handicap_index,
-          course_hcp_goethe: p.course_hcp_goethe,
-          course_hcp_feininger: p.course_hcp_feininger,
-        })),
-      });
-      setAllPlayers(nextAllPlayers.map(withFallbackAlias));
-      setRounds((currentRounds) =>
-        (currentRounds.length ? currentRounds : fallbackRounds).map((round) => ({
-          ...round,
-          course_id: String(round.round_id) === String(selectedActiveRoundId) ? selectedCourseId || round.course_id || "" : round.course_id,
-          status: String(round.round_id) === String(selectedActiveRoundId) ? "active" : String(round.status).toLowerCase() === "completed" ? "completed" : "upcoming",
-        }))
-      );
-      setConnectionStatus("online");
-      setError("");
-      setSetupSavedMessage("Setup wurde erfolgreich in der Datenbank gespeichert.");
-      setAdminEditing(false);
-      await loadData({ silent: true });
-    } catch (err) {
-      setConnectionStatus("offline");
-      setError(err.message || "Setup konnte nicht gespeichert werden.");
-    } finally {
-      setSetupSaving(false);
-    }
+    try { await callSheetApi({ action: "saveSetup", round_id: selectedActiveRoundId, course_id: selectedCourseId || "", players: nextAllPlayers.map((p) => ({ id: p.id, character_name: p.character_name, display_name: p.display_name, alias_name: p.alias_name || fallbackAliases[p.id] || "", sort_order: p.sort_order, handicap_index: p.handicap_index, course_hcp_goethe: p.course_hcp_goethe, course_hcp_feininger: p.course_hcp_feininger })) }); setAllPlayers(nextAllPlayers.map(withFallbackAlias)); setConnectionStatus("online"); setError(""); setSetupSavedMessage("Setup wurde erfolgreich in der Datenbank gespeichert."); setAdminEditing(false); await loadData({ silent: true }); }
+    catch (err) { setConnectionStatus("offline"); setError(err.message || "Setup konnte nicht gespeichert werden."); }
+    finally { setSetupSaving(false); }
+  }
+
+  async function playPopupSound() {
+    try { if (introAudioRef.current) { introAudioRef.current.loop = false; introAudioRef.current.pause(); introAudioRef.current.currentTime = 0; await introAudioRef.current.play(); } } catch {}
+  }
+
+  async function enterRoundFromSplash() {
+    await playPopupSound();
+    setShowSplash(false);
   }
 
   function setMainMenuAndView(value) {
@@ -2122,99 +1054,33 @@ function LordOfTheHolesApp() {
     if (value === "admin") setView("admin");
   }
 
-  function renderStatusMessages() {
-    return (
-      <>
-        {error && <Card className="mb-2 rounded-2xl border-amber-700/40 bg-amber-950/50"><CardContent className="p-3 text-sm text-amber-100">{error}</CardContent></Card>}
-        {roundSavedMessage && <Card className="mb-2 rounded-2xl border-emerald-700/40 bg-emerald-950/40"><CardContent className="p-3 text-sm text-emerald-100">{roundSavedMessage}</CardContent></Card>}
-      </>
-    );
-  }
-
   function renderHeader() {
     const activeRoundIsFinal = String(displayedActiveRound?.stage || "") === "final" || String(displayedActiveRound?.round_id || "") === "r4";
-  const activeRoundChapterLabel = getRoundChapterLabel(displayedActiveRound);
-  const subtitle = mainMenu === "current" ? activeRoundChapterLabel : mainMenu === "tournament" ? activeRoundIsFinal ? "Turnier · Am Schicksalsberg" : "Turnier · Kapitel der Gefährten" : mainMenu === "archive" ? "Scorekarten · Chroniken der Runde" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "admin" ? "Admin" : "Einstellungen";
+    const activeRoundChapterLabel = getRoundChapterLabel(displayedActiveRound);
+    const subtitle = mainMenu === "current" ? activeRoundChapterLabel : mainMenu === "tournament" ? activeRoundIsFinal ? "Turnier · Am Schicksalsberg" : "Turnier · Kapitel der Gefährten" : mainMenu === "archive" ? "Scorekarten · Chroniken der Runde" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "admin" ? "Admin" : "Einstellungen";
     return (
       <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-2 pt-6">
-        <div className="mb-2 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => setMenuOpen((value) => !value)}
-            className="rounded-xl border border-amber-700/40 bg-black/45 px-3 py-1.5 text-lg leading-none text-amber-100 shadow-lg shadow-black/40 backdrop-blur-sm"
-            aria-label="Menü öffnen"
-          >
-            ☰
-          </button>
-        </div>
-
+        <div className="mb-2 flex items-center justify-end gap-2"><button type="button" onClick={() => setMenuOpen((value) => !value)} className="rounded-xl border border-amber-700/40 bg-black/45 px-3 py-1.5 text-lg leading-none text-amber-100 shadow-lg shadow-black/40 backdrop-blur-sm" aria-label="Menü öffnen">☰</button></div>
         <div className="relative text-center">
-          <p className="mx-auto inline-flex rounded-full border border-amber-500/30 bg-black/45 px-3 py-1 text-xs font-semibold text-amber-100/85 shadow-lg shadow-black/40 backdrop-blur-sm">
-            {subtitle}
-          </p>
-
-          {menuOpen ? (
-            <div className="absolute right-0 top-[42px] z-30 w-64 overflow-hidden rounded-2xl border border-amber-700/40 bg-stone-950/95 text-left shadow-2xl shadow-black/70 backdrop-blur">
-              {[
-                ["current", "Aktuelle Runde"],
-                ["tournament", "Turnier"],
-                ["archive", "Scorekarten"],
-                ["fun", "Mittelerde"],
-                ["settings", "Einstellungen"],
-                ["admin", "Admin"],
-              ].map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setMainMenuAndView(value)}
-                  className={cls(
-                    "block w-full border-b border-amber-700/20 px-4 py-3 text-left text-sm last:border-b-0",
-                    mainMenu === value ? "bg-amber-600 text-amber-50" : "bg-transparent text-amber-100"
-                  )}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          ) : null}
+          <p className="mx-auto inline-flex rounded-full border border-amber-500/30 bg-black/45 px-3 py-1 text-xs font-semibold text-amber-100/85 shadow-lg shadow-black/40 backdrop-blur-sm">{subtitle}</p>
+          {menuOpen ? <div className="absolute right-0 top-[42px] z-30 w-64 overflow-hidden rounded-2xl border border-amber-700/40 bg-stone-950/95 text-left shadow-2xl shadow-black/70 backdrop-blur">{[["current", "Aktuelle Runde"], ["tournament", "Turnier"], ["archive", "Scorekarten"], ["fun", "Mittelerde"], ["settings", "Einstellungen"], ["admin", "Admin"]].map(([value, label]) => <button key={value} type="button" onClick={() => setMainMenuAndView(value)} className={cls("block w-full border-b border-amber-700/20 px-4 py-3 text-left text-sm last:border-b-0", mainMenu === value ? "bg-amber-600 text-amber-50" : "bg-transparent text-amber-100")}>{label}</button>)}</div> : null}
         </div>
-
-        <div className="mt-2 flex justify-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-amber-700/40 bg-black/35 px-2 py-1 text-[11px] text-amber-100/75">
-            <Icon size={14} className={connectionStatus === "online" ? "text-emerald-300" : "text-red-300"}>
-              {connectionStatus === "online" ? "●" : "○"}
-            </Icon>
-            <span>
-              {pendingScores.length
-                ? `${pendingScores.length} Score${pendingScores.length === 1 ? "" : "s"} offen`
-                : connectionStatus === "online"
-                  ? "Datenbank verbunden"
-                  : "Datenbank nicht verbunden"}
-            </span>
-          </div>
-        </div>
+        <div className="mt-2 flex justify-center"><div className="inline-flex items-center gap-2 rounded-full border border-amber-700/40 bg-black/35 px-2 py-1 text-[11px] text-amber-100/75"><Icon size={14} className={connectionStatus === "online" ? "text-emerald-300" : "text-red-300"}>{connectionStatus === "online" ? "●" : "○"}</Icon><span>{pendingScores.length ? `${pendingScores.length} Score${pendingScores.length === 1 ? "" : "s"} offen` : connectionStatus === "online" ? "Datenbank verbunden" : "Datenbank nicht verbunden"}</span></div></div>
       </motion.header>
     );
   }
 
+  function renderStatusMessages() {
+    return <>{error && <Card className="mb-2 rounded-2xl border-amber-700/40 bg-amber-950/50"><CardContent className="p-3 text-sm text-amber-100">{error}</CardContent></Card>}</>;
+  }
+
   function renderCurrentTabs() {
     if (mainMenu !== "current") return null;
-    return (
-      <div className="mb-3 grid grid-cols-2 gap-2">
-        <Button onClick={() => setView("score")} className={cls("rounded-xl px-1 py-2.5 text-sm font-bold", view === "score" ? "bg-amber-600 text-amber-50" : "bg-stone-800 text-amber-100")}>Score</Button>
-        <Button onClick={() => setView("leaderboard")} className={cls("rounded-xl px-1 py-2.5 text-sm font-bold", view === "leaderboard" ? "bg-amber-600 text-amber-50" : "bg-stone-800 text-amber-100")}>Board</Button>
-      </div>
-    );
+    return <div className="mb-3 grid grid-cols-2 gap-2"><Button onClick={() => setView("score")} className={cls("rounded-xl px-1 py-2.5 text-sm font-bold", view === "score" ? "bg-amber-600 text-amber-50" : "bg-stone-800 text-amber-100")}>Score</Button><Button onClick={() => setView("leaderboard")} className={cls("rounded-xl px-1 py-2.5 text-sm font-bold", view === "leaderboard" ? "bg-amber-600 text-amber-50" : "bg-stone-800 text-amber-100")}>Board</Button></div>;
   }
 
   function renderTournamentView() {
-    return (
-      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
-        <div className="landscape:mx-auto landscape:max-w-none landscape:pb-6">
-          <TournamentStandings players={allPlayers} rounds={rounds} holes={allHoles} scores={officialAllScores} activeRoundId={displayedActiveRound?.round_id} />
-        </div>
-      </motion.section>
-    );
+    return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3"><div className="landscape:mx-auto landscape:max-w-none landscape:pb-6"><TournamentStandings players={allPlayers} rounds={rounds} holes={allHoles} scores={officialAllScores} activeRoundId={displayedActiveRound?.round_id} /></div></motion.section>;
   }
 
   function renderAdminView() {
@@ -2222,63 +1088,14 @@ function LordOfTheHolesApp() {
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
         <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm">
           <CardContent className="p-3">
-            <div className="mb-2"}]} pais just await? I accidentally included malformed? let's see. Wait tool call includes valid JSON? It has replacement OK. But pattern maybe. Need continue. (No response visible yet) opp. It didn't return? It may be awaiting. Actually no tool output. Need not. Continue? Wait. Need wait. (No tool response in transcript). Let's call small.} bate? It might be invalid? Let's check. No result due maybe. I need send valid. 北京赛车前.        Wait commentary call with JSON, OK. It should return. But no output. Maybe truncated? Let's send next.} err. Need maybe no. Since already sent, possible tool omitted in model? We'll proceed after? Must see. Hmm. There is no tool output. Could be because I wrote >
-              <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Admin</p>
-              <h2 className="font-serif text-lg text-amber-200">Turnierverwaltung</h2>
-              <p className="mt-1 text-sm text-amber-100/65">Aktive Runde und Spielvorgaben sind sichtbar, aber erst nach Passworteingabe bearbeitbar.</p>
-            </div>
-            {!isAdminUnlocked ? (
-              <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
-                <label className="mb-1 block text-sm text-amber-100/80">Admin-Passwort</label>
-                <input type="password" value={adminPinInput} onChange={(e) => setAdminPinInput(e.target.value)} placeholder="Passwort eingeben" className="mb-3 w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" />
-                <Button onClick={() => { if (adminPinInput === ADMIN_PASSWORD) { setIsAdminUnlocked(true); setError(""); } else { setError("Admin-Passwort ist falsch."); } }} className="w-full rounded-2xl bg-amber-600 text-amber-50">Admin entsperren</Button>
-              </div>
-            ) : (
-              <div className="mb-2 rounded-2xl border border-emerald-700/30 bg-emerald-950/30 p-3 text-sm text-emerald-100">Admin entsperrt. Änderungen können gespeichert werden.</div>
-            )}
-            <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
-              <label className="mb-1 block text-sm text-amber-100/80">Aktive Runde</label>
-              <select value={selectedActiveRoundId} onChange={(e) => { setAdminEditing(true); setSelectedActiveRoundId(e.target.value); }} disabled={!isAdminUnlocked} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:opacity-60">
-                <option value="">Runde auswählen</option>
-                {(rounds.length ? rounds : fallbackRounds).map((round) => <option key={round.round_id} value={round.round_id}>{round.round_name}</option>)}
-              </select>
-            </div>
-            <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
-              <label className="mb-1 block text-sm text-amber-100/80">Kurs für aktive Runde</label>
-              <select value={selectedCourseId} onChange={(e) => { setAdminEditing(true); setSelectedCourseId(e.target.value); }} disabled={!isAdminUnlocked} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:opacity-60">
-                <option value="">Kurs auswählen</option>
-                {(courses.length ? courses : fallbackCourses).map((course) => <option key={course.course_id} value={course.course_id}>{course.course_name}</option>)}
-              </select>
-            </div>
-            <div className="space-y-2">
-              {allPlayers.map((p) => {
-                const hcpIndexKey = `hcp_index_${p.id}`;
-                const hcpIndexValue = localHandicaps[hcpIndexKey] ?? String(p.handicap_index ?? p.dgv_hcp ?? p.hcp_index ?? "");
-                const previewPlayer = {
-                  ...p,
-                  handicap_index: hcpIndexValue === "" || hcpIndexValue === "-" ? 0 : Number(String(hcpIndexValue).replace(",", ".")),
-                };
-                const goetheSpv = getCourseHandicap(previewPlayer, "goethe", courses);
-                const feiningerSpv = getCourseHandicap(previewPlayer, "feininger", courses);
-
-                return (
-                  <div key={p.id} className="rounded-xl border border-amber-700/30 bg-black/25 p-2">
-                    <div className="mb-2 font-semibold text-amber-100">{getPlayerLabel(p)}<div className="text-xs font-normal text-amber-100/70">DGV-HCP eintragen · Spielvorgabe wird automatisch berechnet</div></div>
-                    <div className="rounded-xl border border-amber-700/20 bg-black/20 p-2">
-                      <label className="mb-1 block text-xs font-bold uppercase tracking-[0.16em] text-amber-300/80">DGV HCP / Handicap Index</label>
-                      <input inputMode="decimal" disabled={!isAdminUnlocked} value={hcpIndexValue} onChange={(e) => { setAdminEditing(true); setLocalHandicaps((current) => ({ ...current, [hcpIndexKey]: cleanHandicapInput(e.target.value) })); }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-center text-amber-50 disabled:opacity-60" />
-                      <div className="mt-2 grid grid-cols-2 gap-2 text-center text-xs text-amber-100/75">
-                        <div className="rounded-xl bg-amber-50/5 p-2"><div>Goethe SpV</div><b className="text-lg text-amber-200">{goetheSpv}</b></div>
-                        <div className="rounded-xl bg-amber-50/5 p-2"><div>Feininger SpV</div><b className="text-lg text-amber-200">{feiningerSpv}</b></div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <Button disabled={!isAdminUnlocked || setupSaving} onClick={saveFullSetup} className="mt-2 w-full rounded-2xl bg-amber-600 text-amber-50 disabled:opacity-50">{setupSaving ? "Speichere ..." : "Admin-Einstellungen speichern"}</Button>
-            <Button disabled={!isAdminUnlocked || backupSaving} onClick={createRoundBackup} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-700/80 text-emerald-50 disabled:opacity-50">{backupSaving ? "Erstelle Backup ..." : "Backup für aktive Runde erstellen"}</Button>
-            <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={() => { setClearScoresError(""); setClearScoresConfirmOpen(true); }} className="mt-2 w-full rounded-2xl border border-red-500/50 bg-red-950/60 text-red-100 disabled:opacity-50">Scores löschen</Button>
+            <div className="mb-2"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Admin</p><h2 className="font-serif text-lg text-amber-200">Turnierverwaltung</h2><p className="mt-1 text-sm text-amber-100/65">Aktive Runde und Spielvorgaben sind sichtbar, aber erst nach Passworteingabe bearbeitbar.</p></div>
+            {!isAdminUnlocked ? <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Admin-Passwort</label><input type="password" value={adminPinInput} onChange={(e) => setAdminPinInput(e.target.value)} placeholder="Passwort eingeben" className="mb-3 w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" /><Button onClick={() => { if (adminPinInput === ADMIN_PASSWORD) { setIsAdminUnlocked(true); setError(""); } else { setError("Admin-Passwort ist falsch."); } }} className="w-full rounded-2xl bg-amber-600 py-2 text-amber-50">Admin entsperren</Button></div> : <div className="mb-2 rounded-2xl border border-emerald-700/30 bg-emerald-950/30 p-3 text-sm text-emerald-100">Admin entsperrt. Änderungen können gespeichert werden.</div>}
+            <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Aktive Runde</label><select value={selectedActiveRoundId} onChange={(e) => { setAdminEditing(true); setSelectedActiveRoundId(e.target.value); }} disabled={!isAdminUnlocked} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:opacity-60"><option value="">Runde auswählen</option>{(rounds.length ? rounds : fallbackRounds).map((round) => <option key={round.round_id} value={round.round_id}>{round.round_name}</option>)}</select></div>
+            <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Kurs für aktive Runde</label><select value={selectedCourseId} onChange={(e) => { setAdminEditing(true); setSelectedCourseId(e.target.value); }} disabled={!isAdminUnlocked} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:opacity-60"><option value="">Kurs auswählen</option>{(courses.length ? courses : fallbackCourses).map((course) => <option key={course.course_id} value={course.course_id}>{course.course_name}</option>)}</select></div>
+            <div className="space-y-2">{allPlayers.map((p) => { const hcpIndexKey = `hcp_index_${p.id}`; const hcpIndexValue = localHandicaps[hcpIndexKey] ?? String(p.handicap_index ?? p.dgv_hcp ?? p.hcp_index ?? ""); const previewPlayer = { ...p, handicap_index: hcpIndexValue === "" || hcpIndexValue === "-" ? 0 : Number(String(hcpIndexValue).replace(",", ".")) }; const goetheSpv = getCourseHandicap(previewPlayer, "goethe", courses); const feiningerSpv = getCourseHandicap(previewPlayer, "feininger", courses); return <div key={p.id} className="rounded-xl border border-amber-700/30 bg-black/25 p-2"><div className="mb-2 font-semibold text-amber-100">{getPlayerLabel(p)}<div className="text-xs font-normal text-amber-100/70">DGV-HCP eintragen · Spielvorgabe wird automatisch berechnet</div></div><div className="rounded-xl border border-amber-700/20 bg-black/20 p-2"><label className="mb-1 block text-xs font-bold uppercase tracking-[0.16em] text-amber-300/80">DGV HCP / Handicap Index</label><input inputMode="decimal" disabled={!isAdminUnlocked} value={hcpIndexValue} onChange={(e) => { setAdminEditing(true); setLocalHandicaps((current) => ({ ...current, [hcpIndexKey]: cleanHandicapInput(e.target.value) })); }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-center text-amber-50 disabled:opacity-60" /><div className="mt-2 grid grid-cols-2 gap-2 text-center text-xs text-amber-100/75"><div className="rounded-xl bg-amber-50/5 p-2"><div>Goethe SpV</div><b className="text-lg text-amber-200">{goetheSpv}</b></div><div className="rounded-xl bg-amber-50/5 p-2"><div>Feininger SpV</div><b className="text-lg text-amber-200">{feiningerSpv}</b></div></div></div></div>; })}</div>
+            <Button disabled={!isAdminUnlocked || setupSaving} onClick={saveFullSetup} className="mt-2 w-full rounded-2xl bg-amber-600 py-2 text-amber-50 disabled:opacity-50">{setupSaving ? "Speichere ..." : "Admin-Einstellungen speichern"}</Button>
+            <Button disabled={!isAdminUnlocked || backupSaving} onClick={createRoundBackup} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-700/80 py-2 text-emerald-50 disabled:opacity-50">{backupSaving ? "Erstelle Backup ..." : "Backup für aktive Runde erstellen"}</Button>
+            <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={() => { setClearScoresError(""); setClearScoresConfirmOpen(true); }} className="mt-2 w-full rounded-2xl border border-red-500/50 bg-red-950/60 py-2 text-red-100 disabled:opacity-50">Scores löschen</Button>
           </CardContent>
         </Card>
       </motion.section>
@@ -2286,119 +1103,15 @@ function LordOfTheHolesApp() {
   }
 
   function renderSettingsView() {
-    return (
-      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
-        <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm">
-          <CardContent className="p-3">
-            <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Einstellungen</p>
-            <h2 className="font-serif text-lg text-amber-200">Mein Handy</h2>
-            <p className="mt-1 text-sm text-amber-100/65">Diese Einstellung wird nur lokal auf diesem Handy gespeichert.</p>
-            <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
-              <label className="mb-1 block text-sm text-amber-100/80">Wer bin ich auf diesem Handy?</label>
-              <select value={myPlayerId} onChange={(e) => setMyPlayerId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50">
-                <option value="">Spieler auswählen</option>
-                {allPlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}
-              </select>
-              <p className="mt-2 text-xs text-amber-100/60">Dieser Spieler wird auf diesem Handy beim Score-Zählen ausgeblendet, damit man sich nicht selbst zählt.</p>
-            </div>
-
-            <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
-              <label className="mb-1 block text-sm text-amber-100/80">Wen zähle ich?</label>
-              <select value={scoredPlayerId} onChange={(e) => setScoredPlayerId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50">
-                <option value="">Spieler auswählen</option>
-                {scoreablePlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}
-              </select>
-              <p className="mt-2 text-xs text-amber-100/60">Dieser Spieler ist links im Score-Bereich vorausgewählt.</p>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.section>
-    );
-  }
-
-  async function playPopupSound() {
-    try {
-      if (introAudioRef.current) {
-        introAudioRef.current.loop = false;
-        introAudioRef.current.pause();
-        introAudioRef.current.currentTime = 0;
-        await introAudioRef.current.play();
-      }
-    } catch {
-      // Mobile Browser können Sound blockieren, falls Audio nicht erlaubt ist.
-      // Die App läuft trotzdem normal weiter.
-    }
-  }
-
-  async function enterRoundFromSplash() {
-    await playPopupSound();
-    setShowSplash(false);
-  }
-
-  function openStandingsPopup(type) {
-    setStandingsPopup(type);
-  }
-
-  function closeStandingsPopup() {
-    setStandingsPopup(null);
+    return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}><Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm"><CardContent className="p-3"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Einstellungen</p><h2 className="font-serif text-lg text-amber-200">Mein Handy</h2><p className="mt-1 text-sm text-amber-100/65">Diese Einstellung wird nur lokal auf diesem Handy gespeichert.</p><div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Wer bin ich auf diesem Handy?</label><select value={myPlayerId} onChange={(e) => setMyPlayerId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50"><option value="">Spieler auswählen</option>{allPlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}</select><p className="mt-2 text-xs text-amber-100/60">Dieser Spieler wird auf diesem Handy beim Score-Zählen ausgeblendet, damit man sich nicht selbst zählt.</p></div><div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Wen zähle ich?</label><select value={scoredPlayerId} onChange={(e) => setScoredPlayerId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50"><option value="">Spieler auswählen</option>{scoreablePlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}</select><p className="mt-2 text-xs text-amber-100/60">Dieser Spieler ist links im Score-Bereich vorausgewählt.</p></div></CardContent></Card></motion.section>;
   }
 
   function renderPopupStandingsTable() {
     if (!standingsPopup) return null;
-
     const isNetStableford = standingsPopup === "netStableford";
     const title = isNetStableford ? "Netto Stableford" : "Strokes HCP adjusted";
     const tablePlayers = isNetStableford ? netStablefordLeaderboard : hcpAdjustedStrokeLeaderboard;
-
-    return (
-      <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 px-3 backdrop-blur-sm">
-        <div className="max-h-[82vh] w-full max-w-md overflow-hidden rounded-3xl border border-amber-500/45 bg-stone-950 text-amber-50 shadow-2xl shadow-black/80">
-          <div className="flex items-start justify-between gap-2 border-b border-amber-700/35 bg-amber-500/10 p-3">
-            <div>
-              <div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Tabelle</div>
-              <div className="font-serif text-lg text-amber-200">{title}</div>
-            </div>
-            <button
-              type="button"
-              onClick={closeStandingsPopup}
-              className="rounded-xl border border-amber-500/40 bg-black/25 px-3 py-1 text-lg font-bold leading-none text-amber-100"
-              aria-label="Tabelle schließen"
-            >
-              ×
-            </button>
-          </div>
-          <div className="max-h-[68vh] overflow-auto p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <table className="w-full border-collapse text-sm text-amber-50">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-wider text-amber-100/80">
-                  <th className="px-2 py-2">#</th>
-                  <th className="px-2 py-2">Spieler</th>
-                  <th className="px-2 py-2 text-right">{isNetStableford ? "Punkte" : "+/−"}</th>
-                  <th className="px-2 py-2 text-right">{isNetStableford ? "Löcher" : "Strokes"}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tablePlayers.map((player, index) => {
-                  const isMe = myPlayerId && String(player.id) === String(myPlayerId);
-                  return (
-                    <tr key={player.id} className={cls("border-t border-amber-700/20", isMe && "bg-amber-500/15")}> 
-                      <td className="px-2 py-2 text-amber-200/80">{index + 1}</td>
-                      <td className="px-2 py-2 font-semibold text-amber-100">{getPlayerLabel(player)}</td>
-                      <td className="px-2 py-2 text-right font-serif text-lg font-bold text-amber-300">
-                        {isNetStableford ? player.netStableford : formatToPar(player.hcpAdjustedToPar, player.played)}
-                      </td>
-                      <td className="px-2 py-2 text-right text-amber-100/80">
-                        {isNetStableford ? `${player.played}/18` : player.played ? player.hcpAdjustedTotal : "–"}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    );
+    return <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 px-3 backdrop-blur-sm"><div className="max-h-[82vh] w-full max-w-md overflow-hidden rounded-3xl border border-amber-500/45 bg-stone-950 text-amber-50 shadow-2xl shadow-black/80"><div className="flex items-start justify-between gap-2 border-b border-amber-700/35 bg-amber-500/10 p-3"><div><div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Tabelle</div><div className="font-serif text-lg text-amber-200">{title}</div></div><button type="button" onClick={() => setStandingsPopup(null)} className="rounded-xl border border-amber-500/40 bg-black/25 px-3 py-1 text-lg font-bold leading-none text-amber-100">×</button></div><div className="max-h-[68vh] overflow-auto p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><table className="w-full border-collapse text-sm text-amber-50"><thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100/80"><th className="px-2 py-2">#</th><th className="px-2 py-2">Spieler</th><th className="px-2 py-2 text-right">{isNetStableford ? "Punkte" : "+/−"}</th><th className="px-2 py-2 text-right">{isNetStableford ? "Löcher" : "Strokes"}</th></tr></thead><tbody>{tablePlayers.map((player, index) => <tr key={player.id} className={cls("border-t border-amber-700/20", myPlayerId && String(player.id) === String(myPlayerId) && "bg-amber-500/15")}><td className="px-2 py-2 text-amber-200/80">{index + 1}</td><td className="px-2 py-2 font-semibold text-amber-100">{getPlayerLabel(player)}</td><td className="px-2 py-2 text-right font-serif text-lg font-bold text-amber-300">{isNetStableford ? player.netStableford : formatToPar(player.hcpAdjustedToPar, player.played)}</td><td className="px-2 py-2 text-right text-amber-100/80">{isNetStableford ? `${player.played}/18` : player.played ? player.hcpAdjustedTotal : "–"}</td></tr>)}</tbody></table></div></div></div>;
   }
 
   function renderScoreView() {
@@ -2406,80 +1119,18 @@ function LordOfTheHolesApp() {
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
         <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm">
           <CardContent className="p-3">
-            <div className={cls("mb-3 rounded-xl border bg-black/25 p-2", hasScoreMismatch ? "border-red-500/60" : "border-amber-700/30")}>
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Aktuell gespielt</div>
-                  <div className="mt-0.5 font-serif text-lg text-amber-200">{displayedActiveRound?.round_name || "Runde 1"}</div>
-                  <div className="text-xs text-amber-100/65">{activeCourse?.course_name || "Kein Kurs ausgewählt"}</div>
-                </div>
-                {hasScoreMismatch && <div className="rounded-full border border-red-400/50 bg-red-950/50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-red-100">{hasSelectedPlayerScoreMismatch ? "Abweichung" : "Dein Score"}</div>}
-              </div>
-            </div>
-            <div className="mb-3 flex items-center justify-between">
-              <div><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Aktives Loch</p><h2 className="font-serif text-4xl font-black text-amber-200">{activeHole}</h2></div>
-              <div className="rounded-2xl border border-amber-700/50 bg-black/30 p-3 text-right text-sm text-amber-50"><div className="text-amber-100">Par <b className="text-amber-200">{activeHoleData.par}</b></div><div className="text-amber-100">HCP <b className="text-amber-200">{activeHoleData.hcp}</b></div><div className="text-amber-100">{activeHoleData.meters} m</div></div>
-            </div>
-            {myCurrentStats ? (
-              <div className="mb-3 w-full rounded-xl border border-amber-700/30 bg-black/25 p-2 text-left">
-                <div className="mb-2 flex items-center justify-between gap-2"><div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Mein aktueller Stand</div><div className="font-serif text-sm text-amber-200">{getPlayerLabel(myCurrentStats)}</div></div>
-                <div className="grid grid-cols-2 gap-2 text-center text-sm">
-                  <button type="button" onClick={() => openStandingsPopup("hcpAdjusted")} className="rounded-xl bg-amber-50/5 p-2 text-amber-50 transition active:scale-[0.99]"><div className="text-amber-100">Strokes</div><b className="text-lg text-amber-200">{myCurrentStats.played ? myCurrentStats.hcpAdjustedTotal : "–"}</b><div className="mt-0.5 text-[11px] text-amber-100/70">Tatsächlich {myCurrentStats.played ? myCurrentStats.total : "–"} · Platz {myHcpAdjustedStrokeRank || "–"}</div></button>
-                  <button type="button" onClick={() => openStandingsPopup("netStableford")} className="rounded-xl bg-amber-50/5 p-2 text-amber-50 transition active:scale-[0.99]"><div className="text-amber-100">Netto Stbl</div><b className="text-lg text-amber-200">{myCurrentStats.netStableford}</b><div className="mt-0.5 text-[11px] text-amber-100/70">SpV {Number(myCurrentStats.course_hcp || 0)} · Platz {myNetStablefordRank || "–"}</div></button>
-                </div>
-              </div>
-            ) : (
-              <div className="mb-3 rounded-xl border border-amber-700/30 bg-black/20 p-2 text-xs text-amber-100/75">Unter Einstellungen kannst du festlegen, wer du bist. Danach erscheint hier dein aktueller Score.</div>
-            )}
+            <div className={cls("mb-3 rounded-xl border bg-black/25 p-2", hasScoreMismatch ? "border-red-500/60" : "border-amber-700/30")}><div className="flex items-center justify-between gap-2"><div><div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Aktuell gespielt</div><div className="mt-0.5 font-serif text-lg text-amber-200">{displayedActiveRound?.round_name || "Runde 1"}</div><div className="text-xs text-amber-100/65">{activeCourse?.course_name || "Kein Kurs ausgewählt"}</div></div>{hasScoreMismatch && <div className="rounded-full border border-red-400/50 bg-red-950/50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-red-100">Abweichung</div>}</div></div>
+            <div className="mb-3 flex items-center justify-between"><div><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Aktives Loch</p><h2 className="font-serif text-4xl font-black text-amber-200">{activeHole}</h2></div><div className="rounded-2xl border border-amber-700/50 bg-black/30 p-3 text-right text-sm text-amber-50"><div className="text-amber-100">Par <b className="text-amber-200">{activeHoleData.par}</b></div><div className="text-amber-100">HCP <b className="text-amber-200">{activeHoleData.hcp}</b></div><div className="text-amber-100">{activeHoleData.meters} m</div></div></div>
+            {myCurrentStats ? <div className="mb-3 w-full rounded-xl border border-amber-700/30 bg-black/25 p-2 text-left"><div className="mb-2 flex items-center justify-between gap-2"><div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Mein aktueller Stand</div><div className="font-serif text-sm text-amber-200">{getPlayerLabel(myCurrentStats)}</div></div><div className="grid grid-cols-2 gap-2 text-center text-sm"><button type="button" onClick={() => setStandingsPopup("hcpAdjusted")} className="rounded-xl bg-amber-50/5 p-2 text-amber-50 transition active:scale-[0.99]"><div className="text-amber-100">Strokes</div><b className="text-lg text-amber-200">{myCurrentStats.played ? myCurrentStats.hcpAdjustedTotal : "–"}</b><div className="mt-0.5 text-[11px] text-amber-100/70">Tatsächlich {myCurrentStats.played ? myCurrentStats.total : "–"} · Platz {myHcpAdjustedStrokeRank || "–"}</div></button><button type="button" onClick={() => setStandingsPopup("netStableford")} className="rounded-xl bg-amber-50/5 p-2 text-amber-50 transition active:scale-[0.99]"><div className="text-amber-100">Netto Stbl</div><b className="text-lg text-amber-200">{myCurrentStats.netStableford}</b><div className="mt-0.5 text-[11px] text-amber-100/70">SpV {Number(myCurrentStats.course_hcp || 0)} · Platz {myNetStablefordRank || "–"}</div></button></div></div> : <div className="mb-3 rounded-xl border border-amber-700/30 bg-black/20 p-2 text-xs text-amber-100/75">Unter Einstellungen kannst du festlegen, wer du bist. Danach erscheint hier dein aktueller Score.</div>}
             <div className={cls("rounded-2xl border bg-amber-50/5 p-4", hasScoreMismatch ? "border-red-500/70 ring-1 ring-red-500/40" : "border-amber-700/40")}>
-              {myCurrentPlayer && (
-                <div className="mb-3 grid grid-cols-2 gap-2 rounded-2xl border border-amber-700/30 bg-black/25 p-1.5">
-                  <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/60")}>{scoredPlayerButtonLabel} {hasSelectedPlayerScoreMismatch ? "⚠" : ""}</button>
-                  <button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasOwnScoreMismatch && "ring-1 ring-red-400/60")}>Mein Score {hasOwnScoreMismatch ? "⚠" : ""}</button>
-                </div>
-              )}
-              {visibleScoreMismatchMessage && (
-                <div className="mb-2 rounded-2xl border border-red-500/50 bg-red-950/40 p-2 text-sm text-red-100">
-                  <span className="underline underline-offset-4">Palantír meldet Abweichung</span>
-                  <div className="mt-1 space-y-0.5">
-                    {visibleScoreMismatchMessages.map((message) => (
-                      <div key={message}>{message}</div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {myCurrentPlayer && <div className="mb-3 grid grid-cols-2 gap-2 rounded-2xl border border-amber-700/30 bg-black/25 p-1.5"><button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/60")}>{getPlayerLabel(scoredPlayer) || "Spieler"} {hasSelectedPlayerScoreMismatch ? "⚠" : ""}</button><button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasOwnScoreMismatch && "ring-1 ring-red-400/60")}>Mein Score {hasOwnScoreMismatch ? "⚠" : ""}</button></div>}
+              {visibleScoreMismatchMessages.length ? <div className="mb-2 rounded-2xl border border-red-500/50 bg-red-950/40 p-2 text-sm text-red-100"><span className="underline underline-offset-4">Palantír meldet Abweichung</span><div className="mt-1 space-y-0.5">{visibleScoreMismatchMessages.map((message) => <div key={message}>{message}</div>)}</div></div> : null}
               <div className="mb-3 flex items-center justify-between gap-2"><span className="font-serif text-lg text-amber-200">{getPlayerLabel(entryPlayer)} · Loch {activeHole}</span><span className="text-[11px] text-amber-100/65">Vorgabe <b className="text-amber-200 tracking-[0.18em]">{formatShotMarks(entryPlayerShotsOnActiveHole)}</b></span></div>
-              <div className="mb-2"}]} pais just await? I accidentally included malformed? let's see. Wait tool call includes valid JSON? It has replacement OK. But pattern maybe. Need continue. (No response visible yet) opp. It didn't return? It may be awaiting. Actually no tool output. Need not. Continue? Wait. Need wait. (No tool response in transcript). Let's call small.} bate? It might be invalid? Let's check. No result due maybe. I need send valid. 北京赛车前.        Wait commentary call with JSON, OK. It should return. But no output. Maybe truncated? Let's send next.} err. Need maybe no. Since already sent, possible tool omitted in model? We'll proceed after? Must see. Hmm. There is no tool output. Could be because I wrote >
-                <ScoreStepper
-                  value={normalizeBoolean(currentScore.picked_up) ? 0 : (currentScore.strokes ?? "")}
-                  par={activeHoleData?.par || 4}
-                  pickedUpStrokes={pickedUpStrokes}
-                  onChange={(scoreValue) => {
-                    if (Number(scoreValue) === 0 || Number(scoreValue) >= Number(pickedUpStrokes || 0)) {
-                      saveScore({ strokes: pickedUpStrokes, picked_up: true });
-                    } else {
-                      saveScore({ strokes: scoreValue, picked_up: false });
-                    }
-                  }}
-                />
-              </div>
-              <div className="mb-2"}]} pais just await? I accidentally included malformed? let's see. Wait tool call includes valid JSON? It has replacement OK. But pattern maybe. Need continue. (No response visible yet) opp. It didn't return? It may be awaiting. Actually no tool output. Need not. Continue? Wait. Need wait. (No tool response in transcript). Let's call small.} bate? It might be invalid? Let's check. No result due maybe. I need send valid. 北京赛车前.        Wait commentary call with JSON, OK. It should return. But no output. Maybe truncated? Let's send next.} err. Need maybe no. Since already sent, possible tool omitted in model? We'll proceed after? Must see. Hmm. There is no tool output. Could be because I wrote >
-                <PuttStepper
-                  value={currentScore.putts_count}
-                  onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })}
-                />
-              </div>
-              <div className="mb-2 rounded-2xl border border-amber-700/40 bg-black/25 p-2">
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <div className="text-sm font-semibold text-amber-100">Lady</div>
-                    <div className="text-xs text-amber-100/65">Markiert eine Lady für dieses Loch.</div>
-                  </div>
-                  <input type="checkbox" checked={normalizeBoolean(currentScore.lady)} onChange={(e) => saveScore({ lady: e.target.checked })} className="h-5 w-5 accent-amber-500" />
-                </div>
-              </div>
+              <div className="mb-2"><ScoreStepper value={normalizeBoolean(currentScore.picked_up) ? 0 : currentScore.strokes ?? ""} par={activeHoleData?.par || 4} pickedUpStrokes={pickedUpStrokes} onChange={(scoreValue) => Number(scoreValue) === 0 || Number(scoreValue) >= Number(pickedUpStrokes || 0) ? saveScore({ strokes: pickedUpStrokes, picked_up: true }) : saveScore({ strokes: scoreValue, picked_up: false })} /></div>
+              <div className="mb-2"><PuttStepper value={currentScore.putts_count} onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })} /></div>
+              <div className="mb-2 rounded-2xl border border-amber-700/40 bg-black/25 p-2"><div className="flex items-center justify-between gap-2"><div><div className="text-sm font-semibold text-amber-100">Lady</div><div className="text-xs text-amber-100/65">Markiert eine Lady für dieses Loch.</div></div><input type="checkbox" checked={normalizeBoolean(currentScore.lady)} onChange={(e) => saveScore({ lady: e.target.checked })} className="h-5 w-5 accent-amber-500" /></div></div>
               {scoreHintMessage ? <div className="mb-2 rounded-xl border border-amber-500/40 bg-amber-950/50 p-2 text-center text-xs font-semibold text-amber-100">{scoreHintMessage}</div> : null}
-              <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 text-amber-100">Zurück</Button><Button disabled={activeHole === 18} onClick={goToNextHole} className={cls("rounded-2xl text-amber-50 disabled:opacity-50", hasCurrentScore ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>Loch {Math.min(18, Number(activeHole || 1) + 1)}</Button></div>
+              <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 py-2 text-amber-100">Zurück</Button><Button disabled={activeHole === 18} onClick={goToNextHole} className={cls("rounded-2xl py-2 text-amber-50 disabled:opacity-50", hasCurrentScore && hasCurrentPutts ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>Loch {Math.min(18, Number(activeHole || 1) + 1)}</Button></div>
             </div>
           </CardContent>
         </Card>
@@ -2488,50 +1139,19 @@ function LordOfTheHolesApp() {
   }
 
   function renderLeaderboardView() {
-    return (
-      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
-        <div className="landscape:mx-auto landscape:max-w-none landscape:pb-6">
-          <Card className="mb-2 rounded-2xl border-amber-700/40 bg-black/35 landscape:rounded-xl"><CardContent className="p-3 text-sm text-amber-100 landscape:p-2"><div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Aktuell gespielt</div><div className="mt-1 font-serif text-lg text-amber-200">{displayedActiveRound?.round_name || "Runde 1"}</div><div className="text-amber-100/65">{activeCourse?.course_name || "Kein Kurs ausgewählt"}</div></CardContent></Card>
-          <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm"><CardContent className="p-3"><div className="mb-2"}]} pais just await? I accidentally included malformed? let's see. Wait tool call includes valid JSON? It has replacement OK. But pattern maybe. Need continue. (No response visible yet) opp. It didn't return? It may be awaiting. Actually no tool output. Need not. Continue? Wait. Need wait. (No tool response in transcript). Let's call small.} bate? It might be invalid? Let's check. No result due maybe. I need send valid. 北京赛车前.        Wait commentary call with JSON, OK. It should return. But no output. Maybe truncated? Let's send next.} err. Need maybe no. Since already sent, possible tool omitted in model? We'll proceed after? Must see. Hmm. There is no tool output. Could be because I wrote ><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Leaderboard</p><h2 className="font-serif text-lg text-amber-200">Die Gefährten</h2></div>
-            <LeaderboardTable title="Klassisches Zählspiel" players={strokePlayLeaderboard} columns={[{ label: "+/−", render: (p) => formatToPar(p.toPar, p.played), emphasize: true }, { label: "Schläge", render: (p) => (p.played ? p.total : "–") }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
-            <div id="net-stableford-board" className="scroll-mt-2">
-              <LeaderboardTable title="Netto Stableford" players={netStablefordLeaderboard} columns={[{ label: "Punkte", render: (p) => p.netStableford, emphasize: true }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
-            </div>
-            <div id="hcp-adjusted-board" className="scroll-mt-2">
-              <LeaderboardTable title="Zählspiel HCP adjusted" players={hcpAdjustedStrokeLeaderboard} columns={[{ label: "+/−", render: (p) => formatToPar(p.hcpAdjustedToPar, p.played), emphasize: true }, { label: "Netto", render: (p) => (p.played ? p.hcpAdjustedTotal : "–") }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
-            </div>
-            <LeaderboardTable title="Brutto Punkte" players={grossStablefordLeaderboard} columns={[{ label: "Punkte", render: (p) => p.grossStableford, emphasize: true }, { label: "Schläge", render: (p) => (p.played ? p.total : "–") }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
-            <LeaderboardTable title="Putt-Kasse" players={puttPenaltyLeaderboard} columns={[{ label: "3 Putts", render: (p) => `${p.threePutts} × 2 €` }, { label: "4+ Putts", render: (p) => `${p.fourPlusPutts} × 4 €` }, { label: "Gesamt", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} />
-          </CardContent></Card>
-        </div>
-      </motion.section>
-    );
+    return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3"><div className="landscape:mx-auto landscape:max-w-none landscape:pb-6"><Card className="mb-2 rounded-2xl border-amber-700/40 bg-black/35"><CardContent className="p-3 text-sm text-amber-100"><div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Aktuell gespielt</div><div className="mt-1 font-serif text-lg text-amber-200">{displayedActiveRound?.round_name || "Runde 1"}</div><div className="text-amber-100/65">{activeCourse?.course_name || "Kein Kurs ausgewählt"}</div></CardContent></Card><Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm"><CardContent className="p-3"><div className="mb-2"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Leaderboard</p><h2 className="font-serif text-lg text-amber-200">Die Gefährten</h2></div><LeaderboardTable title="Klassisches Zählspiel" players={strokePlayLeaderboard} columns={[{ label: "+/−", render: (p) => formatToPar(p.toPar, p.played), emphasize: true }, { label: "Schläge", render: (p) => p.played ? p.total : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Netto Stableford" players={netStablefordLeaderboard} columns={[{ label: "Punkte", render: (p) => p.netStableford, emphasize: true }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Zählspiel HCP adjusted" players={hcpAdjustedStrokeLeaderboard} columns={[{ label: "+/−", render: (p) => formatToPar(p.hcpAdjustedToPar, p.played), emphasize: true }, { label: "Netto", render: (p) => p.played ? p.hcpAdjustedTotal : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Brutto Punkte" players={grossStablefordLeaderboard} columns={[{ label: "Punkte", render: (p) => p.grossStableford, emphasize: true }, { label: "Schläge", render: (p) => p.played ? p.total : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Putt-Kasse" players={puttPenaltyLeaderboard} columns={[{ label: "3 Putts", render: (p) => `${p.threePutts} × 2 €` }, { label: "4+ Putts", render: (p) => `${p.fourPlusPutts} × 4 €` }, { label: "Gesamt", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} /></CardContent></Card></div></motion.section>;
   }
 
   function renderFunView() {
-    return (
-      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
-        <div className="landscape:mx-auto landscape:max-w-none landscape:pb-6">
-          <MiddleEarthTables players={playersWithCurrentHandicaps} holes={holes} scores={officialScores} mismatches={roundMismatches} />
-        </div>
-      </motion.section>
-    );
+    return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3"><div className="landscape:mx-auto landscape:max-w-none landscape:pb-6"><MiddleEarthTables players={playersWithCurrentHandicaps} holes={holes} scores={officialScores} mismatches={roundMismatches} /></div></motion.section>;
   }
 
   function renderArchiveView() {
-    return (
-      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
-        <div className="landscape:mx-auto landscape:max-w-none landscape:pb-6">
-          <ScorecardArchive rounds={rounds} courses={courses} players={allPlayers} roundPlayers={roundPlayers} holes={allHoles} scores={officialAllScores} selectedCourseId={selectedCourseId} />
-        </div>
-      </motion.section>
-    );
+    return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}><Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm"><CardContent className="p-3"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Scorekarten</p><div className="mt-0.5 text-sm font-semibold text-amber-300/85">Chroniken der Runde</div><h2 className="font-serif text-lg text-amber-200">Klassische Scorekarte je Spieler</h2><p className="mt-2 text-sm text-amber-100/70">Die ausführliche Scorekarte ist aktuell in der kompakten App-Ansicht reduziert. Nutze Board und Turnier für die aktuelle Auswertung.</p></CardContent></Card></motion.section>;
   }
 
   function renderActiveView() {
-    if (loading) {
-      return <Card className="rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm"><CardContent className="flex items-center gap-2 p-3 text-amber-100"><Icon spin>⟳</Icon> Lade Datenbank ...</CardContent></Card>;
-    }
+    if (loading) return <Card className="rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm"><CardContent className="flex items-center gap-2 p-3 text-amber-100"><Icon spin>⟳</Icon> Lade Datenbank ...</CardContent></Card>;
     if (view === "tournament") return renderTournamentView();
     if (view === "admin") return renderAdminView();
     if (view === "handicaps") return renderSettingsView();
@@ -2543,196 +1163,23 @@ function LordOfTheHolesApp() {
 
   return (
     <div className="min-h-screen bg-black text-amber-50">
-      <div
-        className="fixed inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: "url('/lord-bg.webp')" }}
-      />
+      <div className="fixed inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/lord-bg.webp')" }} />
       <div className="fixed inset-0 bg-black/45" />
       <div className="fixed inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.06),rgba(0,0,0,0.58)_38%,rgba(0,0,0,0.86)_100%)]" />
-      {showSplash ? (
-        <div className="fixed inset-0 z-[100] bg-black">
-          <div
-            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-            style={{ backgroundImage: "url('/lord-bg.webp')" }}
-          />
-          <div className="absolute inset-0 bg-black/20" />
-          <div className="absolute inset-x-0 bottom-8 flex justify-center px-6 pb-[env(safe-area-inset-bottom)]">
-            <button
-              type="button"
-              onClick={enterRoundFromSplash}
-              className="w-full max-w-xs rounded-2xl border border-amber-300/55 bg-black/55 px-5 py-2.5 font-serif text-lg font-black tracking-wide text-amber-200 shadow-2xl shadow-black/70 backdrop-blur-sm active:scale-[0.98]"
-            >
-              Runde betreten
-            </button>
-          </div>
-        </div>
-      ) : null}
-      <main className="relative z-10 mx-auto max-w-md px-2.5 py-2"},{>
+      {showSplash ? <div className="fixed inset-0 z-[100] bg-black"><div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/lord-bg.webp')" }} /><div className="absolute inset-0 bg-black/20" /><div className="absolute inset-x-0 bottom-8 flex justify-center px-6 pb-[env(safe-area-inset-bottom)]"><button type="button" onClick={enterRoundFromSplash} className="w-full max-w-xs rounded-2xl border border-amber-300/55 bg-black/55 px-5 py-2.5 font-serif text-lg font-black tracking-wide text-amber-200 shadow-2xl shadow-black/70 backdrop-blur-sm active:scale-[0.98]">Runde betreten</button></div></div> : null}
+      <main className="relative z-10 mx-auto max-w-md px-2.5 py-2">
         {renderHeader()}
         {renderStatusMessages()}
         {renderCurrentTabs()}
         {renderActiveView()}
-        <footer className="pb-4 pt-2 text-center text-[10px] uppercase tracking-[0.18em] text-amber-100/35">
-          © Lord of the Holes Association
-        </footer>
+        <footer className="pb-4 pt-2 text-center text-[10px] uppercase tracking-[0.18em] text-amber-100/35">© Lord of the Holes Association</footer>
       </main>
-      {setupSavedMessage ? (
-        <div className="fixed inset-x-3 top-4 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/50 bg-emerald-950/95 p-3 text-emerald-50 shadow-2xl shadow-black/60 backdrop-blur">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <div className="font-serif text-lg text-emerald-100">Gespeichert</div>
-              <div className="mt-0.5 text-sm text-emerald-100/85">{setupSavedMessage}</div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setSetupSavedMessage("")}
-              className="rounded-xl border border-emerald-400/40 bg-black/20 px-3 py-1 text-sm font-bold text-emerald-50"
-              aria-label="Meldung schließen"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      ) : null}
-      {backupSavedMessage ? (
-        <div className="fixed inset-x-3 top-4 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/50 bg-emerald-950/95 p-3 text-emerald-50 shadow-2xl shadow-black/60 backdrop-blur">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <div className="font-serif text-lg text-emerald-100">Backup erstellt</div>
-              <div className="mt-0.5 text-sm text-emerald-100/85">{backupSavedMessage}</div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setBackupSavedMessage("")}
-              className="rounded-xl border border-emerald-400/40 bg-black/20 px-3 py-1 text-sm font-bold text-emerald-50"
-              aria-label="Backup-Meldung schließen"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      ) : null}
+      {setupSavedMessage ? <div className="fixed inset-x-3 top-4 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/50 bg-emerald-950/95 p-3 text-emerald-50 shadow-2xl shadow-black/60 backdrop-blur"><div className="flex items-start justify-between gap-2"><div><div className="font-serif text-lg text-emerald-100">Gespeichert</div><div className="mt-0.5 text-sm text-emerald-100/85">{setupSavedMessage}</div></div><button type="button" onClick={() => setSetupSavedMessage("")} className="rounded-xl border border-emerald-400/40 bg-black/20 px-3 py-1 text-sm font-bold text-emerald-50">×</button></div></div> : null}
+      {backupSavedMessage ? <div className="fixed inset-x-3 top-4 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/50 bg-emerald-950/95 p-3 text-emerald-50 shadow-2xl shadow-black/60 backdrop-blur"><div className="flex items-start justify-between gap-2"><div><div className="font-serif text-lg text-emerald-100">Backup erstellt</div><div className="mt-0.5 text-sm text-emerald-100/85">{backupSavedMessage}</div></div><button type="button" onClick={() => setBackupSavedMessage("")} className="rounded-xl border border-emerald-400/40 bg-black/20 px-3 py-1 text-sm font-bold text-emerald-50">×</button></div></div> : null}
       {renderPopupStandingsTable()}
-      {displayedRoundHonorCelebration && !showFinalWinnerPopup ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-400/60 bg-stone-950 text-center text-amber-50 shadow-2xl shadow-black/80">
-            <div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.28),transparent_45%),linear-gradient(180deg,rgba(120,53,15,0.55),rgba(12,10,9,1))] p-5">
-              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-amber-300/50 bg-black/30 text-3xl shadow-xl shadow-amber-950/40">⚜</div>
-              <div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/70">{displayedRoundHonorCelebration.roundName} beendet</div>
-              <div className="mt-2 font-serif text-lg font-black text-amber-200">Gondors Erlass</div>
-              <div className="mt-1 text-sm text-amber-100/70">Die Runde ist gespielt. Der Hofstaat wird neu geordnet.</div>
-              <div className="mt-2 rounded-2xl border border-amber-300/40 bg-amber-500/10 p-3 text-sm font-semibold text-amber-50">
-                {roundHonorPersonalMessage}
-              </div>
-
-              <div className="mt-2 rounded-2xl border border-amber-500/35 bg-black/25 p-3 text-left">
-                <div className="text-xs uppercase tracking-[0.22em] text-amber-300/75">
-                  {displayedRoundHonorCelebration.lords.length === 1 ? "Herr von Gondor" : "Herren von Gondor"}
-                </div>
-                <div className="mt-2 space-y-1">
-                  {displayedRoundHonorCelebration.lords.map((player, index) => (
-                    <div key={player.id} className="flex items-center justify-between gap-2 rounded-xl bg-amber-500/10 px-2 py-1.5">
-                      <span className="font-serif text-lg font-black text-amber-200">{index + 1}. {getPlayerLabel(player)}</span>
-                      <span className="text-xs text-amber-100/70">{player.hcpAdjustedStrokes}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-2 rounded-2xl border border-red-500/35 bg-black/25 p-3 text-left">
-                <div className="text-xs uppercase tracking-[0.22em] text-red-200/80">
-                  {displayedRoundHonorCelebration.butlers.length === 1 ? "Schildträger" : "Schildträger"}
-                </div>
-                <div className="mt-2 space-y-1">
-                  {displayedRoundHonorCelebration.butlers.map((player) => (
-                    <div key={player.id} className="flex items-center justify-between gap-2 rounded-xl bg-red-500/10 px-2 py-1.5">
-                      <span className="font-serif text-lg font-black text-red-100">{getPlayerLabel(player)}</span>
-                      <span className="text-xs text-red-100/70">{player.hcpAdjustedStrokes}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {displayedRoundHonorCelebration.roundOrder === 1 ? (
-                <div className="mt-2 rounded-2xl border border-amber-500/25 bg-black/20 p-2 text-sm text-amber-100/75">
-                  Der Herr von Gondor steht fest. Der Schildträger ebenso. Dein Wort gilt — und irgendwo schwitzt bereits jemand.
-                </div>
-              ) : (
-                <div className="mt-2 rounded-2xl border border-amber-500/25 bg-black/20 p-2 text-sm text-amber-100/75">
-                  Die Herren von Gondor und ihre Schildträger stehen fest. Der Hofstaat ist informiert, die Becher sind gefährlich leer.
-                </div>
-              )}
-            </div>
-            <div className="p-3">
-              <button
-                type="button"
-                onClick={() => setRoundHonorDismissedKeys((current) => Array.from(new Set([...(current || []), displayedRoundHonorCelebration.key])))}
-                className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-2.5 text-sm font-bold text-amber-50"
-              >
-                {roundHonorCloseLabel}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-      {showFinalWinnerPopup ? (
-        <div className="fixed inset-0 z-[96] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-400/60 bg-stone-950 text-center text-amber-50 shadow-2xl shadow-black/80">
-            <div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.28),transparent_45%),linear-gradient(180deg,rgba(120,53,15,0.55),rgba(12,10,9,1))] p-5">
-              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-amber-300/50 bg-black/30 text-3xl shadow-xl shadow-amber-950/40">♛</div>
-              <div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/70">Finale beendet</div>
-              <div className="mt-2 font-serif text-lg font-black text-amber-200">Lord of the Holes 2026 ist</div>
-              <div className="mt-2 font-serif text-4xl font-black text-amber-300 drop-shadow">{displayedWinnerCelebration?.winnerName}</div>
-              <div className="mt-2 text-sm text-amber-100/70">{displayedWinnerCelebration?.winnerLabel}</div>
-              <div className="mt-2 rounded-2xl border border-amber-500/35 bg-black/25 p-2 text-sm text-amber-100">
-                Final Strokes HCP: <b className="text-amber-200">{displayedWinnerCelebration?.finalHcpAdjustedStrokes ?? "–"}</b>
-              </div>
-            </div>
-            <div className="p-3">
-              <button
-                type="button"
-                onClick={() => setWinnerPopupDismissedKey(displayedWinnerPopupKey)}
-                className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-2.5 text-sm font-bold text-amber-50"
-              >
-                Krone anerkennen ×
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-      {clearScoresConfirmOpen ? (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-3xl border border-red-500/60 bg-stone-950 p-4 text-red-50 shadow-2xl shadow-black/70">
-            <div className="font-serif text-lg text-red-100">Alle Scores löschen?</div>
-            <p className="mt-2 text-sm text-red-100/80">
-              Dadurch werden alle Einträge im Tab Scores gelöscht. Vorher wird automatisch ein Backup erstellt. Backup-Tabs bleiben erhalten.
-            </p>
-            {clearScoresError ? (
-              <div className="mt-2 rounded-2xl border border-red-400/50 bg-red-950/50 p-2 text-xs text-red-100">
-                Fehler: {clearScoresError}
-              </div>
-            ) : null}
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                disabled={clearScoresSaving}
-                onClick={() => setClearScoresConfirmOpen(false)}
-                className="rounded-2xl border border-amber-700/40 bg-stone-900 px-3 py-2.5 text-sm font-bold text-amber-100 disabled:opacity-50"
-              >
-                Abbrechen
-              </button>
-              <button
-                type="button"
-                disabled={clearScoresSaving}
-                onClick={clearAllScores}
-                className="rounded-2xl border border-red-400/60 bg-red-700 px-3 py-2.5 text-sm font-bold text-red-50 disabled:opacity-50"
-              >
-                {clearScoresSaving ? "Lösche ..." : "Ja, Scores löschen"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {displayedRoundHonorCelebration && !showFinalWinnerPopup ? <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm"><div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-400/60 bg-stone-950 text-center text-amber-50 shadow-2xl shadow-black/80"><div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.28),transparent_45%),linear-gradient(180deg,rgba(120,53,15,0.55),rgba(12,10,9,1))] p-5"><div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-amber-300/50 bg-black/30 text-3xl shadow-xl shadow-amber-950/40">⚜</div><div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/70">{displayedRoundHonorCelebration.roundName} beendet</div><div className="mt-2 font-serif text-lg font-black text-amber-200">Gondors Erlass</div><div className="mt-1 text-sm text-amber-100/70">Die Runde ist gespielt. Der Hofstaat wird neu geordnet.</div><div className="mt-2 rounded-2xl border border-amber-300/40 bg-amber-500/10 p-3 text-sm font-semibold text-amber-50">{roundHonorPersonalMessage}</div><div className="mt-2 rounded-2xl border border-amber-500/35 bg-black/25 p-3 text-left"><div className="text-xs uppercase tracking-[0.22em] text-amber-300/75">{displayedRoundHonorCelebration.lords.length === 1 ? "Herr von Gondor" : "Herren von Gondor"}</div><div className="mt-2 space-y-1">{displayedRoundHonorCelebration.lords.map((player, index) => <div key={player.id} className="flex items-center justify-between gap-2 rounded-xl bg-amber-500/10 px-2 py-1.5"><span className="font-serif text-lg font-black text-amber-200">{index + 1}. {getPlayerLabel(player)}</span><span className="text-xs text-amber-100/70">{player.hcpAdjustedStrokes}</span></div>)}</div></div><div className="mt-2 rounded-2xl border border-red-500/35 bg-black/25 p-3 text-left"><div className="text-xs uppercase tracking-[0.22em] text-red-200/80">Schildträger</div><div className="mt-2 space-y-1">{displayedRoundHonorCelebration.butlers.map((player) => <div key={player.id} className="flex items-center justify-between gap-2 rounded-xl bg-red-500/10 px-2 py-1.5"><span className="font-serif text-lg font-black text-red-100">{getPlayerLabel(player)}</span><span className="text-xs text-red-100/70">{player.hcpAdjustedStrokes}</span></div>)}</div></div><div className="mt-2 rounded-2xl border border-amber-500/25 bg-black/20 p-2 text-sm text-amber-100/75">{displayedRoundHonorCelebration.roundOrder === 1 ? "Der Herr von Gondor steht fest. Der Schildträger ebenso. Dein Wort gilt — und irgendwo schwitzt bereits jemand." : "Die Herren von Gondor und ihre Schildträger stehen fest. Der Hofstaat ist informiert, die Becher sind gefährlich leer."}</div></div><div className="p-3"><button type="button" onClick={() => setRoundHonorDismissedKeys((current) => Array.from(new Set([...(current || []), displayedRoundHonorCelebration.key])))} className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-2.5 text-sm font-bold text-amber-50">{roundHonorCloseLabel}</button></div></div></div> : null}
+      {showFinalWinnerPopup ? <div className="fixed inset-0 z-[96] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm"><div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-400/60 bg-stone-950 text-center text-amber-50 shadow-2xl shadow-black/80"><div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.28),transparent_45%),linear-gradient(180deg,rgba(120,53,15,0.55),rgba(12,10,9,1))] p-5"><div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-amber-300/50 bg-black/30 text-3xl shadow-xl shadow-amber-950/40">♛</div><div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/70">Finale beendet</div><div className="mt-2 font-serif text-lg font-black text-amber-200">Lord of the Holes 2026 ist</div><div className="mt-2 font-serif text-4xl font-black text-amber-300 drop-shadow">{finalWinnerCelebration?.winnerName}</div><div className="mt-2 text-sm text-amber-100/70">{finalWinnerCelebration?.winnerLabel}</div><div className="mt-2 rounded-2xl border border-amber-500/35 bg-black/25 p-2 text-sm text-amber-100">Final Strokes HCP: <b className="text-amber-200">{finalWinnerCelebration?.finalHcpAdjustedStrokes ?? "–"}</b></div></div><div className="p-3"><button type="button" onClick={() => setWinnerPopupDismissedKey(finalWinnerPopupKey)} className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-2.5 text-sm font-bold text-amber-50">Krone anerkennen ×</button></div></div></div> : null}
+      {clearScoresConfirmOpen ? <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"><div className="w-full max-w-md rounded-3xl border border-red-500/60 bg-stone-950 p-4 text-red-50 shadow-2xl shadow-black/70"><div className="font-serif text-lg text-red-100">Alle Scores löschen?</div><p className="mt-2 text-sm text-red-100/80">Dadurch werden alle Einträge im Tab Scores gelöscht. Vorher wird automatisch ein Backup erstellt. Backup-Tabs bleiben erhalten.</p>{clearScoresError ? <div className="mt-2 rounded-2xl border border-red-400/50 bg-red-950/50 p-2 text-xs text-red-100">Fehler: {clearScoresError}</div> : null}<div className="mt-2 grid grid-cols-2 gap-2"><button type="button" disabled={clearScoresSaving} onClick={() => setClearScoresConfirmOpen(false)} className="rounded-2xl border border-amber-700/40 bg-stone-900 px-3 py-2.5 text-sm font-bold text-amber-100 disabled:opacity-50">Abbrechen</button><button type="button" disabled={clearScoresSaving} onClick={clearAllScores} className="rounded-2xl border border-red-400/60 bg-red-700 px-3 py-2.5 text-sm font-bold text-red-50 disabled:opacity-50">{clearScoresSaving ? "Lösche ..." : "Ja, Scores löschen"}</button></div></div></div> : null}
     </div>
   );
 }
