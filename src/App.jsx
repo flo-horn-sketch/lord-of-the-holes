@@ -53,7 +53,7 @@ class AppErrorBoundary extends React.Component {
 }
 
 const GOOGLE_SHEETS_API_URL =
-  "https://script.google.com/macros/s/AKfycbz2Gn8dQ4jqvDr6r1LoTSrJ7YttJ5bWH-3BdT3IvQfga8b3SDeAdheItnwUO3uxKEnk/exec";
+  "https://script.google.com/macros/s/AKfycbw4EGUY8EQKDendALBEf-BtcsMbkCIMl3JJdEYZrZOkQyIV3Nnl6rFeEhmcLNLsaRYe/exec";
 
 const ADMIN_PASSWORD = "weimar";
 
@@ -1372,6 +1372,7 @@ function LordOfTheHolesApp() {
   const [scoreHintMessage, setScoreHintMessage] = useState("");
   const [clearScoresConfirmOpen, setClearScoresConfirmOpen] = useState(false);
   const [clearScoresSaving, setClearScoresSaving] = useState(false);
+  const [clearScoresError, setClearScoresError] = useState("");
 
   const displayedActiveRound =
     (selectedActiveRoundId && (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(selectedActiveRoundId))) ||
@@ -1725,22 +1726,27 @@ function LordOfTheHolesApp() {
 
   async function clearAllScores() {
     setClearScoresSaving(true);
+    setClearScoresError("");
     setError("");
 
     try {
-      await callSheetApi({ action: "clearScores" });
+      const result = await callSheetApi({ action: "clearScores" });
       setScores([]);
       setAllScores([]);
       setPendingScores([]);
       pendingScoresRef.current = [];
       writeLocalJson("lordOfTheHoles.pendingScores", []);
+      writeLocalJson("lordOfTheHoles.cachedState", null);
       setConnectionStatus("online");
       setClearScoresConfirmOpen(false);
-      setBackupSavedMessage("");
+      setBackupSavedMessage(result?.backup_sheet_name ? `Backup erstellt: ${result.backup_sheet_name}` : "");
       setSetupSavedMessage("Alle Scores wurden gelöscht. Backups bleiben erhalten.");
+      await loadData({ silent: true });
     } catch (err) {
       setConnectionStatus("offline");
-      setError(err.message || "Scores konnten nicht gelöscht werden.");
+      const message = err.message || "Scores konnten nicht gelöscht werden.";
+      setClearScoresError(message);
+      setError(message);
     } finally {
       setClearScoresSaving(false);
     }
@@ -1943,7 +1949,7 @@ function LordOfTheHolesApp() {
             </div>
             <Button disabled={!isAdminUnlocked || setupSaving} onClick={saveFullSetup} className="mt-3 w-full rounded-2xl bg-amber-600 text-amber-50 disabled:opacity-50">{setupSaving ? "Speichere ..." : "Admin-Einstellungen speichern"}</Button>
             <Button disabled={!isAdminUnlocked || backupSaving} onClick={createRoundBackup} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-700/80 text-emerald-50 disabled:opacity-50">{backupSaving ? "Erstelle Backup ..." : "Backup für aktive Runde erstellen"}</Button>
-            <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={() => setClearScoresConfirmOpen(true)} className="mt-2 w-full rounded-2xl border border-red-500/50 bg-red-950/60 text-red-100 disabled:opacity-50">Scores löschen</Button>
+            <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={() => { setClearScoresError(""); setClearScoresConfirmOpen(true); }} className="mt-2 w-full rounded-2xl border border-red-500/50 bg-red-950/60 text-red-100 disabled:opacity-50">Scores löschen</Button>
           </CardContent>
         </Card>
       </motion.section>
@@ -2190,8 +2196,13 @@ function LordOfTheHolesApp() {
           <div className="w-full max-w-md rounded-3xl border border-red-500/60 bg-stone-950 p-4 text-red-50 shadow-2xl shadow-black/70">
             <div className="font-serif text-xl text-red-100">Alle Scores löschen?</div>
             <p className="mt-2 text-sm text-red-100/80">
-              Dadurch werden alle Einträge im Tab Scores gelöscht. Backup-Tabs bleiben erhalten.
+              Dadurch werden alle Einträge im Tab Scores gelöscht. Vorher wird automatisch ein Backup erstellt. Backup-Tabs bleiben erhalten.
             </p>
+            {clearScoresError ? (
+              <div className="mt-3 rounded-2xl border border-red-400/50 bg-red-950/50 p-2 text-xs text-red-100">
+                Fehler: {clearScoresError}
+              </div>
+            ) : null}
             <div className="mt-4 grid grid-cols-2 gap-2">
               <button
                 type="button"
