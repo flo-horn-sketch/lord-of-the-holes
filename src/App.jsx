@@ -539,22 +539,42 @@ function buildTournamentNetStandings(players, rounds, holes, scores) {
     .map((player) => {
       const roundResults = qualificationRounds.map((round) => {
         const roundHoles = getRoundHoles(round, holes);
-        const roundScores = (scores || []).filter((score) => String(score.round_id) === String(round.round_id) && String(score.player_id) === String(player.id));
+        const roundScores = (scores || []).filter((score) => String(score.round_id) === String(round.round_id) && String(score.player_id) === String(player.id) && score.strokes !== "" && score.strokes != null);
         const playerForRound = getPlayerForCourse(player, round.course_id || "goethe");
-        const netStableford = roundScores.reduce((sum, score) => {
+        const grossStrokes = roundScores.reduce((sum, score) => sum + Number(score.strokes || 0), 0);
+        const hcpShotsUsed = roundScores.reduce((sum, score) => {
           const hole = roundHoles.find((h) => Number(h.hole_number) === Number(score.hole_number));
-          const shots = getShotsOnHole(playerForRound.course_hcp, hole?.hcp);
-          return sum + getScoreStablefordPoints(score, hole?.par, shots);
+          return sum + getShotsOnHole(playerForRound.course_hcp, hole?.hcp);
         }, 0);
-        return { round_id: round.round_id, round_name: round.round_name, points: netStableford, played: roundScores.filter((score) => score.strokes !== "" && score.strokes != null).length };
+        const hcpAdjustedStrokes = roundScores.length ? grossStrokes - hcpShotsUsed : null;
+        return {
+          round_id: round.round_id,
+          round_name: round.round_name,
+          points: hcpAdjustedStrokes,
+          hcpAdjustedStrokes,
+          grossStrokes,
+          hcpShotsUsed,
+          played: roundScores.length,
+        };
       });
-      const playedResults = roundResults.filter((result) => result.played > 0);
-      const sortedPlayed = [...playedResults].sort((a, b) => Number(b.points || 0) - Number(a.points || 0));
+      const playedResults = roundResults.filter((result) => result.played > 0 && result.hcpAdjustedStrokes != null);
+      const sortedPlayed = [...playedResults].sort((a, b) => Number(a.hcpAdjustedStrokes || 0) - Number(b.hcpAdjustedStrokes || 0));
       const counted = sortedPlayed.slice(0, 2);
       const dropped = sortedPlayed.slice(2, 3)[0] || null;
-      return { ...withFallbackAlias(player), roundResults, countedRoundIds: counted.map((result) => result.round_id), droppedRoundId: dropped?.round_id || "", totalBestTwo: counted.reduce((sum, result) => sum + Number(result.points || 0), 0), roundsPlayed: playedResults.length };
+      return {
+        ...withFallbackAlias(player),
+        roundResults,
+        countedRoundIds: counted.map((result) => result.round_id),
+        droppedRoundId: dropped?.round_id || "",
+        totalBestTwo: counted.length ? counted.reduce((sum, result) => sum + Number(result.hcpAdjustedStrokes || 0), 0) : null,
+        roundsPlayed: playedResults.length,
+      };
     })
-    .sort((a, b) => Number(b.totalBestTwo || 0) - Number(a.totalBestTwo || 0) || Number(b.roundsPlayed || 0) - Number(a.roundsPlayed || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
+    .sort((a, b) => {
+      if (a.totalBestTwo == null && b.totalBestTwo != null) return 1;
+      if (b.totalBestTwo == null && a.totalBestTwo != null) return -1;
+      return Number(a.totalBestTwo || 0) - Number(b.totalBestTwo || 0) || Number(b.roundsPlayed || 0) - Number(a.roundsPlayed || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0);
+    });
 }
 
 function buildTournamentPuttStandings(players, rounds, scores) {
@@ -1085,11 +1105,11 @@ function TournamentStandings({ players, rounds, holes, scores, activeRoundId = "
       <CardContent className="p-3 landscape:p-2">
         <div className="mb-3">
           <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Turnier</p>
-          <h2 className="font-serif text-lg text-amber-200">{isFinalActive ? "Finalwertung Netto" : "Gesamtwertung Netto"}</h2>
+          <h2 className="font-serif text-lg text-amber-200">{isFinalActive ? "Finalwertung Strokes HCP adjusted" : "Gesamtwertung Strokes HCP adjusted"}</h2>
           <p className="mt-1 text-sm text-amber-100/70">
             {isFinalActive
               ? "Finaltag: Top 3 nach der Qualifikation spielen Plätze 1–3 aus. Die übrigen Spieler spielen Plätze 4–6 aus."
-              : "Es zählen die besten zwei Netto-Stableford-Ergebnisse aus den ersten drei Runden. Nach Platz 3 liegt der aktuelle Cut."}
+              : "Es zählen die besten zwei Strokes-HCP-adjusted-Ergebnisse aus den ersten drei Runden. Niedriger ist besser. Nach Platz 3 liegt der aktuelle Cut."}
           </p>
         </div>
 
@@ -1160,7 +1180,7 @@ function TournamentStandings({ players, rounds, holes, scores, activeRoundId = "
                           <td key={round.round_id} className={cls("px-2.5 py-1.5 text-right", isCounted && "font-bold text-amber-300", isDropped && "text-amber-100/50 line-through")}>{result?.played ? result.points : "–"}</td>
                         );
                       })}
-                      <td className="px-2.5 py-1.5 text-right font-serif text-xl font-bold text-amber-300">{player.totalBestTwo}</td>
+                      <td className="px-2.5 py-1.5 text-right font-serif text-xl font-bold text-amber-300">{player.totalBestTwo ?? "–"}</td>
                     </tr>
                   </React.Fragment>
                 ))}
