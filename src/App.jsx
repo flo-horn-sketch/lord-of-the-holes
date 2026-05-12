@@ -587,7 +587,7 @@ function getMismatchesForHole(scores, roundId, holeNumber, players = []) {
         officialScore,
         controlScore,
         officialScorerId: String(officialScore?.scorer_player_id || "").trim(),
-        message: message ? `Loch ${holeNumber} · ${message}` : "",
+        message: message ? `Loch ${holeNumber} · ${(playerMap.get(playerId)?.character_name || playerMap.get(playerId)?.display_name || playerId)} · ${message}` : "",
       };
     })
     .filter((item) => Boolean(item.message));
