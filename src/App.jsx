@@ -702,6 +702,18 @@ function getScoreTimestamp(score) {
   return Number.isNaN(time) ? 0 : time;
 }
 
+function getLatestScoredHole(scores = [], roundId = "", fallbackHole = 1) {
+  const filteredScores = (scores || [])
+    .filter((score) => {
+      if (!score || score.strokes === "" || score.strokes == null) return false;
+      if (roundId && String(score.round_id || "") !== String(roundId)) return false;
+      return Number(score.hole_number) > 0;
+    })
+    .sort((a, b) => getScoreTimestamp(b) - getScoreTimestamp(a));
+
+  return Number(filteredScores[0]?.hole_number || fallbackHole || 1);
+}
+
 function isNewerOrEqualScore(candidate, existing) {
   return getScoreTimestamp(candidate) >= getScoreTimestamp(existing);
 }
@@ -1373,7 +1385,10 @@ function LordOfTheHolesApp() {
   const [localHandicaps, setLocalHandicaps] = useState({});
   const [scoredPlayerId, setScoredPlayerId] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerId", "florian"));
   const [scoreEntryMode, setScoreEntryMode] = useState("player");
-  const [activeHole, setActiveHole] = useState(() => readLocalJson("lordOfTheHoles.activeHole", 1));
+  const [activeHole, setActiveHole] = useState(() => {
+    const cachedRoundId = cachedState?.selectedActiveRoundId || cachedState?.activeRound?.round_id || "";
+    return getLatestScoredHole(cachedState?.scores?.length ? cachedState.scores : cachedState?.allScores || [], cachedRoundId, 1);
+  });
   const [view, setView] = useState("score");
   const [mainMenu, setMainMenu] = useState("current");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1384,6 +1399,7 @@ function LordOfTheHolesApp() {
   const [scoreSaveInFlight, setScoreSaveInFlight] = useState(false);
   const pendingScoreSaveRef = useRef(Promise.resolve(true));
   const scoreSaveSequenceRef = useRef(0);
+  const initialHoleSyncedRef = useRef(false);
   const [autoSync] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState("offline");
   const [error, setError] = useState("");
@@ -1594,6 +1610,10 @@ function LordOfTheHolesApp() {
       );
       setAllScores(nextAllScores);
       setScores(nextActiveScores);
+      if (!initialHoleSyncedRef.current) {
+        setActiveHole(getLatestScoredHole(nextActiveScores, nextActiveRound?.round_id || "", 1));
+        initialHoleSyncedRef.current = true;
+      }
       setConnectionStatus("online");
       setError("");
     } catch (err) {
