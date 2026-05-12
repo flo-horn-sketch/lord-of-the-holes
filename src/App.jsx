@@ -503,6 +503,28 @@ function isScorerControlScore(score) {
   return Boolean(playerId && scorerPlayerId && playerId === scorerPlayerId);
 }
 
+function getScoreIdentityKey(score) {
+  return [
+    String(score?.round_id || "").trim(),
+    String(score?.player_id || "").trim(),
+    String(score?.hole_number || "").trim(),
+    isScorerControlScore(score) ? "control" : "official",
+  ].join("|");
+}
+
+function mergeScoresPreservingPending(sheetScores = [], pendingScores = []) {
+  const map = new Map();
+  sheetScores.forEach((score) => {
+    if (!score || !score.player_id || !score.hole_number) return;
+    map.set(getScoreIdentityKey(score), normalizeScoreRecord(score));
+  });
+  pendingScores.forEach((score) => {
+    if (!score || !score.player_id || !score.hole_number) return;
+    map.set(getScoreIdentityKey(score), normalizeScoreRecord(score));
+  });
+  return Array.from(map.values());
+}
+
 function getOfficialScores(scores) {
   return (scores || []).filter((score) => !isScorerControlScore(score));
 }
@@ -1096,6 +1118,7 @@ function LordOfTheHolesApp() {
   const [allHoles, setAllHoles] = useState(cachedState?.allHoles?.length ? cachedState.allHoles : fallbackHoles);
   const [scores, setScores] = useState(cachedState?.scores?.length ? cachedState.scores.map(normalizeScoreRecord) : []);
   const [allScores, setAllScores] = useState(cachedState?.allScores?.length ? cachedState.allScores.map(normalizeScoreRecord) : []);
+  const [pendingScores, setPendingScores] = useState(() => readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord));
   const [localHandicaps, setLocalHandicaps] = useState({});
   const [scoredPlayerId, setScoredPlayerId] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerId", "florian"));
   const [scoreEntryMode, setScoreEntryMode] = useState("player");
@@ -1229,6 +1252,10 @@ function LordOfTheHolesApp() {
   }, [scoredPlayerId]);
 
   useEffect(() => {
+    writeLocalJson("lordOfTheHoles.pendingScores", pendingScores);
+  }, [pendingScores]);
+
+  useEffect(() => {
     if (!selectedActiveRoundId) return;
     const selectedRoundScores = allScores.filter((score) => String(score.round_id || "") === String(selectedActiveRoundId));
     setScores(selectedRoundScores);
@@ -1246,11 +1273,12 @@ function LordOfTheHolesApp() {
       allHoles,
       scores,
       allScores,
+      pendingScores,
       selectedCourseId,
       selectedActiveRoundId,
       cachedAt: new Date().toISOString(),
     });
-  }, [players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, selectedCourseId, selectedActiveRoundId]);
+  }, [players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId]);
 
   useEffect(() => {
     if (!autoSync) return undefined;
@@ -1258,6 +1286,12 @@ function LordOfTheHolesApp() {
     const timer = setInterval(() => loadData({ silent: true }), 30000);
     return () => clearInterval(timer);
   }, [autoSync]);
+
+  useEffect(() => {
+    if (!autoSync || !pendingScores.length) return undefined;
+    const timer = setInterval(() => flushPendingScores(), 10000);
+    return () => clearInterval(timer);
+  }, [autoSync, pendingScores]);
 
   function applyPlayers(nextActivePlayers, nextAllPlayers = nextActivePlayers, courseList = courses) {
     setPlayers(nextActivePlayers.map(withFallbackAlias));
@@ -1292,8 +1326,13 @@ function LordOfTheHolesApp() {
       applyPlayers(nextActivePlayers, nextAllPlayers, nextCourses);
       setHoles(normalizeHoles(data.activeHoles?.length ? data.activeHoles : data.holes));
       setAllHoles(normalizeHoles(data.holes));
-      const nextAllScores = (data.scores || []).map(normalizeScoreRecord);
-      const nextActiveScores = (data.activeScores || []).map(normalizeScoreRecord);
+      const sheetAllScores = (data.scores || []).map(normalizeScoreRecord);
+      const sheetActiveScores = (data.activeScores || []).map(normalizeScoreRecord);
+      const nextAllScores = mergeScoresPreservingPending(sheetAllScores, pendingScores);
+      const nextActiveScores = mergeScoresPreservingPending(
+        sheetActiveScores,
+        pendingScores.filter((score) => String(score.round_id || "") === String(nextActiveRound?.round_id || ""))
+      );
       setAllScores(nextAllScores);
       setScores(nextActiveScores);
       setConnectionStatus("online");
@@ -1332,15 +1371,55 @@ function LordOfTheHolesApp() {
     return next;
   }
 
+  function addPendingScore(score) {
+    setPendingScores((current) => {
+      const key = getScoreIdentityKey(score);
+      const withoutExisting = current.filter((item) => getScoreIdentityKey(item) !== key);
+      return [...withoutExisting, normalizeScoreRecord(score)];
+    });
+  }
+
+  function removePendingScore(score) {
+    setPendingScores((current) => current.filter((item) => getScoreIdentityKey(item) !== getScoreIdentityKey(score)));
+  }
+
+  async function savePendingScore(score) {
+    try {
+      await callSheetApi({ action: "upsertScore", score });
+      removePendingScore(score);
+      setConnectionStatus("online");
+      setError("");
+      return true;
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Score ist lokal gesichert und wird später synchronisiert.");
+      return false;
+    }
+  }
+
+  async function flushPendingScores() {
+    if (!pendingScores.length) return true;
+
+    let allSaved = true;
+    for (const pendingScore of pendingScores) {
+      const saved = await savePendingScore(pendingScore);
+      if (!saved) allSaved = false;
+    }
+
+    return allSaved;
+  }
+
   async function saveScore(patch) {
     const next = optimisticUpdate(patch);
     const saveId = scoreSaveSequenceRef.current + 1;
     scoreSaveSequenceRef.current = saveId;
+    addPendingScore(next);
     setSaving(true);
     setScoreSaveInFlight(true);
 
     const savePromise = callSheetApi({ action: "upsertScore", score: next })
       .then(() => {
+        removePendingScore(next);
         if (scoreSaveSequenceRef.current === saveId) {
           setConnectionStatus("online");
           setError("");
@@ -1348,9 +1427,10 @@ function LordOfTheHolesApp() {
         return true;
       })
       .catch((err) => {
+        addPendingScore(next);
         if (scoreSaveSequenceRef.current === saveId) {
           setConnectionStatus("offline");
-          setError(err.message || "Score konnte nicht gespeichert werden.");
+          setError("Score lokal gesichert. Wird automatisch synchronisiert, sobald die Datenbank erreichbar ist.");
         }
         return false;
       })
@@ -1368,9 +1448,7 @@ function LordOfTheHolesApp() {
   async function goToNextHole() {
     if (activeHole === 18 || !hasCurrentScore || scoreSaveInFlight) return;
 
-    const wasSaved = await pendingScoreSaveRef.current;
-    if (!wasSaved) return;
-
+    await pendingScoreSaveRef.current;
     setActiveHole((h) => Math.min(18, h + 1));
   }
 
@@ -1501,7 +1579,7 @@ function LordOfTheHolesApp() {
         <div className="mt-2 flex justify-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-amber-700/40 bg-black/35 px-2.5 py-1 text-[11px] text-amber-100/75">
             <Icon size={14} className={connectionStatus === "online" ? "text-emerald-300" : "text-red-300"}>{connectionStatus === "online" ? "●" : "○"}</Icon>
-            {connectionStatus === "online" ? "Datenbank verbunden" : "Datenbank nicht verbunden"}
+            {pendingScores.length ? `${pendingScores.length} Score${pendingScores.length === 1 ? "" : "s"} offen` : connectionStatus === "online" ? "Datenbank verbunden" : "Datenbank nicht verbunden"}
           </div>
         </div>
       </motion.header>
