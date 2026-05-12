@@ -1552,6 +1552,7 @@ function LordOfTheHolesApp() {
   const [backupSavedMessage, setBackupSavedMessage] = useState("");
   const [scoreHintMessage, setScoreHintMessage] = useState("");
   const [showSplash, setShowSplash] = useState(true);
+  const introAudioRef = useRef(null);
   const [clearScoresConfirmOpen, setClearScoresConfirmOpen] = useState(false);
   const [clearScoresSaving, setClearScoresSaving] = useState(false);
   const [clearScoresError, setClearScoresError] = useState("");
@@ -1774,8 +1775,8 @@ function LordOfTheHolesApp() {
 
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setShowSplash(false), 3000);
-    return () => window.clearTimeout(timer);
+    introAudioRef.current = new Audio("/intro-sound.mp3");
+    introAudioRef.current.preload = "auto";
   }, []);
 
   useEffect(() => {
@@ -2272,6 +2273,20 @@ function LordOfTheHolesApp() {
     );
   }
 
+  async function enterRoundFromSplash() {
+    try {
+      if (introAudioRef.current) {
+        introAudioRef.current.currentTime = 0;
+        await introAudioRef.current.play();
+      }
+    } catch {
+      // Mobile Browser können Sound blockieren, falls Audio nicht erlaubt ist.
+      // Die App startet trotzdem normal.
+    } finally {
+      setShowSplash(false);
+    }
+  }
+
   function openStandingsPopup(type) {
     setStandingsPopup(type);
   }
@@ -2488,6 +2503,15 @@ function LordOfTheHolesApp() {
             alt="Lord of the Holes Golf Scoring"
             className="h-full w-full object-cover"
           />
+          <div className="absolute inset-x-0 bottom-8 flex justify-center px-6 pb-[env(safe-area-inset-bottom)]">
+            <button
+              type="button"
+              onClick={enterRoundFromSplash}
+              className="w-full max-w-xs rounded-2xl border border-amber-300/55 bg-black/55 px-5 py-3 font-serif text-lg font-black tracking-wide text-amber-200 shadow-2xl shadow-black/70 backdrop-blur-sm active:scale-[0.98]"
+            >
+              Runde betreten
+            </button>
+          </div>
         </div>
       ) : null}
       <main className="relative mx-auto max-w-md px-3 py-3">
