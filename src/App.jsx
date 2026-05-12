@@ -626,10 +626,10 @@ function runSelfTests() {
 
 if (typeof window !== "undefined") runSelfTests();
 
-function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", helper = "", status = "", onChange }) {
+function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", helper = "", status = "", onChange, formatValue }) {
   const hasValue = value !== "" && value != null;
   const selected = hasValue ? Math.max(min, Math.min(max, Number(value || 0))) : min;
-  const shownValue = hasValue ? selected : emptyLabel;
+  const shownValue = hasValue ? (formatValue ? formatValue(selected) : selected) : emptyLabel;
   const setValue = (nextValue) => onChange(Math.max(min, Math.min(max, Number(nextValue || 0))));
 
   return (
@@ -697,6 +697,7 @@ function PuttStepper({ value, onChange }) {
 
 function getScoreRelationLabel(score, par) {
   if (score === "" || score == null) return "offen";
+  if (Number(score) === 0) return "gestrichen";
 
   const diff = Number(score) - Number(par || 0);
 
@@ -711,18 +712,18 @@ function getScoreRelationLabel(score, par) {
 }
 
 function ScoreStepper({ value, par, onChange }) {
-  const startValue = Number(value || par || 4);
   const relationLabel = getScoreRelationLabel(value, par);
   return (
     <TouchStepper
       label="Score"
       value={value}
-      min={1}
+      min={0}
       max={12}
       emptyLabel="–"
-      helper="Schläge per Touch"
+      helper="0 = Loch gestrichen"
       status={value === "" || value == null ? `Start Par ${par || 4}` : relationLabel}
-      onChange={(nextValue) => onChange(nextValue || startValue)}
+      formatValue={(nextValue) => (Number(nextValue) === 0 ? "–" : nextValue)}
+      onChange={onChange}
     />
   );
 }
@@ -1561,12 +1562,17 @@ function LordOfTheHolesApp() {
               <div className="mb-3 flex items-center justify-between gap-2"><span className="font-serif text-lg text-amber-200">{getPlayerLabel(entryPlayer)} · Loch {activeHole}</span><span className="text-[11px] text-amber-100/65">Vorgabe <b className="text-amber-200 tracking-[0.18em]">{formatShotMarks(entryPlayerShotsOnActiveHole)}</b></span></div>
               <div className="mb-3">
                 <ScoreStepper
-                  value={currentScore.strokes ?? ""}
+                  value={normalizeBoolean(currentScore.picked_up) ? 0 : (currentScore.strokes ?? "")}
                   par={activeHoleData?.par || 4}
-                  onChange={(scoreValue) => saveScore({ strokes: scoreValue, picked_up: false })}
+                  onChange={(scoreValue) => {
+                    if (Number(scoreValue) === 0) {
+                      saveScore({ strokes: pickedUpStrokes, picked_up: true });
+                    } else {
+                      saveScore({ strokes: scoreValue, picked_up: false });
+                    }
+                  }}
                 />
               </div>
-              <div className="mb-3 rounded-2xl border border-amber-700/40 bg-black/25 p-2.5"><div className="flex items-center justify-between gap-3"><div><div className="text-sm font-semibold text-amber-100">Loch gestrichen?</div><div className="text-xs text-amber-100/65">Wertet automatisch {pickedUpStrokes} Schläge und 0 Netto-Punkte.</div></div><input type="checkbox" checked={normalizeBoolean(currentScore.picked_up)} onChange={(e) => saveScore(e.target.checked ? { picked_up: true, strokes: pickedUpStrokes } : { picked_up: false })} className="h-5 w-5 accent-amber-500" /></div></div>
               <div className="mb-3 rounded-2xl border border-amber-700/40 bg-black/25 p-2.5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
