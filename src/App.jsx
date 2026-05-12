@@ -2136,7 +2136,7 @@ function LordOfTheHolesApp() {
   const activeRoundChapterLabel = getRoundChapterLabel(displayedActiveRound);
   const subtitle = mainMenu === "current" ? activeRoundChapterLabel : mainMenu === "tournament" ? activeRoundIsFinal ? "Turnier · Am Schicksalsberg" : "Turnier · Kapitel der Gefährten" : mainMenu === "archive" ? "Scorekarten · Chroniken der Runde" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "admin" ? "Admin" : "Einstellungen";
     return (
-      <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-3 pt-28">
+      <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-3 pt-10">
         <div className="mb-2 flex items-center justify-end gap-2">
           <button type="button" onClick={() => setMenuOpen((value) => !value)} className="rounded-xl border border-amber-700/40 bg-black/45 px-3 py-1.5 text-lg leading-none text-amber-100 shadow-lg shadow-black/40 backdrop-blur-sm" aria-label="Menü öffnen">☰</button>
         </div>
