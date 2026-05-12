@@ -1416,6 +1416,7 @@ function LordOfTheHolesApp() {
   const [clearScoresConfirmOpen, setClearScoresConfirmOpen] = useState(false);
   const [clearScoresSaving, setClearScoresSaving] = useState(false);
   const [clearScoresError, setClearScoresError] = useState("");
+  const [standingsPopup, setStandingsPopup] = useState(null);
 
   const displayedActiveRound =
     (selectedActiveRoundId && (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(selectedActiveRoundId))) ||
@@ -2039,20 +2040,70 @@ function LordOfTheHolesApp() {
     );
   }
 
-  function goToBoardTable(tableId) {
-    setMainMenu("current");
-    setView("leaderboard");
-    window.setTimeout(() => {
-      document.getElementById(tableId)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 120);
+  function openStandingsPopup(type) {
+    setStandingsPopup(type);
   }
 
-  function goToHcpAdjustedBoard() {
-    goToBoardTable("hcp-adjusted-board");
+  function closeStandingsPopup() {
+    setStandingsPopup(null);
   }
 
-  function goToNetStablefordBoard() {
-    goToBoardTable("net-stableford-board");
+  function renderPopupStandingsTable() {
+    if (!standingsPopup) return null;
+
+    const isNetStableford = standingsPopup === "netStableford";
+    const title = isNetStableford ? "Netto Stableford" : "Strokes HCP adjusted";
+    const tablePlayers = isNetStableford ? netStablefordLeaderboard : hcpAdjustedStrokeLeaderboard;
+
+    return (
+      <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 px-3 backdrop-blur-sm">
+        <div className="max-h-[82vh] w-full max-w-md overflow-hidden rounded-3xl border border-amber-500/45 bg-stone-950 text-amber-50 shadow-2xl shadow-black/80">
+          <div className="flex items-start justify-between gap-3 border-b border-amber-700/35 bg-amber-500/10 p-3">
+            <div>
+              <div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Tabelle</div>
+              <div className="font-serif text-xl text-amber-200">{title}</div>
+            </div>
+            <button
+              type="button"
+              onClick={closeStandingsPopup}
+              className="rounded-xl border border-amber-500/40 bg-black/25 px-3 py-1 text-lg font-bold leading-none text-amber-100"
+              aria-label="Tabelle schließen"
+            >
+              ×
+            </button>
+          </div>
+          <div className="max-h-[68vh] overflow-auto p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <table className="w-full border-collapse text-sm text-amber-50">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wider text-amber-100/80">
+                  <th className="px-2 py-2">#</th>
+                  <th className="px-2 py-2">Spieler</th>
+                  <th className="px-2 py-2 text-right">{isNetStableford ? "Punkte" : "+/−"}</th>
+                  <th className="px-2 py-2 text-right">{isNetStableford ? "Löcher" : "Strokes"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tablePlayers.map((player, index) => {
+                  const isMe = myPlayerId && String(player.id) === String(myPlayerId);
+                  return (
+                    <tr key={player.id} className={cls("border-t border-amber-700/20", isMe && "bg-amber-500/15")}> 
+                      <td className="px-2 py-2 text-amber-200/80">{index + 1}</td>
+                      <td className="px-2 py-2 font-semibold text-amber-100">{getPlayerLabel(player)}</td>
+                      <td className="px-2 py-2 text-right font-serif text-lg font-bold text-amber-300">
+                        {isNetStableford ? player.netStableford : formatToPar(player.hcpAdjustedToPar, player.played)}
+                      </td>
+                      <td className="px-2 py-2 text-right text-amber-100/80">
+                        {isNetStableford ? `${player.played}/18` : player.played ? player.hcpAdjustedTotal : "–"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   function renderScoreView() {
@@ -2078,8 +2129,8 @@ function LordOfTheHolesApp() {
               <div className="mb-3 w-full rounded-xl border border-amber-700/30 bg-black/25 p-2.5 text-left">
                 <div className="mb-2 flex items-center justify-between gap-2"><div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Mein aktueller Stand</div><div className="font-serif text-sm text-amber-200">{getPlayerLabel(myCurrentStats)}</div></div>
                 <div className="grid grid-cols-2 gap-2 text-center text-sm">
-                  <button type="button" onClick={goToHcpAdjustedBoard} className="rounded-xl bg-amber-50/5 p-2 text-amber-50 transition active:scale-[0.99]"><div className="text-amber-100">Strokes</div><b className="text-xl text-amber-200">{myCurrentStats.played ? myCurrentStats.hcpAdjustedTotal : "–"}</b><div className="mt-0.5 text-[11px] text-amber-100/70">Tatsächlich {myCurrentStats.played ? myCurrentStats.total : "–"} · Platz {myHcpAdjustedStrokeRank || "–"}</div></button>
-                  <button type="button" onClick={goToNetStablefordBoard} className="rounded-xl bg-amber-50/5 p-2 text-amber-50 transition active:scale-[0.99]"><div className="text-amber-100">Netto Stbl</div><b className="text-xl text-amber-200">{myCurrentStats.netStableford}</b><div className="mt-0.5 text-[11px] text-amber-100/70">SpV {Number(myCurrentStats.course_hcp || 0)} · Platz {myNetStablefordRank || "–"}</div></button>
+                  <button type="button" onClick={() => openStandingsPopup("hcpAdjusted")} className="rounded-xl bg-amber-50/5 p-2 text-amber-50 transition active:scale-[0.99]"><div className="text-amber-100">Strokes</div><b className="text-xl text-amber-200">{myCurrentStats.played ? myCurrentStats.hcpAdjustedTotal : "–"}</b><div className="mt-0.5 text-[11px] text-amber-100/70">Tatsächlich {myCurrentStats.played ? myCurrentStats.total : "–"} · Platz {myHcpAdjustedStrokeRank || "–"}</div></button>
+                  <button type="button" onClick={() => openStandingsPopup("netStableford")} className="rounded-xl bg-amber-50/5 p-2 text-amber-50 transition active:scale-[0.99]"><div className="text-amber-100">Netto Stbl</div><b className="text-xl text-amber-200">{myCurrentStats.netStableford}</b><div className="mt-0.5 text-[11px] text-amber-100/70">SpV {Number(myCurrentStats.course_hcp || 0)} · Platz {myNetStablefordRank || "–"}</div></button>
                 </div>
               </div>
             ) : (
@@ -2243,6 +2294,7 @@ function LordOfTheHolesApp() {
           </div>
         </div>
       ) : null}
+      {renderPopupStandingsTable()}
       {clearScoresConfirmOpen ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-3xl border border-red-500/60 bg-stone-950 p-4 text-red-50 shadow-2xl shadow-black/70">
