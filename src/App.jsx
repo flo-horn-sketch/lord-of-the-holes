@@ -1482,10 +1482,8 @@ function LordOfTheHolesApp() {
     return savePromise;
   }
 
-  async function goToNextHole() {
-    if (activeHole === 18 || !hasCurrentScore || scoreSaveInFlight) return;
-
-    await pendingScoreSaveRef.current;
+  function goToNextHole() {
+    if (activeHole === 18 || !hasCurrentScore) return;
     setActiveHole((h) => Math.min(18, h + 1));
   }
 
@@ -1832,7 +1830,7 @@ function LordOfTheHolesApp() {
                   onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 text-amber-100">Zurück</Button><Button disabled={activeHole === 18 || !hasCurrentScore || scoreSaveInFlight} onClick={goToNextHole} className="rounded-2xl bg-amber-600 text-amber-50 disabled:opacity-50">{scoreSaveInFlight ? "Speichere ..." : "Nächstes Loch"}</Button></div>
+              <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 text-amber-100">Zurück</Button><Button disabled={activeHole === 18 || !hasCurrentScore} onClick={goToNextHole} className="rounded-2xl bg-amber-600 text-amber-50 disabled:opacity-50">Loch {Math.min(18, Number(activeHole || 1) + 1)}</Button></div>
             </div>
           </CardContent>
         </Card>
