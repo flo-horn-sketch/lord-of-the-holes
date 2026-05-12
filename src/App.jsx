@@ -1538,6 +1538,22 @@ function LordOfTheHolesApp() {
     );
   }
 
+  function goToBoardTable(tableId) {
+    setMainMenu("current");
+    setView("leaderboard");
+    window.setTimeout(() => {
+      document.getElementById(tableId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+  }
+
+  function goToHcpAdjustedBoard() {
+    goToBoardTable("hcp-adjusted-board");
+  }
+
+  function goToNetStablefordBoard() {
+    goToBoardTable("net-stableford-board");
+  }
+
   function renderScoreView() {
     return (
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
@@ -1558,14 +1574,14 @@ function LordOfTheHolesApp() {
               <div className="rounded-2xl border border-amber-700/50 bg-black/30 p-3 text-right text-sm text-amber-50"><div className="text-amber-100">Par <b className="text-amber-200">{activeHoleData.par}</b></div><div className="text-amber-100">HCP <b className="text-amber-200">{activeHoleData.hcp}</b></div><div className="text-amber-100">{activeHoleData.meters} m</div></div>
             </div>
             {myCurrentStats ? (
-              <div className="mb-3 rounded-xl border border-amber-700/30 bg-black/25 p-2.5">
+              <button type="button" onClick={goToHcpAdjustedBoard} className="mb-3 w-full rounded-xl border border-amber-700/30 bg-black/25 p-2.5 text-left transition active:scale-[0.99]">
                 <div className="mb-2 flex items-center justify-between gap-2"><div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Mein aktueller Stand</div><div className="font-serif text-sm text-amber-200">{getPlayerLabel(myCurrentStats)}</div></div>
                 <div className="grid grid-cols-2 gap-2 text-center text-sm">
-                  <div className="rounded-xl bg-amber-50/5 p-2 text-amber-50"><div className="text-amber-100">Schläge HCP adjusted</div><b className="text-xl text-amber-200">{myCurrentStats.played ? myCurrentStats.hcpAdjustedTotal : "–"}</b><div className="mt-0.5 text-[11px] text-amber-100/70">Tatsächlich {myCurrentStats.played ? myCurrentStats.total : "–"} · Platz {myHcpAdjustedStrokeRank || "–"}</div></div>
-                  <div className="rounded-xl bg-amber-50/5 p-2 text-amber-50"><div className="text-amber-100">Netto Stbl</div><b className="text-xl text-amber-200">{myCurrentStats.netStableford}</b><div className="mt-0.5 text-[11px] text-amber-100/70">SpV {Number(myCurrentStats.course_hcp || 0)} · Platz {myNetStablefordRank || "–"}</div></div>
+                  <div className="rounded-xl bg-amber-50/5 p-2 text-amber-50"><div className="text-amber-100">Strokes</div><b className="text-xl text-amber-200">{myCurrentStats.played ? myCurrentStats.hcpAdjustedTotal : "–"}</b><div className="mt-0.5 text-[11px] text-amber-100/70">Tatsächlich {myCurrentStats.played ? myCurrentStats.total : "–"} · Platz {myHcpAdjustedStrokeRank || "–"}</div></div>
+                  <button type="button" onClick={goToNetStablefordBoard} className="rounded-xl bg-amber-50/5 p-2 text-amber-50 transition active:scale-[0.99]"><div className="text-amber-100">Netto Stbl</div><b className="text-xl text-amber-200">{myCurrentStats.netStableford}</b><div className="mt-0.5 text-[11px] text-amber-100/70">SpV {Number(myCurrentStats.course_hcp || 0)} · Platz {myNetStablefordRank || "–"}</div></button>
                   
                 </div>
-              </div>
+              </button>
             ) : (
               <div className="mb-3 rounded-xl border border-amber-700/30 bg-black/20 p-2.5 text-xs text-amber-100/75">Unter Einstellungen kannst du festlegen, wer du bist. Danach erscheint hier dein aktueller Score.</div>
             )}
@@ -1625,8 +1641,12 @@ function LordOfTheHolesApp() {
         <Card className="mb-3 rounded-2xl border-amber-700/40 bg-black/35"><CardContent className="p-3 text-sm text-amber-100"><div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Aktuell gespielt</div><div className="mt-1 font-serif text-lg text-amber-200">{displayedActiveRound?.round_name || "Runde 1"}</div><div className="text-amber-100/65">{activeCourse?.course_name || "Kein Kurs ausgewählt"}</div></CardContent></Card>
         <Card className="mb-3 rounded-2xl border-amber-700/40 bg-[#20170f]/90 shadow-xl"><CardContent className="p-3"><div className="mb-3"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Leaderboard</p><h2 className="font-serif text-lg text-amber-200">Die Gefährten</h2></div>
           <LeaderboardTable title="Klassisches Zählspiel" players={strokePlayLeaderboard} columns={[{ label: "+/−", render: (p) => formatToPar(p.toPar, p.played), emphasize: true }, { label: "Schläge", render: (p) => (p.played ? p.total : "–") }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
-          <LeaderboardTable title="Netto Stableford" players={netStablefordLeaderboard} columns={[{ label: "Punkte", render: (p) => p.netStableford, emphasize: true }, { label: "SpV", render: (p) => Number(p.course_hcp || 0) }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
-          <LeaderboardTable title="Zählspiel HCP adjusted" players={hcpAdjustedStrokeLeaderboard} columns={[{ label: "+/−", render: (p) => formatToPar(p.hcpAdjustedToPar, p.played), emphasize: true }, { label: "Netto", render: (p) => (p.played ? p.hcpAdjustedTotal : "–") }, { label: "HCP", render: (p) => p.hcpShotsUsed }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
+          <div id="net-stableford-board" className="scroll-mt-3">
+            <LeaderboardTable title="Netto Stableford" players={netStablefordLeaderboard} columns={[{ label: "Punkte", render: (p) => p.netStableford, emphasize: true }, { label: "SpV", render: (p) => Number(p.course_hcp || 0) }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
+          </div>
+          <div id="hcp-adjusted-board" className="scroll-mt-3">
+            <LeaderboardTable title="Zählspiel HCP adjusted" players={hcpAdjustedStrokeLeaderboard} columns={[{ label: "+/−", render: (p) => formatToPar(p.hcpAdjustedToPar, p.played), emphasize: true }, { label: "Netto", render: (p) => (p.played ? p.hcpAdjustedTotal : "–") }, { label: "HCP", render: (p) => p.hcpShotsUsed }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
+          </div>
           <LeaderboardTable title="Brutto Punkte" players={grossStablefordLeaderboard} columns={[{ label: "Punkte", render: (p) => p.grossStableford, emphasize: true }, { label: "Schläge", render: (p) => (p.played ? p.total : "–") }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
           <LeaderboardTable title="Putt-Kasse" players={puttPenaltyLeaderboard} columns={[{ label: "3 Putts", render: (p) => `${p.threePutts} × 2 €` }, { label: "4+ Putts", render: (p) => `${p.fourPlusPutts} × 4 €` }, { label: "Gesamt", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} />
           <LeaderboardTable title="Ladys" players={ladyLeaderboard} columns={[{ label: "Anzahl", render: (p) => Number(p.ladyCount || 0), emphasize: true }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
