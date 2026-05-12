@@ -67,17 +67,17 @@ const fallbackAliases = {
 };
 
 const fallbackPlayers = [
-  { id: "florian", character_name: "Florian", display_name: "Florian", alias_name: "Sliceron", sort_order: 1, course_hcp_goethe: 0, course_hcp_feininger: 0 },
-  { id: "mucky", character_name: "Mucky", display_name: "Mucky", alias_name: "Gimme", sort_order: 2, course_hcp_goethe: 0, course_hcp_feininger: 0 },
-  { id: "kio", character_name: "Kio", display_name: "Kio", alias_name: "Foredo", sort_order: 3, course_hcp_goethe: 0, course_hcp_feininger: 0 },
-  { id: "andreas", character_name: "Andreas", display_name: "Andreas", alias_name: "Bogeymir", sort_order: 4, course_hcp_goethe: 0, course_hcp_feininger: 0 },
-  { id: "achim", character_name: "Achim", display_name: "Achim", alias_name: "Gangolf", sort_order: 5, course_hcp_goethe: 0, course_hcp_feininger: 0 },
-  { id: "phillip", character_name: "Phillip", display_name: "Phillip", alias_name: "Golfum", sort_order: 6, course_hcp_goethe: 0, course_hcp_feininger: 0 },
+  { id: "florian", character_name: "Florian", display_name: "Florian", alias_name: "Sliceron", sort_order: 1, handicap_index: 0, course_hcp_goethe: 0, course_hcp_feininger: 0 },
+  { id: "mucky", character_name: "Mucky", display_name: "Mucky", alias_name: "Gimme", sort_order: 2, handicap_index: 0, course_hcp_goethe: 0, course_hcp_feininger: 0 },
+  { id: "kio", character_name: "Kio", display_name: "Kio", alias_name: "Foredo", sort_order: 3, handicap_index: 0, course_hcp_goethe: 0, course_hcp_feininger: 0 },
+  { id: "andreas", character_name: "Andreas", display_name: "Andreas", alias_name: "Bogeymir", sort_order: 4, handicap_index: 0, course_hcp_goethe: 0, course_hcp_feininger: 0 },
+  { id: "achim", character_name: "Achim", display_name: "Achim", alias_name: "Gangolf", sort_order: 5, handicap_index: 0, course_hcp_goethe: 0, course_hcp_feininger: 0 },
+  { id: "phillip", character_name: "Phillip", display_name: "Phillip", alias_name: "Golfum", sort_order: 6, handicap_index: 0, course_hcp_goethe: 0, course_hcp_feininger: 0 },
 ];
 
 const fallbackCourses = [
-  { course_id: "goethe", course_name: "Goethe Kurs" },
-  { course_id: "feininger", course_name: "Feininger Kurs" },
+  { course_id: "goethe", course_name: "Goethe Kurs", course_rating: 72.0, slope_rating: 131, par: 72 },
+  { course_id: "feininger", course_name: "Feininger Kurs", course_rating: 70.4, slope_rating: 122, par: 71 },
 ];
 
 const fallbackRounds = [
@@ -130,6 +130,16 @@ function normalizeBoolean(value) {
 
 function cleanNumericInput(value) {
   return String(value ?? "").replace(/[^0-9]/g, "");
+}
+
+function cleanHandicapInput(value) {
+  const normalized = String(value ?? "")
+    .replace(",", ".")
+    .replace(/[^0-9.-]/g, "");
+  const firstMinus = normalized.startsWith("-") ? "-" : "";
+  const withoutMinus = normalized.replace(/-/g, "");
+  const parts = withoutMinus.split(".");
+  return firstMinus + parts[0] + (parts.length > 1 ? "." + parts.slice(1).join("") : "");
 }
 
 function readLocalJson(key, fallback) {
@@ -274,22 +284,52 @@ function getCourseHcpKey(playerId, courseId) {
   return `${playerId}_${String(courseId || "goethe").toLowerCase().trim()}`;
 }
 
-function getCourseHandicap(player, courseId = "goethe") {
+function roundPlayingHandicap(value) {
+  return Math.round(Number(value || 0));
+}
+
+function getCourseSettings(id, list = fallbackCourses) {
+  const cid = String(id || "goethe").toLowerCase().trim();
+  const known = cid === "feininger" ? fallbackCourses[1] : fallbackCourses[0];
+  const fromList = (list || []).find((item) => String(item?.course_id || "").toLowerCase().trim() === cid);
+  return fromList || known;
+}
+
+function calculatePlayingHandicap(handicapIndex, course) {
+  const hcpIndex = Number(String(handicapIndex ?? "0").replace(",", ".") || 0);
+  const slope = Number(course?.slope_rating || 113);
+  const courseRating = Number(course?.course_rating || course?.rating || course?.cr || course?.par || 72);
+  const par = Number(course?.par || 72);
+  return roundPlayingHandicap(hcpIndex * (slope / 113) + (courseRating - par));
+}
+
+function getHandicapIndex(player) {
+  const rawValue = player?.handicap_index ?? player?.dgv_hcp ?? player?.hcp_index ?? "";
+  if (rawValue === "" || rawValue == null) return null;
+  return Number(String(rawValue).replace(",", "."));
+}
+
+function getCourseHandicap(player, courseId = "goethe", courses = fallbackCourses) {
+  const handicapIndex = getHandicapIndex(player);
+  if (handicapIndex != null && !Number.isNaN(handicapIndex)) {
+    return calculatePlayingHandicap(handicapIndex, getCourseSettings(courseId, courses));
+  }
+
   const normalizedCourseId = String(courseId || "goethe").toLowerCase().trim();
   if (normalizedCourseId === "feininger") return Number(player?.course_hcp_feininger ?? 0);
   return Number(player?.course_hcp_goethe ?? 0);
 }
 
-function getPlayerForCourse(player, courseId = "goethe") {
+function getPlayerForCourse(player, courseId = "goethe", courses = fallbackCourses) {
   if (!player) return null;
   return {
     ...withFallbackAlias(player),
-    course_hcp: getCourseHandicap(player, courseId),
+    course_hcp: getCourseHandicap(player, courseId, courses),
   };
 }
 
-function getPlayersForCourse(players, courseId = "goethe") {
-  return players.map((player) => getPlayerForCourse(player, courseId)).filter(Boolean);
+function getPlayersForCourse(players, courseId = "goethe", courses = fallbackCourses) {
+  return players.map((player) => getPlayerForCourse(player, courseId, courses)).filter(Boolean);
 }
 
 function getShotsOnHole(courseHcp, holeHcp) {
@@ -602,6 +642,8 @@ function runSelfTests() {
   assert("alias fallback works", getPlayerLabel({ id: "florian", character_name: "Florian" }) === "Sliceron (Florian)");
   assert("explicit alias overrides fallback", getPlayerLabel({ id: "florian", character_name: "Florian", alias_name: "Captain Slice" }) === "Captain Slice (Florian)");
   assert("feininger handicap selected", getPlayerForCourse({ id: "x", course_hcp_goethe: 1, course_hcp_feininger: 9 }, "feininger")?.course_hcp === 9);
+  assert("goethe DGV HCP 10 gives playing handicap 12", getCourseHandicap({ id: "x", handicap_index: 10 }, "goethe", fallbackCourses) === 12);
+  assert("feininger DGV HCP 10 gives playing handicap 10", getCourseHandicap({ id: "x", handicap_index: 10 }, "feininger", fallbackCourses) === 10);
 
   const stats = buildPlayerStats(fallbackPlayers.slice(0, 2), fallbackHoles.slice(0, 2), [
     { round_id: "r1", player_id: "florian", hole_number: 1, strokes: 4, over_two_putts: false, putts_count: "" },
@@ -946,8 +988,8 @@ function ScorecardArchive({ rounds, courses, players, roundPlayers, holes, score
   };
 
   return (
-    <Card className="mb-3 rounded-2xl border-amber-700/40 bg-[#20170f]/90 shadow-xl">
-      <CardContent className="p-3">
+    <Card className="mb-3 rounded-2xl border-amber-700/40 bg-[#20170f]/90 shadow-xl landscape:rounded-xl">
+      <CardContent className="p-3 landscape:p-2">
         <div className="mb-3">
           <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Scorekarten</p>
           <h2 className="font-serif text-lg text-amber-200">Klassische Scorekarte je Spieler</h2>
@@ -1004,7 +1046,7 @@ function ScorecardArchive({ rounds, courses, players, roundPlayers, holes, score
                       <td className="px-2.5 py-1.5 text-right">{row.hole.meters}</td>
                       <td className="px-2.5 py-1.5 text-right">{row.hole.par}</td>
                       <td className="px-2.5 py-1.5 text-right">{row.hole.hcp}</td>
-                      <td className="px-2.5 py-1.5 text-right font-semibold text-amber-200">{row.strokes == null ? "–" : row.isPickedUp ? `${row.strokes} gestr.` : row.strokes}</td>
+                      <td className="px-2.5 py-1.5 text-right font-semibold text-amber-200">{row.strokes == null ? "–" : row.isPickedUp ? "X" : row.strokes}</td>
                       <td className="px-2.5 py-1.5 text-right">{row.toPar == null ? "–" : formatToPar(row.toPar)}</td>
                       <td className="px-2.5 py-1.5 text-right">{row.strokes == null ? "–" : row.netStableford}</td>
                       <td className="px-2.5 py-1.5 text-right">{row.strokes == null ? "–" : row.grossStableford}</td>
@@ -1094,7 +1136,7 @@ function LordOfTheHolesApp() {
     const filteredPlayers = myPlayerId ? visiblePlayers.filter((p) => String(p.id) !== String(myPlayerId)) : visiblePlayers;
     return filteredPlayers.length ? filteredPlayers : visiblePlayers;
   }, [visiblePlayers, myPlayerId]);
-  const playersWithCurrentHandicaps = useMemo(() => getPlayersForCourse(visiblePlayers, displayCourseId), [visiblePlayers, displayCourseId]);
+  const playersWithCurrentHandicaps = useMemo(() => getPlayersForCourse(visiblePlayers, displayCourseId, courses), [visiblePlayers, displayCourseId, courses]);
   const activeHoleData = holes.find((h) => Number(h.hole_number) === activeHole) || holes[activeHole - 1] || fallbackHoles[activeHole - 1];
   const scoredPlayerBase = scoreablePlayers.find((p) => p.id === scoredPlayerId);
   const scoredPlayer = getPlayerForCourse(scoredPlayerBase, displayCourseId);
@@ -1210,8 +1252,9 @@ function LordOfTheHolesApp() {
     if (adminEditing) return;
     const nextHandicaps = {};
     nextAllPlayers.forEach((player) => {
-      nextHandicaps[getCourseHcpKey(player.id, "goethe")] = String(player.course_hcp_goethe ?? 0);
-      nextHandicaps[getCourseHcpKey(player.id, "feininger")] = String(player.course_hcp_feininger ?? 0);
+      nextHandicaps[`hcp_index_${player.id}`] = String(player.handicap_index ?? player.dgv_hcp ?? player.hcp_index ?? "");
+      nextHandicaps[getCourseHcpKey(player.id, "goethe")] = String(getCourseHandicap(player, "goethe", courses));
+      nextHandicaps[getCourseHcpKey(player.id, "feininger")] = String(getCourseHandicap(player, "feininger", courses));
     });
     setLocalHandicaps(nextHandicaps);
   }
@@ -1320,14 +1363,18 @@ function LordOfTheHolesApp() {
   async function saveFullSetup() {
     setSetupSavedMessage("");
     const nextAllPlayers = allPlayers.map((p) => {
-      const goetheKey = getCourseHcpKey(p.id, "goethe");
-      const feiningerKey = getCourseHcpKey(p.id, "feininger");
-      const goetheValue = cleanNumericInput(localHandicaps[goetheKey]);
-      const feiningerValue = cleanNumericInput(localHandicaps[feiningerKey]);
-      return {
+      const hcpIndexKey = `hcp_index_${p.id}`;
+      const hcpIndexInput = cleanHandicapInput(localHandicaps[hcpIndexKey] ?? p.handicap_index ?? p.dgv_hcp ?? p.hcp_index ?? "");
+      const handicapIndex = hcpIndexInput === "" || hcpIndexInput === "-" ? 0 : Number(hcpIndexInput);
+      const nextPlayer = {
         ...p,
-        course_hcp_goethe: goetheValue !== "" ? Number(goetheValue) : Number(p.course_hcp_goethe ?? 0),
-        course_hcp_feininger: feiningerValue !== "" ? Number(feiningerValue) : Number(p.course_hcp_feininger ?? 0),
+        handicap_index: handicapIndex,
+      };
+
+      return {
+        ...nextPlayer,
+        course_hcp_goethe: getCourseHandicap(nextPlayer, "goethe", courses),
+        course_hcp_feininger: getCourseHandicap(nextPlayer, "feininger", courses),
       };
     });
 
@@ -1348,6 +1395,7 @@ function LordOfTheHolesApp() {
           display_name: p.display_name,
           alias_name: p.alias_name || fallbackAliases[p.id] || "",
           sort_order: p.sort_order,
+          handicap_index: p.handicap_index,
           course_hcp_goethe: p.course_hcp_goethe,
           course_hcp_feininger: p.course_hcp_feininger,
         })),
@@ -1481,19 +1529,24 @@ function LordOfTheHolesApp() {
             </div>
             <div className="space-y-2">
               {allPlayers.map((p) => {
-                const goetheKey = getCourseHcpKey(p.id, "goethe");
-                const feiningerKey = getCourseHcpKey(p.id, "feininger");
+                const hcpIndexKey = `hcp_index_${p.id}`;
+                const hcpIndexValue = localHandicaps[hcpIndexKey] ?? String(p.handicap_index ?? p.dgv_hcp ?? p.hcp_index ?? "");
+                const previewPlayer = {
+                  ...p,
+                  handicap_index: hcpIndexValue === "" || hcpIndexValue === "-" ? 0 : Number(String(hcpIndexValue).replace(",", ".")),
+                };
+                const goetheSpv = getCourseHandicap(previewPlayer, "goethe", courses);
+                const feiningerSpv = getCourseHandicap(previewPlayer, "feininger", courses);
+
                 return (
                   <div key={p.id} className="rounded-xl border border-amber-700/30 bg-black/25 p-2.5">
-                    <div className="mb-2 font-semibold text-amber-100">{getPlayerLabel(p)}<div className="text-xs font-normal text-amber-100/70">2 Kurs-Spielvorgaben</div></div>
-                    <div className="grid grid-cols-1 gap-2">
-                      <div className="rounded-xl border border-amber-700/20 bg-black/20 p-2">
-                        <label className="mb-1 block text-xs font-bold uppercase tracking-[0.16em] text-amber-300/80">Goethe Spielvorgabe</label>
-                        <input inputMode="numeric" disabled={!isAdminUnlocked} value={localHandicaps[goetheKey] ?? String(p.course_hcp_goethe ?? 0)} onChange={(e) => { setAdminEditing(true); setLocalHandicaps((current) => ({ ...current, [goetheKey]: cleanNumericInput(e.target.value) })); }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2.5 text-center text-amber-50 disabled:opacity-60" />
-                      </div>
-                      <div className="rounded-xl border border-amber-700/20 bg-black/20 p-2">
-                        <label className="mb-1 block text-xs font-bold uppercase tracking-[0.16em] text-amber-300/80">Feininger Spielvorgabe</label>
-                        <input inputMode="numeric" disabled={!isAdminUnlocked} value={localHandicaps[feiningerKey] ?? String(p.course_hcp_feininger ?? 0)} onChange={(e) => { setAdminEditing(true); setLocalHandicaps((current) => ({ ...current, [feiningerKey]: cleanNumericInput(e.target.value) })); }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2.5 text-center text-amber-50 disabled:opacity-60" />
+                    <div className="mb-2 font-semibold text-amber-100">{getPlayerLabel(p)}<div className="text-xs font-normal text-amber-100/70">DGV-HCP eintragen · Spielvorgabe wird automatisch berechnet</div></div>
+                    <div className="rounded-xl border border-amber-700/20 bg-black/20 p-2">
+                      <label className="mb-1 block text-xs font-bold uppercase tracking-[0.16em] text-amber-300/80">DGV HCP / Handicap Index</label>
+                      <input inputMode="decimal" disabled={!isAdminUnlocked} value={hcpIndexValue} onChange={(e) => { setAdminEditing(true); setLocalHandicaps((current) => ({ ...current, [hcpIndexKey]: cleanHandicapInput(e.target.value) })); }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2.5 text-center text-amber-50 disabled:opacity-60" />
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-center text-xs text-amber-100/75">
+                        <div className="rounded-xl bg-amber-50/5 p-2"><div>Goethe SpV</div><b className="text-lg text-amber-200">{goetheSpv}</b></div>
+                        <div className="rounded-xl bg-amber-50/5 p-2"><div>Feininger SpV</div><b className="text-lg text-amber-200">{feiningerSpv}</b></div>
                       </div>
                     </div>
                   </div>
