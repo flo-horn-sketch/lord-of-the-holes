@@ -626,10 +626,11 @@ function runSelfTests() {
 
 if (typeof window !== "undefined") runSelfTests();
 
-function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", helper = "", status = "", onChange, formatValue }) {
+function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", helper = "", status = "", defaultValue = null, onChange, formatValue }) {
   const hasValue = value !== "" && value != null;
-  const selected = hasValue ? Math.max(min, Math.min(max, Number(value || 0))) : min;
-  const shownValue = hasValue ? (formatValue ? formatValue(selected) : selected) : emptyLabel;
+  const fallbackValue = defaultValue == null ? min : Number(defaultValue);
+  const baseValue = Math.max(min, Math.min(max, Number(hasValue ? value : fallbackValue)));
+  const shownValue = hasValue || defaultValue != null ? (formatValue ? formatValue(baseValue) : baseValue) : emptyLabel;
   const setValue = (nextValue) => onChange(Math.max(min, Math.min(max, Number(nextValue || 0))));
 
   return (
@@ -645,8 +646,8 @@ function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", hel
       <div className="grid grid-cols-[48px_1fr_48px] items-center gap-2">
         <button
           type="button"
-          onClick={() => setValue((hasValue ? selected : min) - 1)}
-          disabled={!hasValue || selected <= min}
+          onClick={() => setValue(baseValue - 1)}
+          disabled={baseValue <= min}
           className="h-12 rounded-xl border border-amber-700/50 bg-stone-950 text-2xl font-black leading-none text-amber-100 disabled:opacity-35"
           aria-label={`${label} verringern`}
         >
@@ -655,7 +656,7 @@ function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", hel
 
         <button
           type="button"
-          onClick={() => setValue(hasValue ? selected : min)}
+          onClick={() => setValue(baseValue)}
           className="h-12 rounded-xl border border-amber-700/30 bg-stone-950/70 text-center shadow-inner shadow-black/60"
           aria-label={`${label} auswählen`}
         >
@@ -665,8 +666,8 @@ function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", hel
 
         <button
           type="button"
-          onClick={() => setValue((hasValue ? selected : min) + 1)}
-          disabled={hasValue && selected >= max}
+          onClick={() => setValue(baseValue + 1)}
+          disabled={baseValue >= max}
           className="h-12 rounded-xl border border-amber-700/50 bg-stone-950 text-2xl font-black leading-none text-amber-100 disabled:opacity-35"
           aria-label={`${label} erhöhen`}
         >
@@ -678,8 +679,9 @@ function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", hel
 }
 
 function PuttStepper({ value, onChange }) {
-  const selected = Number(value || 0);
-  const snakeLabel = selected >= 4 ? "4+ · 4 €" : selected === 3 ? "3 · 2 €" : selected > 0 ? "keine Snake" : "offen";
+  const hasValue = value !== "" && value != null;
+  const selected = hasValue ? Number(value || 0) : 2;
+  const snakeLabel = selected >= 4 ? "4+ · 4 €" : selected === 3 ? "3 · 2 €" : "keine Snake";
 
   return (
     <TouchStepper
@@ -687,8 +689,9 @@ function PuttStepper({ value, onChange }) {
       value={value || ""}
       min={1}
       max={6}
-      emptyLabel="–"
-      helper="1–6 per Touch"
+      emptyLabel="2"
+      defaultValue={2}
+      helper="Start 2 · erst bei Touch gespeichert"
       status={snakeLabel}
       onChange={onChange}
     />
@@ -712,15 +715,17 @@ function getScoreRelationLabel(score, par) {
 }
 
 function ScoreStepper({ value, par, onChange }) {
-  const relationLabel = getScoreRelationLabel(value, par);
+  const displayScore = value === "" || value == null ? Number(par || 4) : value;
+  const relationLabel = getScoreRelationLabel(displayScore, par);
   return (
     <TouchStepper
       label="Score"
       value={value}
       min={0}
       max={12}
-      emptyLabel="–"
-      helper="0 = Loch gestrichen"
+      emptyLabel={String(par || 4)}
+      defaultValue={Number(par || 4)}
+      helper="0 = gestrichen · erst bei Touch gespeichert"
       status={value === "" || value == null ? `Start Par ${par || 4}` : relationLabel}
       formatValue={(nextValue) => (Number(nextValue) === 0 ? "–" : nextValue)}
       onChange={onChange}
