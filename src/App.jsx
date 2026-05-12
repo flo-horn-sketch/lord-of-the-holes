@@ -1251,15 +1251,15 @@ function MiddleEarthTables({ players, holes, scores, mismatches }) {
 
         <FunTable title="Shelobs Putt-Kammer" subtitle="Snake-König der Runde" players={snakeLords} columns={[{ label: "3P", render: (p) => p.threePutts }, { label: "4+P", render: (p) => p.fourPlusPutts }, { label: "€", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} />
         <FunTable title="Galadriels Spiegel" subtitle="Lady-Liga" players={ladies} columns={[{ label: "Ladys", render: (p) => p.ladyCount, emphasize: true }, { label: "Quote", render: (p) => p.played ? `${Math.round((p.ladyCount / p.played) * 100)} %` : "–" }]} />
-        öcher" players={whiteFlags} columns={[{ label: "X", render: (p) => p.pickedUpCount, emphasize: true }, { label: "Quote", render: (p) => p.played ? `${Math.round((p.pickedUpCount / p.played) * 100)} %` : "–" }]} />
+        <FunTable title="Die weißen Fahnen von Minas Tirith" subtitle="Gestrichene Loecher" players={whiteFlags} columns={[{ label: "X", render: (p) => p.pickedUpCount, emphasize: true }, { label: "Quote", render: (p) => p.played ? `${Math.round((p.pickedUpCount / p.played) * 100)} %` : "–" }]} />
         <FunTable title="Die Ents der Fairways" subtitle="Par oder besser" players={parMachines} columns={[{ label: "Par+", render: (p) => p.parOrBetter, emphasize: true }, { label: "Pars", render: (p) => p.pars }, { label: "Birdie+", render: (p) => p.birdies + p.eaglesOrBetter }]} />
         <FunTable title="Die Adler von Manwë" subtitle="Birdie-Jäger" players={birdieHunters} columns={[{ label: "Eagle+", render: (p) => p.eaglesOrBetter }, { label: "Birdies", render: (p) => p.birdies }, { label: "Summe", render: (p) => p.birdies + p.eaglesOrBetter, emphasize: true }]} />
-        <FunTable title="Morias Strafregister" subtitle="Doppelbogey oder schlimmer"geyPlus, emphasize: true }, { label: "Triple+", render: (p) => p.triplePlus }, { label: "X", render: (p) => p.pickedUpCount }]} />
+        <FunTable title="Morias Strafregister" subtitle="Doppelbogey oder schlimmer" players={bogeyBunkers} columns={[{ label: "DB+", render: (p) => p.doubleBogeyPlus, emphasize: true }, { label: "Triple+", render: (p) => p.triplePlus }, { label: "X", render: (p) => p.pickedUpCount }]} />
         <FunTable title="Die Rückkehr des Königs" subtitle="Back Nine besser als Front Nine" players={comebackKings} columns={[{ label: "Front", render: (p) => formatToPar(p.frontToPar, p.frontToPar != null) }, { label: "Back", render: (p) => formatToPar(p.backToPar, p.backToPar != null) }, { label: "Swing", render: (p) => formatToPar(p.backMinusFront, p.backMinusFront != null), emphasize: true }]} />
         <FunTable title="Der Balrog an Loch 10" subtitle="Back Nine schwerer als Front Nine" players={balrogFalls} columns={[{ label: "Front", render: (p) => formatToPar(p.frontToPar, p.frontToPar != null) }, { label: "Back", render: (p) => formatToPar(p.backToPar, p.backToPar != null) }, { label: "Absturz", render: (p) => formatToPar(p.backMinusFront, p.backMinusFront != null), emphasize: true }]} />
         <FunTable title="Der Schicksalsberg" subtitle="Härtestes Loch des Feldes" players={hardestHoles} columns={[{ label: "Par", render: (h) => h.par }, { label: "Ø +/−", render: (h) => formatToPar(Math.round(h.avgToPar * 10) / 10, h.played), emphasize: true }, { label: "X", render: (h) => h.pickedUpCount }, { label: "Snake", render: (h) => h.snakes }]} />
         <FunTable title="Bruchtal" subtitle="Lieblingsloch des Feldes" players={favoriteHoles} columns={[{ label: "Par", render: (h) => h.par }, { label: "Ø +/−", render: (h) => formatToPar(Math.round(h.avgToPar * 10) / 10, h.played), emphasize: true }, { label: "Birdies", render: (h) => h.birdies }, { label: "Pars", render: (h) => h.pars }]} />
-        <FunTable title="Gollums Schatzkammer" subtitle="Netto minus Brutto Stableford" players={hcpRaiders} columns={[{ label: "Netto", render: (p) => p.netSthatz", render: (p) => p.hcpBonus, emphasize: true }]} />
+        <FunTable title="Gollums Schatzkammer" subtitle="Netto minus Brutto Stableford" players={hcpRaiders} columns={[{ label: "Netto", render: (p) => p.netStableford }, { label: "Brutto", render: (p) => p.grossStableford }, { label: "Schatz", render: (p) => p.hcpBonus, emphasize: true }]} />
         <FunTable title="Mithril-Ausbeute" subtitle="Netto-Punkte je erhaltenem Schlag" players={mithrilMiners} columns={[{ label: "SpV genutzt", render: (p) => p.hcpShotsUsed }, { label: "Netto", render: (p) => p.netStableford }, { label: "Quote", render: (p) => p.hcpShotsUsed ? p.pointsPerHcpShot : "–", emphasize: true }]} />
         
       </CardContent>
@@ -1282,9 +1282,11 @@ function TournamentStandings({ players, rounds, holes, scores, activeRoundId = "
         <div className="mb-3 landscape:mb-2">
           <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Turnier</p>
           <h2 className="font-serif text-lg text-amber-200">{isFinalActive ? "Finalwertung Strokes HCP adjusted" : "Gesamtwertung Strokes HCP adjusted"}</h2>
+          {isFinalActive ? <div className="mt-0.5 text-sm font-semibold text-amber-300/85">Am Schicksalsberg · Nur einer trägt den Ring.</div> : null}
           <p className="mt-1 text-sm text-amber-100/70">
-            {isFinalActiv<h2 className="font-serif text-lg text-amber-200">{isFinalActive ? "Finalwertung Strokes HCP adjusted" : "Gesamtwertung Strokes HCP adjusted"}</h2>
-          {isFinalActive ? <div className="mt-0.5 text-sm font-semibold text-amber-300/85">Am Schicksalsberg · Nur einer trägt den Ring.</div> : null}zählen die besten zwei Strokes-HCP-adjusted-Ergebnisse aus den ersten drei Runden. Niedriger ist besser. Nach Platz 3 liegt der aktuelle Cut."}
+            {isFinalActive
+              ? "Finaltag: Top 3 nach der Qualifikation spielen Plätze 1–3 aus. Die übrigen Spieler spielen Plätze 4–6 aus."
+              : "Es zählen die besten zwei Strokes-HCP-adjusted-Ergebnisse aus den ersten drei Runden. Niedriger ist besser. Nach Platz 3 liegt der aktuelle Cut."}
           </p>
         </div>
 
@@ -1407,10 +1409,10 @@ function ScorecardArchive({ rounds, courses, players, roundPlayers, holes, score
       <CardContent className="p-3 landscape:p-2">
         <div className="mb-3">
           <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Scorekarten</p>
+          <div className="mt-0.5 text-sm font-semibold text-amber-300/85">Chroniken der Runde</div>
           <h2 className="font-serif text-lg text-amber-200">Klassische Scorekarte je Spieler</h2>
         </div>
-        <div className="mb-3 grid<p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Scorekarten</p>
-          <div className="mt-0.5 text-sm font-semibold text-amber-300/85">Chroniken der Runde</div>4 landscape:items-end landscape:gap-2">
+        <div className="mb-3 grid gap-2 rounded-xl border border-amber-700/30 bg-black/25 p-2.5 landscape:grid-cols-4 landscape:items-end landscape:gap-2">
           <label className="block text-sm text-amber-100/80">Runde</label>
           <select value={selectedRoundId} onChange={(e) => setSelectedRoundId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2.5 text-amber-50">
             {availableRounds.map((round) => <option key={round.round_id} value={round.round_id}>{archiveRoundLabel(round)}</option>)}
@@ -1675,7 +1677,11 @@ function LordOfTheHolesApp() {
     myRoundHonorRole === "lord"
       ? `Du bist ${displayedRoundHonorCelebration?.lords?.length === 1 ? "Herr" : "einer der Herren"} von Gondor.`
       : myRoundHonorRole === "shieldbearer"
-        ? "Dubst freier Gefährte. Beobachte den Hofstaat mit Würde — und einem sichereen ×"
+        ? "Du bist Schildträger. Dein Dienst beginnt — der Becher ruft."
+        : "Du bleibst freier Gefährte. Beobachte den Hofstaat mit Würde — und einem sicheren Platz am Tisch.";
+  const roundHonorCloseLabel =
+    myRoundHonorRole === "lord"
+      ? "Krone richten ×"
       : myRoundHonorRole === "shieldbearer"
         ? "Schild aufnehmen ×"
         : "Erlass zur Kenntnis nehmen ×";
@@ -2112,11 +2118,13 @@ function LordOfTheHolesApp() {
   }
 
   function renderHeader() {
-    const subtitle = mainMenu === "current" ? displayedActiveRound?.round_name || "Aktive Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "admin" ? "Admin" : "Einstellungen";
+    const activeRoundIsFinal = String(displayedActiveRound?.stage || "") === "final" || String(displayedActiveRound?.round_id || "") === "r4";
+  const subtitle = mainMenu === "current" ? activeRoundIsFinal ? "Finaltag · Am Schicksalsberg" : displayedActiveRound?.round_name || "Aktive Runde" : mainMenu === "tournament" ? activeRoundIsFinal ? "Turnier · Am Schicksalsberg" : "Turnier" : mainMenu === "archive" ? "Scorekarten · Chroniken der Runde" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "admin" ? "Admin" : "Einstellungen";
     return (
       <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-3">
-        <div className="mb-1 flexconst activeRoundIsFinal = String(displayedActiveRound?.stage || "") === "final" || String(displayedActiveRound?.round_id || "") === "r4";
-  const subtitle = mainMenu === "current" ? activeRoundIsFinal ? "Finaltag · Am Schicksalsberg" : displayedActiveRound?.round_name || "Aktive Runde" : mainMenu === "tournament" ? activeRoundIsFinal ? "Turnier · Am Schicksalsberg" : "Turnier" : mainMenu === "archive" ? "Scorekarten · Chroniken der Runde" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "admin" ? "Admin" : "Einstellungen";tton" onClick={() => setMenuOpen((value) => !value)} className="rounded-xl border border-amber-700/40 bg-black/25 px-3 py-1.5 text-lg leading-none text-amber-100" aria-label="Menü öffnen">☰</button>
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-black/35 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-amber-200">Weimarer Land</div>
+          <button type="button" onClick={() => setMenuOpen((value) => !value)} className="rounded-xl border border-amber-700/40 bg-black/25 px-3 py-1.5 text-lg leading-none text-amber-100" aria-label="Menü öffnen">☰</button>
         </div>
         <div className="relative text-center">
           <h1 className="font-serif text-3xl font-black tracking-wide text-amber-300 drop-shadow">Lord of the Holes</h1>
@@ -2599,10 +2607,16 @@ function LordOfTheHolesApp() {
 
               {displayedRoundHonorCelebration.roundOrder === 1 ? (
                 <div className="mt-3 rounded-2xl border border-amber-500/25 bg-black/20 p-2 text-sm text-amber-100/75">
-                  Der Herr von Gondor steht           </div>
+                  Der Herr von Gondor steht fest. Der Schildträger ebenso. Dein Wort gilt — und irgendwo schwitzt bereits jemand.
+                </div>
               ) : (
                 <div className="mt-3 rounded-2xl border border-amber-500/25 bg-black/20 p-2 text-sm text-amber-100/75">
-                  Die Herren von Gondor und ihre Schildträger stehen fest. Der Hofstaat ist informiert, die Becher sind gefährlich leer.           <button
+                  Die Herren von Gondor und ihre Schildträger stehen fest. Der Hofstaat ist informiert, die Becher sind gefährlich leer.
+                </div>
+              )}
+            </div>
+            <div className="p-3">
+              <button
                 type="button"
                 onClick={() => setRoundHonorDismissedKeys((current) => Array.from(new Set([...(current || []), displayedRoundHonorCelebration.key])))}
                 className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-3 text-sm font-bold text-amber-50"
