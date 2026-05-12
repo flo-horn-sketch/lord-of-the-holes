@@ -978,7 +978,7 @@ function LeaderboardTable({ title, players, columns }) {
   );
 }
 
-function FunTable({ title, subtitle = "", players, columns }) {
+function FunTable({ title, subtitle = "", players, columns, nameLabel = "Name" }) {
   return (
     <div className="mb-3 overflow-hidden rounded-2xl border border-amber-700/30 bg-black/20">
       <div className="border-b border-amber-700/30 bg-amber-500/10 px-2.5 py-1.5">
@@ -990,7 +990,7 @@ function FunTable({ title, subtitle = "", players, columns }) {
           <thead>
             <tr className="text-left text-xs uppercase tracking-wider text-amber-100">
               <th className="px-2.5 py-1.5">#</th>
-              <th className="px-2.5 py-1.5">Name</th>
+              <th className="px-2.5 py-1.5">{nameLabel}</th>
               {columns.map((column) => (
                 <th key={column.label} className="px-2.5 py-1.5 text-right">{column.label}</th>
               ))}
@@ -998,11 +998,11 @@ function FunTable({ title, subtitle = "", players, columns }) {
           </thead>
           <tbody>
             {players.map((item, index) => (
-              <tr key={item.id || item.hole_number || index} className="border-t border-amber-700/20">
+              <tr key={item.id || `${item.hole_number}-${index}` || index} className="border-t border-amber-700/20">
                 <td className="px-2.5 py-1.5 text-amber-200/75">{index + 1}</td>
                 <td className="px-2.5 py-1.5 font-semibold text-amber-100">{item.hole_number ? `Loch ${item.hole_number}` : (item.character_name || item.display_name || item.id)}</td>
                 {columns.map((column) => (
-                  <td key={column.label} className={cls("px-2.5 py-1.5 text-right", column.emphasize && "font-serif text-lg text-amber-300")}>{column.render(item)}</td>
+                  <td key={column.label} className={cls("px-2.5 py-1.5 text-right", column.emphasize && "font-serif text-lg text-amber-300")}>{column.render(item, index)}</td>
                 ))}
               </tr>
             ))}
@@ -1048,11 +1048,11 @@ function MiddleEarthTables({ players, holes, scores, mismatches }) {
         <FunTable title="Die Minen von Moria" subtitle="Doppelbogey oder schlimmer" players={bogeyBunkers} columns={[{ label: "DB+", render: (p) => p.doubleBogeyPlus, emphasize: true }, { label: "Triple+", render: (p) => p.triplePlus }, { label: "X", render: (p) => p.pickedUpCount }]} />
         <FunTable title="Die Rückkehr des Königs" subtitle="Back Nine besser als Front Nine" players={comebackKings} columns={[{ label: "Front", render: (p) => formatToPar(p.frontToPar, p.frontToPar != null) }, { label: "Back", render: (p) => formatToPar(p.backToPar, p.backToPar != null) }, { label: "Swing", render: (p) => formatToPar(p.backMinusFront, p.backMinusFront != null), emphasize: true }]} />
         <FunTable title="Der Balrog an Loch 10" subtitle="Back Nine schwerer als Front Nine" players={balrogFalls} columns={[{ label: "Front", render: (p) => formatToPar(p.frontToPar, p.frontToPar != null) }, { label: "Back", render: (p) => formatToPar(p.backToPar, p.backToPar != null) }, { label: "Absturz", render: (p) => formatToPar(p.backMinusFront, p.backMinusFront != null), emphasize: true }]} />
-        <FunTable title="Der Schicksalsberg" subtitle="Härtestes Loch des Feldes" players={hardestHoles} columns={[{ label: "Par", render: (h) => h.par }, { label: "Ø +/−", render: (h) => formatToPar(Math.round(h.avgToPar * 10) / 10, h.played), emphasize: true }, { label: "X", render: (h) => h.pickedUpCount }, { label: "Snake", render: (h) => h.snakes }]} />
-        <FunTable title="Bruchtal" subtitle="Lieblingsloch des Feldes" players={favoriteHoles} columns={[{ label: "Par", render: (h) => h.par }, { label: "Ø +/−", render: (h) => formatToPar(Math.round(h.avgToPar * 10) / 10, h.played), emphasize: true }, { label: "Birdies", render: (h) => h.birdies }, { label: "Pars", render: (h) => h.pars }]} />
+        <FunTable title="Der Schicksalsberg" subtitle="Härtestes Loch des Feldes" nameLabel="Platz / Loch" players={hardestHoles} columns={[{ label: "Loch", render: (h) => h.hole_number }, { label: "Par", render: (h) => h.par }, { label: "Ø +/−", render: (h) => formatToPar(Math.round(h.avgToPar * 10) / 10, h.played), emphasize: true }, { label: "X", render: (h) => h.pickedUpCount }, { label: "Snake", render: (h) => h.snakes }]} />
+        <FunTable title="Bruchtal" subtitle="Lieblingsloch des Feldes" nameLabel="Platz / Loch" players={favoriteHoles} columns={[{ label: "Loch", render: (h) => h.hole_number }, { label: "Par", render: (h) => h.par }, { label: "Ø +/−", render: (h) => formatToPar(Math.round(h.avgToPar * 10) / 10, h.played), emphasize: true }, { label: "Birdies", render: (h) => h.birdies }, { label: "Pars", render: (h) => h.pars }]} />
         <FunTable title="Gollums Netto-Schatz" subtitle="Netto minus Brutto Stableford" players={hcpRaiders} columns={[{ label: "Netto", render: (p) => p.netStableford }, { label: "Brutto", render: (p) => p.grossStableford }, { label: "Schatz", render: (p) => p.hcpBonus, emphasize: true }]} />
         <FunTable title="Mithril pro Vorgabeschlag" subtitle="Netto-Punkte je erhaltenem Schlag" players={mithrilMiners} columns={[{ label: "SpV genutzt", render: (p) => p.hcpShotsUsed }, { label: "Netto", render: (p) => p.netStableford }, { label: "Quote", render: (p) => p.hcpShotsUsed ? p.pointsPerHcpShot : "–", emphasize: true }]} />
-        <FunTable title="Der Palantír" subtitle="Nur echte Abweichungen, wenn beide Scores vorhanden sind" players={palantirStats} columns={[{ label: "Als Spieler", render: (p) => p.asPlayer }, { label: "Als Zähler", render: (p) => p.asScorer }, { label: "Total", render: (p) => p.total, emphasize: true }]} />
+        
       </CardContent>
     </Card>
   );
