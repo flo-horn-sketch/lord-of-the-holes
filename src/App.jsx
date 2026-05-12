@@ -533,13 +533,21 @@ function getFinalRound(rounds) {
   return (rounds?.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === "r4") || (rounds?.length ? rounds : fallbackRounds).find((round) => String(round.stage) === "final") || fallbackRounds[3];
 }
 
-function buildTournamentNetStandings(players, rounds, holes, scores) {
-  const qualificationRounds = getQualificationRounds(rounds);
-  return (players || [])
-    .map((player) => {
-      const roundResults = qualificationRounds.map((round) => {
-        const roundHoles = getRoundHoles(round, holes);
-        const roundScores = (scores || []).filter((score) => String(score.round_id) === String(round.round_id) && String(score.player_id) === String(player.id) && score.strokes !== "" && score.strokes != null);
+function getRoundChapterLabel(round) {
+  const roundId = String(round?.round_id || "").trim();
+  const sortOrder = Number(round?.sort_order || 0);
+  const stage = String(round?.stage || "").toLowerCase().trim();
+
+  if (stage === "final" || roundId === "r4" || sortOrder === 4) return "Finaltag · Am Schicksalsberg";
+  if (roundId === "r1" || sortOrder === 1) return "Runde 1 · Die Gefährten brechen auf";
+  if (roundId === "r2" || sortOrder === 2) return "Runde 2 · Durch die Minen";
+  if (roundId === "r3" || sortOrder === 3) return "Runde 3 · Vor den Toren Mordors";
+
+  const roundName = round?.round_name || "Runde";
+  return `${roundName} · Kapitel der Runde`;
+}
+
+function buildTournamentNetStandings = (scores || []).filter((score) => String(score.round_id) === String(round.round_id) && String(score.player_id) === String(player.id) && score.strokes !== "" && score.strokes != null);
         const playerForRound = getPlayerForCourse(player, round.course_id || "goethe");
         const grossStrokes = roundScores.reduce((sum, score) => sum + Number(score.strokes || 0), 0);
         const hcpShotsUsed = roundScores.reduce((sum, score) => {
@@ -2119,18 +2127,10 @@ function LordOfTheHolesApp() {
 
   function renderHeader() {
     const activeRoundIsFinal = String(displayedActiveRound?.stage || "") === "final" || String(displayedActiveRound?.round_id || "") === "r4";
-  const subtitle = mainMenu === "current" ? activeRoundIsFinal ? "Finaltag · Am Schicksalsberg" : displayedActiveRound?.round_name || "Aktive Runde" : mainMenu === "tournament" ? activeRoundIsFinal ? "Turnier · Am Schicksalsberg" : "Turnier" : mainMenu === "archive" ? "Scorekarten · Chroniken der Runde" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "admin" ? "Admin" : "Einstellungen";
-    return (
-      <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-3">
-        <div className="mb-1 flex items-center justify-between gap-2">
-          <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-black/35 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-amber-200">Weimarer Land</div>
-          <button type="button" onClick={() => setMenuOpen((value) => !value)} className="rounded-xl border border-amber-700/40 bg-black/25 px-3 py-1.5 text-lg leading-none text-amber-100" aria-label="Menü öffnen">☰</button>
-        </div>
-        <div className="relative text-center">
-          <h1 className="font-serif text-3xl font-black tracking-wide text-amber-300 drop-shadow">Lord of the Holes</h1>
-          <p className="mt-0.5 text-xs text-amber-100/75">{subtitle}</p>
-          {menuOpen && (
-            <div className="absolute right-0 top-[58px] z-30 w-64 overflow-hidden rounded-2xl border border-amber-700/40 bg-stone-950/95 text-left shadow-2xl shadow-black/70 backdrop-blur">
+  const subtitle = mainMenu === "current" ? activeRoundIsFinal ? "Finaltag · Am Schicksalsberg" : displayedActiveRound?.round_name || "Aktive Runde" : const activeRoundIsFinal = String(displayedActiveRound?.stage || "") === "final" || String(displayedActiveRound?.round_id || "") === "r4";
+  const activeRoundChapterLabel = getRoundChapterLabel(displayedActiveRound);
+  const subtitle = mainMenu === "current" ? activeRoundChapterLabel : mainMenu === "tournament" ? activeRoundIsFinal ? "Turnier · Am Schicksalsberg" : "Turnier · Kapitel der Gefährten" : mainMenu === "archive" ? "Scorekarten · Chroniken der Runde" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "admin" ? "Admin" : "Eiack/35 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-amber-200">Weimarer Land</div>
+          <button type="button" onClick={(verflow-hidden rounded-2xl border border-amber-700/40 bg-stone-950/95 text-left shadow-2xl shadow-black/70 backdrop-blur">
               {[
                 ["current", "Aktuelle Runde"],
                 ["tournament", "Turnier"],
