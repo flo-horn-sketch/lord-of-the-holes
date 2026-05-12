@@ -1038,7 +1038,7 @@ function LeaderboardTable({ title, players, columns }) {
     <div className="mb-3 overflow-hidden rounded-2xl border border-amber-700/30 bg-black/20">
       <div className="border-b border-amber-700/30 bg-amber-500/10 px-2.5 py-1.5 font-serif text-lg text-amber-200">{title}</div>
       <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <table className="w-full min-w-[360px] border-collapse text-sm text-amber-50 landscape:min-w-[520px] landscape:text-xs">
+        <table className="w-full min-w-[360px] border-collapse text-sm text-amber-50 landscape:min-w-[900px] landscape:text-xs">
           <thead>
             <tr className="text-left text-xs uppercase tracking-wider text-amber-100">
               <th className="px-2.5 py-1.5">#</th>
@@ -1075,7 +1075,7 @@ function FunTable({ title, subtitle = "", players, columns, nameLabel = "Name" }
         {subtitle ? <div className="text-xs text-amber-100/60">{subtitle}</div> : null}
       </div>
       <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <table className="w-full min-w-[360px] border-collapse text-sm text-amber-50 landscape:min-w-[520px] landscape:text-xs">
+        <table className="w-full min-w-[360px] border-collapse text-sm text-amber-50 landscape:min-w-[900px] landscape:text-xs">
           <thead>
             <tr className="text-left text-xs uppercase tracking-wider text-amber-100">
               <th className="px-2.5 py-1.5">Platz</th>
@@ -1161,7 +1161,7 @@ function TournamentStandings({ players, rounds, holes, scores, activeRoundId = "
   return (
     <Card className="mb-3 rounded-2xl border-amber-700/40 bg-[#20170f]/90 shadow-xl landscape:rounded-xl">
       <CardContent className="p-3 landscape:p-2">
-        <div className="mb-3">
+        <div className="mb-3 landscape:mb-2">
           <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Turnier</p>
           <h2 className="font-serif text-lg text-amber-200">{isFinalActive ? "Finalwertung Strokes HCP adjusted" : "Gesamtwertung Strokes HCP adjusted"}</h2>
           <p className="mt-1 text-sm text-amber-100/70">
@@ -1173,7 +1173,7 @@ function TournamentStandings({ players, rounds, holes, scores, activeRoundId = "
 
         {isFinalActive ? (
           <div className="overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <table className="w-full min-w-[760px] border-collapse text-sm text-amber-50">
+            <table className="w-full min-w-[760px] border-collapse text-sm text-amber-50 landscape:min-w-[1120px] landscape:text-xs">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wider text-amber-100">
                   <th className="px-2.5 py-1.5">Platz</th>
@@ -1207,7 +1207,7 @@ function TournamentStandings({ players, rounds, holes, scores, activeRoundId = "
           </div>
         ) : (
           <div className="overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <table className="w-full min-w-[760px] border-collapse text-sm text-amber-50">
+            <table className="w-full min-w-[760px] border-collapse text-sm text-amber-50 landscape:min-w-[1120px] landscape:text-xs">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wider text-amber-100">
                   <th className="px-2.5 py-1.5">#</th>
@@ -1957,8 +1957,10 @@ function LordOfTheHolesApp() {
 
   function renderTournamentView() {
     return (
-      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
-        <TournamentStandings players={allPlayers} rounds={rounds} holes={allHoles} scores={officialAllScores} activeRoundId={displayedActiveRound?.round_id} />
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
+        <div className="landscape:mx-auto landscape:max-w-none landscape:pb-6">
+          <TournamentStandings players={allPlayers} rounds={rounds} holes={allHoles} scores={officialAllScores} activeRoundId={displayedActiveRound?.round_id} />
+        </div>
       </motion.section>
     );
   }
@@ -2217,7 +2219,7 @@ function LordOfTheHolesApp() {
   function renderLeaderboardView() {
     return (
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
-        <div className="landscape:mx-auto landscape:max-w-none">
+        <div className="landscape:mx-auto landscape:max-w-none landscape:pb-6">
           <Card className="mb-3 rounded-2xl border-amber-700/40 bg-black/35 landscape:rounded-xl"><CardContent className="p-3 text-sm text-amber-100 landscape:p-2"><div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Aktuell gespielt</div><div className="mt-1 font-serif text-lg text-amber-200">{displayedActiveRound?.round_name || "Runde 1"}</div><div className="text-amber-100/65">{activeCourse?.course_name || "Kein Kurs ausgewählt"}</div></CardContent></Card>
           <Card className="mb-3 rounded-2xl border-amber-700/40 bg-[#20170f]/90 shadow-xl"><CardContent className="p-3"><div className="mb-3"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Leaderboard</p><h2 className="font-serif text-lg text-amber-200">Die Gefährten</h2></div>
             <LeaderboardTable title="Klassisches Zählspiel" players={strokePlayLeaderboard} columns={[{ label: "+/−", render: (p) => formatToPar(p.toPar, p.played), emphasize: true }, { label: "Schläge", render: (p) => (p.played ? p.total : "–") }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
@@ -2238,7 +2240,7 @@ function LordOfTheHolesApp() {
   function renderFunView() {
     return (
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
-        <div className="landscape:mx-auto landscape:max-w-none">
+        <div className="landscape:mx-auto landscape:max-w-none landscape:pb-6">
           <MiddleEarthTables players={playersWithCurrentHandicaps} holes={holes} scores={officialScores} mismatches={roundMismatches} />
         </div>
       </motion.section>
@@ -2248,7 +2250,7 @@ function LordOfTheHolesApp() {
   function renderArchiveView() {
     return (
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
-        <div className="landscape:mx-auto landscape:max-w-none">
+        <div className="landscape:mx-auto landscape:max-w-none landscape:pb-6">
           <ScorecardArchive rounds={rounds} courses={courses} players={allPlayers} roundPlayers={roundPlayers} holes={allHoles} scores={officialAllScores} selectedCourseId={selectedCourseId} />
         </div>
       </motion.section>
