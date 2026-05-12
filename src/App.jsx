@@ -252,386 +252,30 @@ function getMismatchesForHole(scores, roundId, holeNumber, players = []) {
       return {
         playerId,
         player: playerMap.get(playerId) || { id: playerId, character_name: playerId, display_name: playerId },
+        holeNumber,
         officialScore,
         controlScore,
         officialScorerId: String(officialScore?.scorer_player_id || "").trim(),
-        message,
+        message: message ? `Abweichung · Loch ${holeNumber} · ${message}` : "",
       };
     })
     .filter((item) => Boolean(item.message));
 }
 
-function withFallbackAlias(player) {
-  if (!player) return player;
-  return {
-    ...player,
-    alias_name: player.alias_name || fallbackAliases[String(player.id || "").trim()] || "",
-  };
+function getMismatchesForRound(scores, roundId, players = []) {
+  const holeNumbers = Array.from(
+    new Set(
+      (scores || [])
+        .filter((score) => String(score.round_id || "") === String(roundId || ""))
+        .map((score) => Number(score.hole_number))
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a - b);
+
+  return holeNumbers.flatMap((holeNumber) => getMismatchesForHole(scores, roundId, holeNumber, players));
 }
 
-function getPlayerLabel(player) {
-  if (!player) return "";
-
-  const playerWithAlias = withFallbackAlias(player);
-  const alias = String(playerWithAlias?.alias_name || "").trim();
-  const name = String(playerWithAlias?.character_name || playerWithAlias?.display_name || playerWithAlias?.id || "").trim();
-
-  if (!name) return alias || "";
-  return alias ? `${alias} (${name})` : name;
-}
-
-function formatToPar(value, played = true) {
-  if (!played) return "–";
-  if (value === 0) return "E";
-  return value > 0 ? `+${value}` : String(value);
-}
-
-function normalizeHoles(rawHoles) {
-  const validHoles = Array.isArray(rawHoles)
-    ? rawHoles.filter((h) => Number(h.hole_number) > 0 && Number(h.par) > 0 && Number(h.hcp) > 0)
-    : [];
-  return validHoles.length ? validHoles : fallbackHoles;
-}
-
-function getCourseHcpKey(playerId, courseId) {
-  return `${playerId}_${String(courseId || "goethe").toLowerCase().trim()}`;
-}
-
-function roundPlayingHandicap(value) {
-  return Math.round(Number(value || 0));
-}
-
-function getCourseSettings(id, list = fallbackCourses) {
-  const cid = String(id || "goethe").toLowerCase().trim();
-  const fallbackCourse = cid === "feininger" ? fallbackCourses[1] : fallbackCourses[0];
-  const sheetCourse = (list || []).find((item) => String(item?.course_id || "").toLowerCase().trim() === cid);
-
-  return {
-    ...fallbackCourse,
-    ...sheetCourse,
-    course_rating: Number(sheetCourse?.course_rating || sheetCourse?.rating || sheetCourse?.cr || fallbackCourse.course_rating),
-    slope_rating: Number(sheetCourse?.slope_rating || sheetCourse?.slope || sheetCourse?.sr || fallbackCourse.slope_rating),
-    par: Number(sheetCourse?.par || fallbackCourse.par),
-  };
-}
-
-function calculatePlayingHandicap(handicapIndex, course) {
-  const hcpIndex = Number(String(handicapIndex ?? "0").replace(",", ".") || 0);
-  const slope = Number(course?.slope_rating || 113);
-  const courseRating = Number(course?.course_rating || course?.rating || course?.cr || course?.par || 72);
-  const par = Number(course?.par || 72);
-  return roundPlayingHandicap(hcpIndex * (slope / 113) + (courseRating - par));
-}
-
-function getHandicapIndex(player) {
-  const rawValue = player?.handicap_index ?? player?.dgv_hcp ?? player?.hcp_index ?? "";
-  if (rawValue === "" || rawValue == null) return null;
-  return Number(String(rawValue).replace(",", "."));
-}
-
-function getCourseHandicap(player, courseId = "goethe", courses = fallbackCourses) {
-  const handicapIndex = getHandicapIndex(player);
-  if (handicapIndex != null && !Number.isNaN(handicapIndex)) {
-    return calculatePlayingHandicap(handicapIndex, getCourseSettings(courseId, courses));
-  }
-
-  const normalizedCourseId = String(courseId || "goethe").toLowerCase().trim();
-  if (normalizedCourseId === "feininger") return Number(player?.course_hcp_feininger ?? 0);
-  return Number(player?.course_hcp_goethe ?? 0);
-}
-
-function getPlayerForCourse(player, courseId = "goethe", courses = fallbackCourses) {
-  if (!player) return null;
-  return {
-    ...withFallbackAlias(player),
-    course_hcp: getCourseHandicap(player, courseId, courses),
-  };
-}
-
-function getPlayersForCourse(players, courseId = "goethe", courses = fallbackCourses) {
-  return players.map((player) => getPlayerForCourse(player, courseId, courses)).filter(Boolean);
-}
-
-function getShotsOnHole(courseHcp, holeHcp) {
-  const hcp = Number(courseHcp || 0);
-  const strokeIndex = Number(holeHcp || 18);
-  if (hcp <= 0) return 0;
-  return Math.floor((hcp + 18 - strokeIndex) / 18);
-}
-
-function getStablefordPoints(strokes, par, shots) {
-  if (strokes === "" || strokes == null) return 0;
-  const netScore = Number(strokes) - Number(shots || 0);
-  const diff = netScore - Number(par || 0);
-  return Math.max(0, 2 - diff);
-}
-
-function getScoreStablefordPoints(score, par, shots) {
-  if (normalizeBoolean(score?.picked_up)) return 0;
-  return getStablefordPoints(score?.strokes, par, shots);
-}
-
-function getPickedUpStrokes(player, hole, courseId = "goethe") {
-  return Number(hole?.par || 0) * 2 + 1;
-}
-
-function formatShotMarks(shots) {
-  const count = Math.max(0, Number(shots || 0));
-  return count === 0 ? "–" : "|".repeat(count);
-}
-
-function getPuttBuckets(playerScores) {
-  const threePutts = playerScores.filter((s) => normalizeBoolean(s.over_two_putts) && Number(s.putts_count) === 3).length;
-  const fourPlusPutts = playerScores.filter((s) => normalizeBoolean(s.over_two_putts) && Number(s.putts_count) >= 4).length;
-  return { threePutts, fourPlusPutts, overTwoPutts: threePutts + fourPlusPutts };
-}
-
-function getRoundCourse(round, courses) {
-  return courses.find((course) => String(course.course_id) === String(round?.course_id));
-}
-
-function getRoundHoles(round, holes) {
-  if (!round?.course_id) return [];
-  return holes
-    .filter((hole) => String(hole.course_id) === String(round.course_id))
-    .sort((a, b) => Number(a.hole_number) - Number(b.hole_number));
-}
-
-function getRoundPlayers(roundId, allPlayers, roundPlayers) {
-  const rowsForRound = Array.isArray(roundPlayers)
-    ? roundPlayers.filter((rp) => String(rp.round_id).trim() === String(roundId).trim())
-    : [];
-
-  if (rowsForRound.length) {
-    const allowedIds = rowsForRound
-      .filter((rp) => normalizeBoolean(rp.is_playing))
-      .map((rp) => String(rp.player_id).trim());
-    return allPlayers.filter((p) => allowedIds.includes(String(p.id).trim()));
-  }
-
-  if (String(roundId).trim() === "r1") return allPlayers.filter((p) => String(p.id).trim() !== "achim");
-  return allPlayers;
-}
-
-function buildPlayerStats(players, holes, scores) {
-  return players.map((p) => {
-    const playerScores = scores.filter((s) => s.player_id === p.id && s.strokes !== "" && s.strokes != null);
-    const played = playerScores.length;
-    const total = playerScores.reduce((sum, s) => sum + Number(s.strokes || 0), 0);
-    const parPlayed = playerScores.reduce((sum, s) => {
-      const hole = holes.find((h) => Number(h.hole_number) === Number(s.hole_number));
-      return sum + Number(hole?.par || 0);
-    }, 0);
-    const { threePutts, fourPlusPutts, overTwoPutts } = getPuttBuckets(playerScores);
-    const ladyCount = playerScores.filter((s) => normalizeBoolean(s.lady)).length;
-    const netStableford = playerScores.reduce((sum, s) => {
-      const hole = holes.find((h) => Number(h.hole_number) === Number(s.hole_number));
-      const shots = getShotsOnHole(p.course_hcp, hole?.hcp);
-      return sum + getScoreStablefordPoints(s, hole?.par, shots);
-    }, 0);
-    const grossStableford = playerScores.reduce((sum, s) => {
-      const hole = holes.find((h) => Number(h.hole_number) === Number(s.hole_number));
-      return sum + getScoreStablefordPoints(s, hole?.par, 0);
-    }, 0);
-    const hcpShotsUsed = playerScores.reduce((sum, s) => {
-      const hole = holes.find((h) => Number(h.hole_number) === Number(s.hole_number));
-      return sum + getShotsOnHole(p.course_hcp, hole?.hcp);
-    }, 0);
-    const hcpAdjustedTotal = total - hcpShotsUsed;
-    const hcpAdjustedToPar = hcpAdjustedTotal - parPlayed;
-
-    return {
-      ...p,
-      played,
-      total,
-      toPar: total - parPlayed,
-      hcpShotsUsed,
-      hcpAdjustedTotal,
-      hcpAdjustedToPar,
-      overTwoPutts,
-      threePutts,
-      fourPlusPutts,
-      puttPenaltyEuro: threePutts * 2 + fourPlusPutts * 4,
-      ladyCount,
-      netStableford,
-      grossStableford,
-    };
-  });
-}
-
-function sortStrokePlay(stats) {
-  return [...stats].sort((a, b) => {
-    if (a.played === 0 && b.played > 0) return 1;
-    if (b.played === 0 && a.played > 0) return -1;
-    return a.toPar - b.toPar || b.played - a.played || Number(a.sort_order || 0) - Number(b.sort_order || 0);
-  });
-}
-
-function sortStableford(stats, fieldName) {
-  return [...stats].sort((a, b) => {
-    if (a.played === 0 && b.played > 0) return 1;
-    if (b.played === 0 && a.played > 0) return -1;
-    return Number(b[fieldName] || 0) - Number(a[fieldName] || 0) || b.played - a.played || Number(a.sort_order || 0) - Number(b.sort_order || 0);
-  });
-}
-
-function sortHcpAdjustedStrokePlay(stats) {
-  return [...stats].sort((a, b) => {
-    if (a.played === 0 && b.played > 0) return 1;
-    if (b.played === 0 && a.played > 0) return -1;
-    return Number(a.hcpAdjustedToPar || 0) - Number(b.hcpAdjustedToPar || 0) || Number(a.hcpAdjustedTotal || 0) - Number(b.hcpAdjustedTotal || 0) || b.played - a.played || Number(a.sort_order || 0) - Number(b.sort_order || 0);
-  });
-}
-
-function sortPuttPenalties(stats) {
-  return [...stats].sort((a, b) => Number(b.puttPenaltyEuro || 0) - Number(a.puttPenaltyEuro || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
-}
-
-function sortLadyCounts(stats) {
-  return [...stats].sort((a, b) => Number(b.ladyCount || 0) - Number(a.ladyCount || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
-}
-
-function getQualificationRounds(rounds) {
-  return (rounds?.length ? rounds : fallbackRounds)
-    .filter((round) => String(round.stage || "qualification") === "qualification")
-    .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0))
-    .slice(0, 3);
-}
-
-function getPuttKasseRounds(rounds) {
-  return (rounds?.length ? rounds : fallbackRounds)
-    .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0))
-    .slice(0, 4);
-}
-
-function getFinalRound(rounds) {
-  return (
-    (rounds?.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === "r4") ||
-    (rounds?.length ? rounds : fallbackRounds).find((round) => String(round.stage) === "final") ||
-    fallbackRounds[3]
-  );
-}
-
-function buildTournamentNetStandings(players, rounds, holes, scores) {
-  const qualificationRounds = getQualificationRounds(rounds);
-  return players
-    .map((player) => {
-      const roundResults = qualificationRounds.map((round) => {
-        const roundHoles = getRoundHoles(round, holes);
-        const coursePlayer = getPlayerForCourse(player, round.course_id);
-        const roundScores = scores.filter((score) => String(score.round_id) === String(round.round_id) && String(score.player_id) === String(player.id));
-        const playedScores = roundScores.filter((score) => score.strokes !== "" && score.strokes != null);
-        const netStableford = playedScores.reduce((sum, score) => {
-          const hole = roundHoles.find((h) => Number(h.hole_number) === Number(score.hole_number));
-          const shots = getShotsOnHole(coursePlayer?.course_hcp, hole?.hcp);
-          return sum + getScoreStablefordPoints(score, hole?.par, shots);
-        }, 0);
-        return { round_id: round.round_id, round_name: round.round_name, points: netStableford, played: playedScores.length };
-      });
-
-      const playedResults = roundResults.filter((result) => result.played > 0);
-      const sortedPlayed = [...playedResults].sort((a, b) => Number(b.points || 0) - Number(a.points || 0));
-      const counted = sortedPlayed.slice(0, 2);
-      const dropped = sortedPlayed.slice(2, 3)[0] || null;
-
-      return {
-        ...withFallbackAlias(player),
-        roundResults,
-        countedRoundIds: counted.map((result) => result.round_id),
-        droppedRoundId: dropped?.round_id || "",
-        totalBestTwo: counted.reduce((sum, result) => sum + Number(result.points || 0), 0),
-        roundsPlayed: playedResults.length,
-      };
-    })
-    .sort((a, b) => Number(b.totalBestTwo || 0) - Number(a.totalBestTwo || 0) || Number(b.roundsPlayed || 0) - Number(a.roundsPlayed || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
-}
-
-function buildTournamentPuttStandings(players, rounds, scores) {
-  const puttRounds = getPuttKasseRounds(rounds);
-  return players
-    .map((player) => {
-      const roundResults = puttRounds.map((round) => {
-        const roundScores = scores.filter((score) => String(score.round_id) === String(round.round_id) && String(score.player_id) === String(player.id));
-        const buckets = getPuttBuckets(roundScores);
-        return { round_id: round.round_id, round_name: round.round_name, threePutts: buckets.threePutts, fourPlusPutts: buckets.fourPlusPutts, amount: buckets.threePutts * 2 + buckets.fourPlusPutts * 4 };
-      });
-      return {
-        ...withFallbackAlias(player),
-        roundResults,
-        totalThreePutts: roundResults.reduce((sum, r) => sum + r.threePutts, 0),
-        totalFourPlusPutts: roundResults.reduce((sum, r) => sum + r.fourPlusPutts, 0),
-        totalAmount: roundResults.reduce((sum, r) => sum + r.amount, 0),
-      };
-    })
-    .sort((a, b) => Number(b.totalAmount || 0) - Number(a.totalAmount || 0) || Number(b.totalFourPlusPutts || 0) - Number(a.totalFourPlusPutts || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
-}
-
-function buildFinalNetStandings(players, rounds, holes, scores) {
-  const qualificationStandings = buildTournamentNetStandings(players, rounds, holes, scores);
-  const finalRound = getFinalRound(rounds);
-  const finalHoles = getRoundHoles(finalRound, holes);
-  const withFinalScores = qualificationStandings.map((player, qualificationIndex) => {
-    const finalPlayer = getPlayerForCourse(player, finalRound?.course_id);
-    const finalScores = scores.filter((score) => String(score.round_id) === String(finalRound?.round_id) && String(score.player_id) === String(player.id));
-    const playedFinalScores = finalScores.filter((score) => score.strokes !== "" && score.strokes != null);
-    const finalNetStableford = playedFinalScores.reduce((sum, score) => {
-      const hole = finalHoles.find((h) => Number(h.hole_number) === Number(score.hole_number));
-      const shots = getShotsOnHole(finalPlayer?.course_hcp, hole?.hcp);
-      return sum + getScoreStablefordPoints(score, hole?.par, shots);
-    }, 0);
-    return {
-      ...withFallbackAlias(player),
-      qualificationRank: qualificationIndex + 1,
-      finalNetStableford,
-      finalPlayed: playedFinalScores.length,
-      finalGroup: qualificationIndex < 3 ? "championship" : "placement",
-    };
-  });
-
-  const championshipGroup = withFinalScores
-    .filter((p) => p.finalGroup === "championship")
-    .sort((a, b) => Number(b.finalNetStableford || 0) - Number(a.finalNetStableford || 0) || Number(a.qualificationRank || 0) - Number(b.qualificationRank || 0))
-    .map((p, i) => ({ ...p, finalRank: i + 1 }));
-  const placementGroup = withFinalScores
-    .filter((p) => p.finalGroup === "placement")
-    .sort((a, b) => Number(b.finalNetStableford || 0) - Number(a.finalNetStableford || 0) || Number(a.qualificationRank || 0) - Number(b.qualificationRank || 0))
-    .map((p, i) => ({ ...p, finalRank: i + 4 }));
-  return [...championshipGroup, ...placementGroup];
-}
-
-function buildScorecardRows(player, round, holes, scores) {
-  const roundHoles = getRoundHoles(round, holes);
-  const coursePlayer = getPlayerForCourse(player, round?.course_id);
-  const roundScores = scores.filter((s) => String(s.round_id) === String(round?.round_id) && String(s.player_id) === String(player?.id));
-
-  return roundHoles.map((hole) => {
-    const score = roundScores.find((s) => Number(s.hole_number) === Number(hole.hole_number));
-    const strokes = score?.strokes === "" || score?.strokes == null ? null : Number(score.strokes);
-    const isPickedUp = normalizeBoolean(score?.picked_up);
-    const shots = getShotsOnHole(coursePlayer?.course_hcp, hole.hcp);
-    const netStableford = getScoreStablefordPoints(score, hole.par, shots);
-    const grossStableford = getScoreStablefordPoints(score, hole.par, 0);
-    const toPar = strokes == null ? null : strokes - Number(hole.par || 0);
-    const puttsCount = score?.putts_count === "" || score?.putts_count == null ? null : Number(score.putts_count);
-    const puttLabel = puttsCount == null ? "–" : puttsCount >= 4 ? "4+ Putt" : `${puttsCount} Putt${puttsCount === 1 ? "" : "s"}`;
-    return { hole, score, strokes, isPickedUp, isLady: normalizeBoolean(score?.lady), shots, toPar, netStableford, grossStableford, puttLabel };
-  });
-}
-
-function summarizeScorecard(rows) {
-  const playedRows = rows.filter((row) => row.strokes != null);
-  return {
-    played: playedRows.length,
-    totalStrokes: playedRows.reduce((sum, row) => sum + Number(row.strokes || 0), 0),
-    toPar: playedRows.reduce((sum, row) => sum + Number(row.strokes || 0), 0) - playedRows.reduce((sum, row) => sum + Number(row.hole.par || 0), 0),
-    netStableford: playedRows.reduce((sum, row) => sum + Number(row.netStableford || 0), 0),
-    grossStableford: playedRows.reduce((sum, row) => sum + Number(row.grossStableford || 0), 0),
-    threePutts: rows.filter((row) => row.puttLabel === "3 Putt").length,
-    fourPlusPutts: rows.filter((row) => row.puttLabel === "4+ Putt").length,
-  };
-}
-
-function runSelfTests() {
+function runSelfTestsn runSelfTests() {
   const failures = [];
   const assert = (name, condition) => {
     if (!condition) failures.push(name);
@@ -1185,24 +829,27 @@ function LordOfTheHolesApp() {
   const officialScores = useMemo(() => getOfficialScores(scores), [scores]);
   const officialAllScores = useMemo(() => getOfficialScores(allScores), [allScores]);
   const comparisonPlayerId = isScorerEntryMode ? myPlayerId : scoredPlayerId;
-  const holeMismatches = useMemo(
-    () => getMismatchesForHole(scores, displayedActiveRound?.round_id || "r1", activeHole, visiblePlayers),
-    [scores, displayedActiveRound?.round_id, activeHole, visiblePlayers]
+  const roundMismatches = useMemo(
+    () => getMismatchesForRound(scores, displayedActiveRound?.round_id || "r1", visiblePlayers),
+    [scores, displayedActiveRound?.round_id, visiblePlayers]
   );
   const responsibleHoleMismatches = useMemo(
     () =>
       myPlayerId
-        ? holeMismatches.filter((item) => {
+        ? roundMismatches.filter((item) => {
             const isAffectedPlayer = String(item.playerId) === String(myPlayerId);
             const isOfficialScorer = String(item.officialScorerId) === String(myPlayerId);
             return isAffectedPlayer || isOfficialScorer;
           })
         : [],
-    [holeMismatches, myPlayerId]
+    [roundMismatches, myPlayerId]
   );
   const selectedPlayerMismatch = useMemo(
-    () => responsibleHoleMismatches.find((item) => String(item.playerId) === String(scoredPlayerId)) || null,
-    [responsibleHoleMismatches, scoredPlayerId]
+    () =>
+      responsibleHoleMismatches.find((item) => String(item.playerId) === String(scoredPlayerId) && Number(item.holeNumber) === Number(activeHole)) ||
+      responsibleHoleMismatches.find((item) => String(item.playerId) === String(scoredPlayerId)) ||
+      null,
+    [responsibleHoleMismatches, scoredPlayerId, activeHole]
   );
   const ownPlayerMismatch = useMemo(
     () => myPlayerId ? responsibleHoleMismatches.find((item) => String(item.playerId) === String(myPlayerId)) || null : null,
