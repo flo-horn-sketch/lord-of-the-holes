@@ -1480,6 +1480,7 @@ function LordOfTheHolesApp() {
   const [clearScoresError, setClearScoresError] = useState("");
   const [standingsPopup, setStandingsPopup] = useState(null);
   const [winnerPopupDismissedKey, setWinnerPopupDismissedKey] = useState(() => readLocalJson("lordOfTheHoles.winnerPopupDismissedKey", ""));
+  const [forceWinnerPopupOpen, setForceWinnerPopupOpen] = useState(false);
 
   const displayedActiveRound =
     (selectedActiveRoundId && (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(selectedActiveRoundId))) ||
@@ -1573,7 +1574,20 @@ function LordOfTheHolesApp() {
     [allPlayers, rounds, allHoles, officialAllScores, roundPlayers]
   );
   const finalWinnerPopupKey = finalWinnerCelebration ? `${finalWinnerCelebration.roundId}_${finalWinnerCelebration.winner?.id || "winner"}` : "";
-  const showFinalWinnerPopup = Boolean(finalWinnerCelebration && finalWinnerPopupKey !== winnerPopupDismissedKey);
+  const simulatedWinnerCelebration = useMemo(() => {
+    const winner = hcpAdjustedStrokeLeaderboard[0] || playersWithCurrentHandicaps[0] || null;
+    if (!winner) return null;
+    return {
+      roundId: "simulation",
+      winner,
+      winnerName: winner.character_name || winner.display_name || winner.id,
+      winnerLabel: getPlayerLabel(winner),
+      finalHcpAdjustedStrokes: winner.hcpAdjustedTotal ?? winner.total ?? "–",
+    };
+  }, [hcpAdjustedStrokeLeaderboard, playersWithCurrentHandicaps]);
+  const displayedWinnerCelebration = forceWinnerPopupOpen ? simulatedWinnerCelebration : finalWinnerCelebration;
+  const displayedWinnerPopupKey = forceWinnerPopupOpen ? "simulation" : finalWinnerPopupKey;
+  const showFinalWinnerPopup = Boolean(displayedWinnerCelebration && (forceWinnerPopupOpen || displayedWinnerPopupKey !== winnerPopupDismissedKey));
 
   useEffect(() => {
     if (!scoreablePlayers.some((p) => String(p.id) === String(scoredPlayerId))) setScoredPlayerId(scoreablePlayers[0]?.id || "");
@@ -2079,6 +2093,7 @@ function LordOfTheHolesApp() {
             </div>
             <Button disabled={!isAdminUnlocked || setupSaving} onClick={saveFullSetup} className="mt-3 w-full rounded-2xl bg-amber-600 text-amber-50 disabled:opacity-50">{setupSaving ? "Speichere ..." : "Admin-Einstellungen speichern"}</Button>
             <Button disabled={!isAdminUnlocked || backupSaving} onClick={createRoundBackup} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-700/80 text-emerald-50 disabled:opacity-50">{backupSaving ? "Erstelle Backup ..." : "Backup für aktive Runde erstellen"}</Button>
+            <Button disabled={!isAdminUnlocked} onClick={() => setForceWinnerPopupOpen(true)} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-amber-900/50 text-amber-100 disabled:opacity-50">Sieger-Popup testen</Button>
             <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={() => { setClearScoresError(""); setClearScoresConfirmOpen(true); }} className="mt-2 w-full rounded-2xl border border-red-500/50 bg-red-950/60 text-red-100 disabled:opacity-50">Scores löschen</Button>
           </CardContent>
         </Card>
@@ -2379,16 +2394,22 @@ function LordOfTheHolesApp() {
               <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-amber-300/50 bg-black/30 text-3xl shadow-xl shadow-amber-950/40">♛</div>
               <div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/70">Finale beendet</div>
               <div className="mt-2 font-serif text-2xl font-black text-amber-200">Lord of the Holes 2026 ist</div>
-              <div className="mt-2 font-serif text-4xl font-black text-amber-300 drop-shadow">{finalWinnerCelebration?.winnerName}</div>
-              <div className="mt-2 text-sm text-amber-100/70">{finalWinnerCelebration?.winnerLabel}</div>
+              <div className="mt-2 font-serif text-4xl font-black text-amber-300 drop-shadow">{displayedWinnerCelebration?.winnerName}</div>
+              <div className="mt-2 text-sm text-amber-100/70">{displayedWinnerCelebration?.winnerLabel}</div>
               <div className="mt-3 rounded-2xl border border-amber-500/35 bg-black/25 p-2 text-sm text-amber-100">
-                Final Strokes HCP: <b className="text-amber-200">{finalWinnerCelebration?.finalHcpAdjustedStrokes ?? "–"}</b>
+                Final Strokes HCP: <b className="text-amber-200">{displayedWinnerCelebration?.finalHcpAdjustedStrokes ?? "–"}</b>
               </div>
             </div>
             <div className="p-3">
               <button
                 type="button"
-                onClick={() => setWinnerPopupDismissedKey(finalWinnerPopupKey)}
+                onClick={() => {
+                  if (forceWinnerPopupOpen) {
+                    setForceWinnerPopupOpen(false);
+                  } else {
+                    setWinnerPopupDismissedKey(displayedWinnerPopupKey);
+                  }
+                }}
                 className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-3 text-sm font-bold text-amber-50"
               >
                 Krone anerkennen ×
