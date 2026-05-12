@@ -1085,16 +1085,17 @@ async function callSheetApi(payload) {
 }
 
 function LordOfTheHolesApp() {
-  const [players, setPlayers] = useState(fallbackPlayers);
-  const [allPlayers, setAllPlayers] = useState(fallbackPlayers);
-  const [courses, setCourses] = useState(fallbackCourses);
-  const [rounds, setRounds] = useState(fallbackRounds);
-  const [roundPlayers, setRoundPlayers] = useState([]);
-  const [activeRound, setActiveRound] = useState(null);
-  const [holes, setHoles] = useState(fallbackHoles);
-  const [allHoles, setAllHoles] = useState(fallbackHoles);
-  const [scores, setScores] = useState([]);
-  const [allScores, setAllScores] = useState([]);
+  const cachedState = readLocalJson("lordOfTheHoles.cachedState", null);
+  const [players, setPlayers] = useState(cachedState?.players?.length ? cachedState.players : fallbackPlayers);
+  const [allPlayers, setAllPlayers] = useState(cachedState?.allPlayers?.length ? cachedState.allPlayers : fallbackPlayers);
+  const [courses, setCourses] = useState(cachedState?.courses?.length ? cachedState.courses : fallbackCourses);
+  const [rounds, setRounds] = useState(cachedState?.rounds?.length ? cachedState.rounds : fallbackRounds);
+  const [roundPlayers, setRoundPlayers] = useState(cachedState?.roundPlayers || []);
+  const [activeRound, setActiveRound] = useState(cachedState?.activeRound || null);
+  const [holes, setHoles] = useState(cachedState?.holes?.length ? cachedState.holes : fallbackHoles);
+  const [allHoles, setAllHoles] = useState(cachedState?.allHoles?.length ? cachedState.allHoles : fallbackHoles);
+  const [scores, setScores] = useState(cachedState?.scores?.length ? cachedState.scores.map(normalizeScoreRecord) : []);
+  const [allScores, setAllScores] = useState(cachedState?.allScores?.length ? cachedState.allScores.map(normalizeScoreRecord) : []);
   const [localHandicaps, setLocalHandicaps] = useState({});
   const [scoredPlayerId, setScoredPlayerId] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerId", "florian"));
   const [scoreEntryMode, setScoreEntryMode] = useState("player");
@@ -1112,8 +1113,8 @@ function LordOfTheHolesApp() {
   const [autoSync] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState("offline");
   const [error, setError] = useState("");
-  const [selectedCourseId, setSelectedCourseId] = useState("");
-  const [selectedActiveRoundId, setSelectedActiveRoundId] = useState("r1");
+  const [selectedCourseId, setSelectedCourseId] = useState(cachedState?.selectedCourseId || "");
+  const [selectedActiveRoundId, setSelectedActiveRoundId] = useState(cachedState?.selectedActiveRoundId || "r1");
   const [myPlayerId, setMyPlayerId] = useState(() => readLocalJson("lordOfTheHoles.myPlayerId", ""));
   const [adminPinInput, setAdminPinInput] = useState("");
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
@@ -1232,6 +1233,24 @@ function LordOfTheHolesApp() {
     const selectedRoundScores = allScores.filter((score) => String(score.round_id || "") === String(selectedActiveRoundId));
     setScores(selectedRoundScores);
   }, [selectedActiveRoundId, allScores]);
+
+  useEffect(() => {
+    writeLocalJson("lordOfTheHoles.cachedState", {
+      players,
+      allPlayers,
+      courses,
+      rounds,
+      roundPlayers,
+      activeRound,
+      holes,
+      allHoles,
+      scores,
+      allScores,
+      selectedCourseId,
+      selectedActiveRoundId,
+      cachedAt: new Date().toISOString(),
+    });
+  }, [players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, selectedCourseId, selectedActiveRoundId]);
 
   useEffect(() => {
     if (!autoSync) return undefined;
