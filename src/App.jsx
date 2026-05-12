@@ -448,6 +448,13 @@ function buildFunPlayerStats(players, holes, scores) {
   });
 }
 
+function getCourseShortName(courseId) {
+  const normalized = String(courseId || "").toLowerCase().trim();
+  if (normalized === "goethe") return "Goethe";
+  if (normalized === "feininger") return "Feininger";
+  return courseId || "Kurs";
+}
+
 function buildFunHoleStats(players, holes, scores) {
   return (holes || []).map((hole) => {
     const holeScores = (scores || []).filter((score) => Number(score.hole_number) === Number(hole.hole_number) && score.strokes !== "" && score.strokes != null);
@@ -461,6 +468,8 @@ function buildFunHoleStats(players, holes, scores) {
     const ladies = holeScores.filter((score) => normalizeBoolean(score.lady)).length;
     const snakes = holeScores.filter((score) => normalizeBoolean(score.over_two_putts)).length;
     return {
+      course_id: hole.course_id || "",
+      course_name: getCourseShortName(hole.course_id),
       hole_number: hole.hole_number,
       par: hole.par,
       hcp: hole.hcp,
@@ -1000,7 +1009,7 @@ function FunTable({ title, subtitle = "", players, columns, nameLabel = "Name" }
             {players.map((item, index) => (
               <tr key={item.id || `${item.hole_number}-${index}` || index} className="border-t border-amber-700/20">
                 <td className="px-2.5 py-1.5 text-amber-200/75">{index + 1}</td>
-                <td className="px-2.5 py-1.5 font-semibold text-amber-100">{item.hole_number ? `Loch ${item.hole_number}` : (item.character_name || item.display_name || item.id)}</td>
+                <td className="px-2.5 py-1.5 font-semibold text-amber-100">{item.hole_number ? `${item.course_name || getCourseShortName(item.course_id)} · Loch ${item.hole_number}` : (item.character_name || item.display_name || item.id)}</td>
                 {columns.map((column) => (
                   <td key={column.label} className={cls("px-2.5 py-1.5 text-right", column.emphasize && "font-serif text-lg text-amber-300")}>{column.render(item, index)}</td>
                 ))}
