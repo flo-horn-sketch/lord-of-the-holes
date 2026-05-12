@@ -312,7 +312,7 @@ function getScoreStablefordPoints(score, par, shots) {
 }
 
 function getPickedUpStrokes(player, hole, courseId = "goethe") {
-  return Number(hole?.par || 0) * 2;
+  return Number(hole?.par || 0) * 2 + 1;
 }
 
 function formatShotMarks(shots) {
@@ -593,7 +593,7 @@ function runSelfTests() {
   assert("mismatch list finds player on hole", getMismatchesForHole([{ round_id: "r1", player_id: "florian", scorer_player_id: "mucky", hole_number: 1, strokes: 6 }, { round_id: "r1", player_id: "florian", scorer_player_id: "florian", hole_number: 1, strokes: 5 }], "r1", 1, fallbackPlayers).length === 1);
   assert("stableford par is two points", getStablefordPoints(4, 4, 0) === 2);
   assert("picked up score gives zero net points", getScoreStablefordPoints({ strokes: getPickedUpStrokes({ course_hcp_goethe: 5 }, { par: 4, hcp: 5 }, "goethe"), picked_up: true }, 4, getShotsOnHole(5, 5)) === 0);
-  assert("picked up score is double par", getPickedUpStrokes({ course_hcp_goethe: 18 }, { par: 5, hcp: 1 }, "goethe") === 10);
+  assert("picked up score is double par plus one", getPickedUpStrokes({ course_hcp_goethe: 18 }, { par: 5, hcp: 1 }, "goethe") === 11);
   assert("picked up score stays zero even with many strokes received", getScoreStablefordPoints({ strokes: 10, picked_up: true }, 5, 5) === 0);
   assert("course handicap allocates two strokes above 18", getShotsOnHole(19, 1) === 2);
   assert("shot marks display two strokes", formatShotMarks(2) === "||");
@@ -1160,10 +1160,10 @@ function LordOfTheHolesApp() {
   const hcpAdjustedStrokeLeaderboard = useMemo(() => sortHcpAdjustedStrokePlay(playerStats), [playerStats]);
   const puttPenaltyLeaderboard = useMemo(() => sortPuttPenalties(playerStats), [playerStats]);
   const ladyLeaderboard = useMemo(() => sortLadyCounts(playerStats), [playerStats]);
-  const myStrokeRank = useMemo(() => {
-    const index = strokePlayLeaderboard.findIndex((player) => String(player.id) === String(myPlayerId));
+  const myHcpAdjustedStrokeRank = useMemo(() => {
+    const index = hcpAdjustedStrokeLeaderboard.findIndex((player) => String(player.id) === String(myPlayerId));
     return index >= 0 ? index + 1 : null;
-  }, [strokePlayLeaderboard, myPlayerId]);
+  }, [hcpAdjustedStrokeLeaderboard, myPlayerId]);
   const myNetStablefordRank = useMemo(() => {
     const index = netStablefordLeaderboard.findIndex((player) => String(player.id) === String(myPlayerId));
     return index >= 0 ? index + 1 : null;
@@ -1523,6 +1523,15 @@ function LordOfTheHolesApp() {
               </select>
               <p className="mt-2 text-xs text-amber-100/60">Dieser Spieler wird auf diesem Handy beim Score-Zählen ausgeblendet, damit man sich nicht selbst zählt.</p>
             </div>
+
+            <div className="mt-3 rounded-2xl border border-amber-700/30 bg-black/25 p-2.5">
+              <label className="mb-1 block text-sm text-amber-100/80">Wen zähle ich?</label>
+              <select value={scoredPlayerId} onChange={(e) => setScoredPlayerId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2.5 text-amber-50">
+                <option value="">Spieler auswählen</option>
+                {scoreablePlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}
+              </select>
+              <p className="mt-2 text-xs text-amber-100/60">Dieser Spieler ist links im Score-Bereich vorausgewählt.</p>
+            </div>
           </CardContent>
         </Card>
       </motion.section>
@@ -1552,9 +1561,9 @@ function LordOfTheHolesApp() {
               <div className="mb-3 rounded-xl border border-amber-700/30 bg-black/25 p-2.5">
                 <div className="mb-2 flex items-center justify-between gap-2"><div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Mein aktueller Stand</div><div className="font-serif text-sm text-amber-200">{getPlayerLabel(myCurrentStats)}</div></div>
                 <div className="grid grid-cols-2 gap-2 text-center text-sm">
-                  <div className="rounded-xl bg-amber-50/5 p-2 text-amber-50"><div className="text-amber-100">Schläge</div><b className="text-xl text-amber-200">{myCurrentStats.played ? myCurrentStats.total : "–"}</b><div className="mt-0.5 text-[11px] text-amber-100/70">{myCurrentStats.played}/18 · Platz {myStrokeRank || "–"}</div></div>
+                  <div className="rounded-xl bg-amber-50/5 p-2 text-amber-50"><div className="text-amber-100">Schläge HCP adjusted</div><b className="text-xl text-amber-200">{myCurrentStats.played ? myCurrentStats.hcpAdjustedTotal : "–"}</b><div className="mt-0.5 text-[11px] text-amber-100/70">Tatsächlich {myCurrentStats.played ? myCurrentStats.total : "–"} · Platz {myHcpAdjustedStrokeRank || "–"}</div></div>
                   <div className="rounded-xl bg-amber-50/5 p-2 text-amber-50"><div className="text-amber-100">Netto Stbl</div><b className="text-xl text-amber-200">{myCurrentStats.netStableford}</b><div className="mt-0.5 text-[11px] text-amber-100/70">SpV {Number(myCurrentStats.course_hcp || 0)} · Platz {myNetStablefordRank || "–"}</div></div>
-                  <div className="col-span-2 text-center text-[11px] text-amber-100/65">Vorgabe Loch {activeHole}: <b className="text-amber-200 tracking-[0.18em]">{formatShotMarks(myShotsOnActiveHole)}</b></div>
+                  
                 </div>
               </div>
             ) : (
@@ -1564,7 +1573,7 @@ function LordOfTheHolesApp() {
               {myCurrentPlayer && (
                 <div className="mb-3 grid grid-cols-2 gap-2 rounded-2xl border border-amber-700/30 bg-black/25 p-1.5">
                   <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/60")}>{scoredPlayerButtonLabel} {hasSelectedPlayerScoreMismatch ? "⚠" : ""}</button>
-                  <button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasOwnScoreMismatch && "ring-1 ring-red-400/60")}>{scorerButtonLabel} {hasOwnScoreMismatch ? "⚠" : ""}</button>
+                  <button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasOwnScoreMismatch && "ring-1 ring-red-400/60")}>Mein Score {hasOwnScoreMismatch ? "⚠" : ""}</button>
                 </div>
               )}
               {visibleScoreMismatchMessage && (
@@ -1603,11 +1612,6 @@ function LordOfTheHolesApp() {
                 />
               </div>
               <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 text-amber-100">Zurück</Button><Button disabled={activeHole === 18 || !hasCurrentScore || scoreSaveInFlight} onClick={goToNextHole} className="rounded-2xl bg-amber-600 text-amber-50 disabled:opacity-50">{scoreSaveInFlight ? "Speichere ..." : "Nächstes Loch"}</Button></div>
-              {!isScorerEntryMode ? (
-                <div className="mt-3 rounded-2xl border border-amber-700/30 bg-black/25 p-2.5"><label className="mb-1 block text-sm text-amber-100/80">Spieler</label><select value={scoredPlayerId} onChange={(e) => setScoredPlayerId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2.5 text-amber-50">{scoreablePlayers.map((p) => <option key={p.id} value={p.id}>{String(p.id) === String(scoredPlayerId) && hasSelectedPlayerScoreMismatch ? "⚠ " : ""}{getPlayerLabel(p)}</option>)}</select></div>
-              ) : (
-                <div className="mt-3 rounded-2xl border border-amber-700/30 bg-black/25 p-2.5 text-sm text-amber-100/80">Zähler: <b className={cls("text-amber-200", hasOwnScoreMismatch && "text-red-200")}>{hasOwnScoreMismatch ? "⚠ " : ""}{getPlayerLabel(myCurrentPlayer)}</b></div>
-              )}
             </div>
           </CardContent>
         </Card>
