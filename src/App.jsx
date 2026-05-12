@@ -595,18 +595,45 @@ function buildFinalNetStandings(players, rounds, holes, scores) {
   const qualificationStandings = buildTournamentNetStandings(players, rounds, holes, scores);
   const finalRound = getFinalRound(rounds);
   const finalHoles = getRoundHoles(finalRound, holes);
+
   const withFinalScores = qualificationStandings.map((player, qualificationIndex) => {
-    const finalScores = (scores || []).filter((score) => String(score.round_id) === String(finalRound?.round_id) && String(score.player_id) === String(player.id));
+    const finalScores = (scores || []).filter(
+      (score) =>
+        String(score.round_id) === String(finalRound?.round_id) &&
+        String(score.player_id) === String(player.id) &&
+        score.strokes !== "" &&
+        score.strokes != null
+    );
+
     const playerForRound = getPlayerForCourse(player, finalRound?.course_id || "goethe");
-    const finalNetStableford = finalScores.reduce((sum, score) => {
+    const finalGrossStrokes = finalScores.reduce((sum, score) => sum + Number(score.strokes || 0), 0);
+    const finalHcpShotsUsed = finalScores.reduce((sum, score) => {
       const hole = finalHoles.find((h) => Number(h.hole_number) === Number(score.hole_number));
-      const shots = getShotsOnHole(playerForRound.course_hcp, hole?.hcp);
-      return sum + getScoreStablefordPoints(score, hole?.par, shots);
+      return sum + getShotsOnHole(playerForRound.course_hcp, hole?.hcp);
     }, 0);
-    return { ...withFallbackAlias(player), qualificationRank: qualificationIndex + 1, finalNetStableford, finalPlayed: finalScores.filter((score) => score.strokes !== "" && score.strokes != null).length, finalGroup: qualificationIndex < 3 ? "championship" : "placement" };
+    const finalHcpAdjustedStrokes = finalScores.length ? finalGrossStrokes - finalHcpShotsUsed : null;
+
+    return {
+      ...withFallbackAlias(player),
+      qualificationRank: qualificationIndex + 1,
+      finalHcpAdjustedStrokes,
+      finalGrossStrokes,
+      finalHcpShotsUsed,
+      finalPlayed: finalScores.length,
+      finalGroup: qualificationIndex < 3 ? "championship" : "placement",
+    };
   });
-  const championshipGroup = withFinalScores.filter((p) => p.finalGroup === "championship").sort((a, b) => Number(b.finalNetStableford || 0) - Number(a.finalNetStableford || 0) || Number(a.qualificationRank || 0) - Number(b.qualificationRank || 0)).map((p, i) => ({ ...p, finalRank: i + 1 }));
-  const placementGroup = withFinalScores.filter((p) => p.finalGroup === "placement").sort((a, b) => Number(b.finalNetStableford || 0) - Number(a.finalNetStableford || 0) || Number(a.qualificationRank || 0) - Number(b.qualificationRank || 0)).map((p, i) => ({ ...p, finalRank: i + 4 }));
+
+  const sortFinalGroup = (items) =>
+    [...items].sort((a, b) => {
+      if (a.finalHcpAdjustedStrokes == null && b.finalHcpAdjustedStrokes != null) return 1;
+      if (b.finalHcpAdjustedStrokes == null && a.finalHcpAdjustedStrokes != null) return -1;
+      return Number(a.finalHcpAdjustedStrokes || 0) - Number(b.finalHcpAdjustedStrokes || 0) || Number(a.qualificationRank || 0) - Number(b.qualificationRank || 0);
+    });
+
+  const championshipGroup = sortFinalGroup(withFinalScores.filter((p) => p.finalGroup === "championship")).map((p, i) => ({ ...p, finalRank: i + 1 }));
+  const placementGroup = sortFinalGroup(withFinalScores.filter((p) => p.finalGroup === "placement")).map((p, i) => ({ ...p, finalRank: i + 4 }));
+
   return [...championshipGroup, ...placementGroup];
 }
 
@@ -1121,7 +1148,7 @@ function TournamentStandings({ players, rounds, holes, scores, activeRoundId = "
                   <th className="px-2.5 py-1.5">Platz</th>
                   <th className="px-2.5 py-1.5">Spieler</th>
                   <th className="px-2.5 py-1.5 text-right">Quali</th>
-                  <th className="px-2.5 py-1.5 text-right">Final Netto</th>
+                  <th className="px-2.5 py-1.5 text-right">Final Strokes HCP</th>
                   <th className="px-2.5 py-1.5 text-right">Löcher</th>
                   <th className="px-2.5 py-1.5 text-right">Gruppe</th>
                 </tr>
@@ -1138,7 +1165,7 @@ function TournamentStandings({ players, rounds, holes, scores, activeRoundId = "
                       <td className="px-2.5 py-1.5 font-serif text-lg font-bold text-amber-300">{player.finalRank}</td>
                       <td className="px-2.5 py-1.5 font-semibold text-amber-100">{getPlayerLabel(player)}</td>
                       <td className="px-2.5 py-1.5 text-right text-amber-100/75">{player.qualificationRank}</td>
-                      <td className="px-2.5 py-1.5 text-right font-serif text-xl font-bold text-amber-300">{player.finalPlayed ? player.finalNetStableford : "–"}</td>
+                      <td className="px-2.5 py-1.5 text-right font-serif text-xl font-bold text-amber-300">{player.finalHcpAdjustedStrokes ?? "–"}</td>
                       <td className="px-2.5 py-1.5 text-right text-amber-100">{player.finalPlayed}/18</td>
                       <td className="px-2.5 py-1.5 text-right text-amber-100/75">{player.finalGroup === "championship" ? "1–3" : "4–6"}</td>
                     </tr>
