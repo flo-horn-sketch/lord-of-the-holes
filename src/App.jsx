@@ -1551,6 +1551,7 @@ function LordOfTheHolesApp() {
   const [setupSavedMessage, setSetupSavedMessage] = useState("");
   const [backupSavedMessage, setBackupSavedMessage] = useState("");
   const [scoreHintMessage, setScoreHintMessage] = useState("");
+  const [showSplash, setShowSplash] = useState(true);
   const [clearScoresConfirmOpen, setClearScoresConfirmOpen] = useState(false);
   const [clearScoresSaving, setClearScoresSaving] = useState(false);
   const [clearScoresError, setClearScoresError] = useState("");
@@ -1695,23 +1696,11 @@ function LordOfTheHolesApp() {
     if (!displayedRoundHonorCelebration || !myPlayerId) return null;
     return displayedRoundHonorCelebration.butlers.find((player) => String(player.id) === String(myPlayerId)) || null;
   }, [displayedRoundHonorCelebration, myPlayerId]);
-  const assignedLordForMe = useMemo(() => {
-    if (!displayedRoundHonorCelebration || myRoundHonorRole !== "shieldbearer" || !myPlayerId) return null;
-    const shieldbearerIndex = displayedRoundHonorCelebration.butlers.findIndex((player) => String(player.id) === String(myPlayerId));
-    if (shieldbearerIndex < 0) return null;
-    return displayedRoundHonorCelebration.lords[shieldbearerIndex] || displayedRoundHonorCelebration.lords[0] || null;
-  }, [displayedRoundHonorCelebration, myRoundHonorRole, myPlayerId]);
-  const assignedShieldbearerForMe = useMemo(() => {
-    if (!displayedRoundHonorCelebration || myRoundHonorRole !== "lord" || !myPlayerId) return null;
-    const lordIndex = displayedRoundHonorCelebration.lords.findIndex((player) => String(player.id) === String(myPlayerId));
-    if (lordIndex < 0) return null;
-    return displayedRoundHonorCelebration.butlers[lordIndex] || displayedRoundHonorCelebration.butlers[0] || null;
-  }, [displayedRoundHonorCelebration, myRoundHonorRole, myPlayerId]);
   const roundHonorPersonalMessage =
     myRoundHonorRole === "lord"
-      ? `Du bist ${displayedRoundHonorCelebration?.lords?.length === 1 ? "Herr" : "einer der Herren"} von Gondor.${assignedShieldbearerForMe ? ` Dein Schildträger ist ${getPlayerLabel(assignedShieldbearerForMe)}.` : ""}`
+      ? `Du bist ${displayedRoundHonorCelebration?.lords?.length === 1 ? "Herr" : "einer der Herren"} von Gondor.`
       : myRoundHonorRole === "shieldbearer"
-        ? `Du bist Schildträger${assignedLordForMe ? ` von ${getPlayerLabel(assignedLordForMe)}` : ""}. Möge dein Dienst kurz und dein Becher niemals leer sein.`
+        ? "Du bist Schildträger. Möge dein Dienst kurz und dein Becher niemals leer sein."
         : "Du bleibst freier Gefährte. Kein Schild, keine Krone — nur Ruhm, Spott und ein sicherer Platz am Tisch.";
   const roundHonorCloseLabel =
     myRoundHonorRole === "lord"
@@ -1783,6 +1772,11 @@ function LordOfTheHolesApp() {
     });
   }, [players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId]);
 
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setShowSplash(false), 3000);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!autoSync) return undefined;
@@ -2487,6 +2481,15 @@ function LordOfTheHolesApp() {
   return (
     <div className="min-h-screen bg-stone-950 text-amber-50">
       <div className="fixed inset-0 bg-[radial-gradient(circle_at_30%_10%,rgba(245,158,11,0.22),transparent_35%),radial-gradient(circle_at_80%_15%,rgba(220,38,38,0.18),transparent_30%),linear-gradient(180deg,rgba(0,0,0,0.25),rgba(0,0,0,0.9))]" />
+      {showSplash ? (
+        <div className="fixed inset-0 z-[100] bg-black">
+          <img
+            src="/loading-screen.png"
+            alt="Lord of the Holes Golf Scoring"
+            className="h-full w-full object-cover"
+          />
+        </div>
+      ) : null}
       <main className="relative mx-auto max-w-md px-3 py-3">
         {renderHeader()}
         {renderStatusMessages()}
@@ -2575,11 +2578,11 @@ function LordOfTheHolesApp() {
 
               {displayedRoundHonorCelebration.roundOrder === 1 ? (
                 <div className="mt-3 rounded-2xl border border-amber-500/25 bg-black/20 p-2 text-sm text-amber-100/75">
-                  Der Herr von Gondor erhält seinen Schildträger. Möge der Becher stets gefüllt sein.
+                  Der Herr von Gondor steht fest. Der Schildträger ebenso. Möge der Becher stets gefüllt sein.
                 </div>
               ) : (
                 <div className="mt-3 rounded-2xl border border-amber-500/25 bg-black/20 p-2 text-sm text-amber-100/75">
-                  Die Herren von Gondor erhalten ihre Schildträger. Der Dienst am Hofe beginnt unverzüglich.
+                  Die Herren von Gondor und ihre Schildträger stehen fest. Der Dienst am Hofe beginnt unverzüglich.
                 </div>
               )}
             </div>
