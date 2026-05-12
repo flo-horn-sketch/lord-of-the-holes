@@ -2136,16 +2136,14 @@ function LordOfTheHolesApp() {
   const activeRoundChapterLabel = getRoundChapterLabel(displayedActiveRound);
   const subtitle = mainMenu === "current" ? activeRoundChapterLabel : mainMenu === "tournament" ? activeRoundIsFinal ? "Turnier · Am Schicksalsberg" : "Turnier · Kapitel der Gefährten" : mainMenu === "archive" ? "Scorekarten · Chroniken der Runde" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "admin" ? "Admin" : "Einstellungen";
     return (
-      <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-3">
-        <div className="mb-1 flex items-center justify-between gap-2">
-          <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-black/35 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-amber-200">Weimarer Land</div>
-          <button type="button" onClick={() => setMenuOpen((value) => !value)} className="rounded-xl border border-amber-700/40 bg-black/25 px-3 py-1.5 text-lg leading-none text-amber-100" aria-label="Menü öffnen">☰</button>
+      <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-3 pt-28">
+        <div className="mb-2 flex items-center justify-end gap-2">
+          <button type="button" onClick={() => setMenuOpen((value) => !value)} className="rounded-xl border border-amber-700/40 bg-black/45 px-3 py-1.5 text-lg leading-none text-amber-100 shadow-lg shadow-black/40 backdrop-blur-sm" aria-label="Menü öffnen">☰</button>
         </div>
         <div className="relative text-center">
-          <h1 className="font-serif text-3xl font-black tracking-wide text-amber-300 drop-shadow">Lord of the Holes</h1>
-          <p className="mt-0.5 text-xs text-amber-100/75">{subtitle}</p>
+          <p className="mx-auto inline-flex rounded-full border border-amber-500/30 bg-black/45 px-3 py-1 text-xs font-semibold text-amber-100/85 shadow-lg shadow-black/40 backdrop-blur-sm">{subtitle}</p>
           {menuOpen && (
-            <div className="absolute right-0 top-[58px] z-30 w-64 overflow-hidden rounded-2xl border border-amber-700/40 bg-stone-950/95 text-left shadow-2xl shadow-black/70 backdrop-blur">
+            <div className="absolute right-0 top-[42px] z-30 w-64 overflow-hidden rounded-2xl border border-amber-700/40 bg-stone-950/95 text-left shadow-2xl shadow-black/70 backdrop-blur">
               {[
                 ["current", "Aktuelle Runde"],
                 ["tournament", "Turnier"],
@@ -2159,7 +2157,7 @@ function LordOfTheHolesApp() {
             </div>
           )}
         </div>
-        <div className="mt-2 flex justify-center">
+        <div className="mt-2 flex jus
           <div className="inline-flex items-center gap-2 rounded-full border border-amber-700/40 bg-black/35 px-2.5 py-1 text-[11px] text-amber-100/75">
             <Icon size={14} className={connectionStatus === "online" ? "text-emerald-300" : "text-red-300"}>{connectionStatus === "online" ? "●" : "○"}</Icon>
             {pendingScores.length ? `${pendingScores.length} Score${pendingScores.length === 1 ? "" : "s"} offen` : connectionStatus === "online" ? "Datenbank verbunden" : "Datenbank nicht verbunden"}
@@ -2514,8 +2512,12 @@ function LordOfTheHolesApp() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-950 text-amber-50">
-      <div className="fixed inset-0 bg-[radial-gradient(circle_at_30%_10%,rgba(245,158,11,0.22),transparent_35%),radial-gradient(circle_at_80%_15%,rgba(220,38,38,0.18),transparent_30%),linear-gradient(180deg,rgba(0,0,0,0.25),rgba(0,0,0,0.9))]" />
+    <div
+      className="min-h-screen bg-black bg-cover bg-center bg-no-repeat text-amber-50"
+      style={{ backgroundImage: "url('/lord-bg.webp')" }}
+    >
+      <div className="fixed inset-0 bg-black/45" />
+      <div className="fixed inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.06),rgba(0,0,0,0.58)_38%,rgba(0,0,0,0.86)_100%)]" />
       {showSplash ? (
         <div className="fixed inset-0 z-[100] bg-black">
           <img
@@ -2534,7 +2536,7 @@ function LordOfTheHolesApp() {
           </div>
         </div>
       ) : null}
-      <main className="relative mx-auto max-w-md px-3 py-3">
+      <main className="relative z-10 mx-auto max-w-md px-3 py-3">
         {renderHeader()}
         {renderStatusMessages()}
         {renderCurrentTabs()}
