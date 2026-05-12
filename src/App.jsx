@@ -1036,47 +1036,25 @@ function ScoreStepper({ value, par, pickedUpStrokes, onChange }) {
 function LeaderboardTable({ title, players, columns }) {
   return (
     <div className="mb-3 overflow-hidden rounded-2xl border border-amber-700/30 bg-black/20">
-      <div className="border-b border-amber-700/30 bg-amber-500/10 px-2 py-1.5 landscape:px-1.5 landscape:py-1ext-lg text-amber-200">{title}<low-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        
+      <div className="border-b border-amber-700/30 bg-amber-500/10 px-2 py-1.5 landscape:px-1.5 landscape:py-1 font-serif text-lg text-amber-200">{title}</div>
+      <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <table className="w-full min-w-[360px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">
           <thead>
-            <tr className="<table className="w-full min-w-[360px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">     <th className="px-2.5 py-1.5">Spieler</th>
+            <tr className="text-left text-xs uppercase tracking-wider text-amber-100">
+              <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1">#</th>
+              <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1">Spieler</th>
               {columns.map((column) => (
-                <th key={column.label} cl.5 pypx-2 py-1.5 landscape:px-1.5 landscape:py-1ht">{column.label}</th>
-              px-2 py-1.5 landscape:px-1.5 landscape:py-1   </tr>
-   d>
-          <tbody>
-            {players.map((p, index) => (
-              <tr key={p.id} clapx-2 py-1.5 landscape:px-1.5 landscape:py-1r-t border-amber-700/20">
-                ="px-2.5 py-1.5 text-amber-200/75">{index + 1}</td>
-                <td className="px-2.5 py-1.5 font-semibold text-amber-100">{getPlayerLabel(p)}</td>
-                {columns.map((column) => (
-            px-2 py-1.5 landscape:px-1.5 landscape:py-1={column.label} className={cls("px-2.5 py-1.5 text-right", column.empx-2 py-1.5 landscape:px-1.5 landscape:py-1t-lg text-amber-300")}>{column.render(p)}</td>
-                ))}
-              </tr>
-            ))}tbody>
-        </table>
-      </div>
-    </div>
-  );
-}px-2 py-1.5 landscape:px-1.5 landscape:py-1nTable({ title, subtitle = "", playfont-serif text-lg text-amber-300 landscape:text-base}) {
-  const hasHoleRows = players.some((item) => item?.hole_numrn (
-    <div className="mb-3 overflow-hidden rounded-2xl border border-amber-700/30 bg-black/20">
-      <div className="border-b border-amber-700/30 bg-amber-500/10 px-2.5 py-1.5">
-        <div className="font-serif text-lg text-amber-200">{title}</div>
-        {subtitle ? <div className="text-xs text-amber-100/60">{subtitle}</div> : null}
-      </div>
-      <div className="overflow-x-auto [scrollbar-widthpx-2 py-1.5 landscape:px-1.5 landscape:py-1ebkit-scrollbar]:hidden">
-        <table className="w-full min-w-[360px] border-collapse text-sm text-amber-50 landscape:min-w-[900px] landscape:text-xs  <th clas py-1.5">Platz</th>
-              <th className="px-2.5 py-1.5">{hasHoleRows ? "Loch" : nameLabel}</th>
-            <table className="w-full min-w-[360px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">  </tr>
+                <th key={column.label} className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">{column.label}</th>
+              ))}
+            </tr>
           </thead>
           <tbody>
-            {players.map((item, index) => (
-              <tr key={item.id || `${item.courpx-2 py-1.5 landscape:px-1.5 landscape:py-1rse"}-${item.hole_number}-${index}` || indpx-2 py-1.5 landscape:px-1.5 landscape:py-1="border-t border-amber-700/20">
-                <td className="px-2.5 py-1.5 text-amber-200/75">{inde               <td className="ppx-2 py-1.5 landscape:px-1.5 landscape:py-1font-semibold text-amber-100">
-          .hole_number ? `${item.course_name || getCourseShortName(item.course_id)} · Loch ${item.hole_number}` : (item.character_name || item.display_name || item.id)}
-                <        {columns.map((column) => (
-                  <td key={column.label} className={cls("px-2.5 py-1.5 text-px-2 py-1.5 landscape:px-1.5 landscape:py-1n.emphasize && "font-serif text-lg text-amber-300")}>{column.render(px-2 py-1.5 landscape:px-1.5 landscape:py-1</td>
+            {players.map((p, index) => (
+              <tr key={p.id} className="border-t border-amber-700/20">
+                <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-amber-200/75">{index + 1}</td>
+                <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 font-semibold text-amber-100">{getPlayerLabel(p)}</td>
+                {columns.map((column) => (
+                  <td key={column.label} className={cls("px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right", column.emphasize && "font-serif text-lg text-amber-300 landscape:text-base")}>{column.render(p)}</td>
                 ))}
               </tr>
             ))}
@@ -1087,12 +1065,52 @@ function LeaderboardTable({ title, players, columns }) {
   );
 }
 
-function MiddleEarthTables({ playerses, mismatches }) {
-  const funPlayers = useMemo(() => buildFunPlayerStats(players, holes, scores), [players, h);
-  const funHoles = useMemo(() => buildFunHoleStats(playepx-2 py-1.5 landscape:px-1.5 landscape:py-1ores), [players, holes, scores]);
-  => buildScorerMismatchStats(mismatches, players), [mismatches, players]);
+function FunTable({ title, subtitle = "", players, columns, nameLabel = "Name" }) {
+  const hasHoleRows = players.some((item) => item?.hole_number);
 
-  const snakeLords = [...funPlayers].sort((a, b) => Number(b.puttPenaltyEuro || 0) - Number(a.puttPenaltyEuro || 0) || Number(a.sort_order || 0) - Number(b.sort_or const ladies = [...funPlayers].sort((a, b) => Number(b.ladyCount || 0) - Number(a.ladyCount || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
+  return (
+    <div className="mb-3 overflow-hidden rounded-2xl border border-amber-700/30 bg-black/20">
+      <div className="border-b border-amber-700/30 bg-amber-500/10 px-2 py-1.5 landscape:px-1.5 landscape:py-1">
+        <div className="font-serif text-lg text-amber-200 landscape:text-base">{title}</div>
+        {subtitle ? <div className="text-xs text-amber-100/60 landscape:text-[10px]">{subtitle}</div> : null}
+      </div>
+      <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <table className="w-full min-w-[360px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">
+          <thead>
+            <tr className="text-left text-xs uppercase tracking-wider text-amber-100 landscape:text-[10px]">
+              <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1">Platz</th>
+              <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1">{hasHoleRows ? "Loch" : nameLabel}</th>
+              {columns.map((column) => (
+                <th key={column.label} className="px-2 py-1.5 text-right landscape:px-1.5 landscape:py-1">{column.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {players.map((item, index) => (
+              <tr key={item.id || `${item.course_id || "course"}-${item.hole_number}-${index}` || index} className="border-t border-amber-700/20">
+                <td className="px-2 py-1.5 text-amber-200/75 landscape:px-1.5 landscape:py-1">{index + 1}</td>
+                <td className="px-2 py-1.5 font-semibold text-amber-100 landscape:px-1.5 landscape:py-1">
+                  {item.hole_number ? `${item.course_name || getCourseShortName(item.course_id)} · Loch ${item.hole_number}` : (item.character_name || item.display_name || item.id)}
+                </td>
+                {columns.map((column) => (
+                  <td key={column.label} className={cls("px-2 py-1.5 text-right landscape:px-1.5 landscape:py-1", column.emphasize && "font-serif text-lg text-amber-300 landscape:text-base")}>{column.render(item, index)}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function MiddleEarthTables({ players, holes, scores, mismatches }) {
+  const funPlayers = useMemo(() => buildFunPlayerStats(players, holes, scores), [players, holes, scores]);
+  const funHoles = useMemo(() => buildFunHoleStats(players, holes, scores), [players, holes, scores]);
+  const palantirStats = useMemo(() => buildScorerMismatchStats(mismatches, players), [mismatches, players]);
+
+  const snakeLords = [...funPlayers].sort((a, b) => Number(b.puttPenaltyEuro || 0) - Number(a.puttPenaltyEuro || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
+  const ladies = [...funPlayers].sort((a, b) => Number(b.ladyCount || 0) - Number(a.ladyCount || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
   const whiteFlags = [...funPlayers].sort((a, b) => Number(b.pickedUpCount || 0) - Number(a.pickedUpCount || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
   const parMachines = [...funPlayers].sort((a, b) => Number(b.parOrBetter || 0) - Number(a.parOrBetter || 0) || Number(b.pars || 0) - Number(a.pars || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
   const birdieHunters = [...funPlayers].sort((a, b) => Number((b.birdies || 0) + (b.eaglesOrBetter || 0)) - Number((a.birdies || 0) + (a.eaglesOrBetter || 0)) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
@@ -1115,7 +1133,7 @@ function MiddleEarthTables({ playerses, mismatches }) {
 
         <FunTable title="Shelobs Putt-Kammer" subtitle="Snake-König der Runde" players={snakeLords} columns={[{ label: "3P", render: (p) => p.threePutts }, { label: "4+P", render: (p) => p.fourPlusPutts }, { label: "€", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} />
         <FunTable title="Galadriels Spiegel" subtitle="Lady-Liga" players={ladies} columns={[{ label: "Ladys", render: (p) => p.ladyCount, emphasize: true }, { label: "Quote", render: (p) => p.played ? `${Math.round((p.ladyCount / p.played) * 100)} %` : "–" }]} />
-        <FunTable title="Die weißen Fahnen von Gondor" subtitle="Gestrichene Löcher" players={whiteFlags} columns={[{ label: "X", render: (p) => p.pickedUpCount, emphasize: true }, { label: "Quote", reound((p.pickedUpCount / p.played) * 100)} %` : "–" }]} />
+        <FunTable title="Die weißen Fahnen von Gondor" subtitle="Gestrichene Löcher" players={whiteFlags} columns={[{ label: "X", render: (p) => p.pickedUpCount, emphasize: true }, { label: "Quote", render: (p) => p.played ? `${Math.round((p.pickedUpCount / p.played) * 100)} %` : "–" }]} />
         <FunTable title="Die Ents der Fairways" subtitle="Par oder besser" players={parMachines} columns={[{ label: "Par+", render: (p) => p.parOrBetter, emphasize: true }, { label: "Pars", render: (p) => p.pars }, { label: "Birdie+", render: (p) => p.birdies + p.eaglesOrBetter }]} />
         <FunTable title="Die Adler von Manwë" subtitle="Birdie-Jäger" players={birdieHunters} columns={[{ label: "Eagle+", render: (p) => p.eaglesOrBetter }, { label: "Birdies", render: (p) => p.birdies }, { label: "Summe", render: (p) => p.birdies + p.eaglesOrBetter, emphasize: true }]} />
         <FunTable title="Die Minen von Moria" subtitle="Doppelbogey oder schlimmer" players={bogeyBunkers} columns={[{ label: "DB+", render: (p) => p.doubleBogeyPlus, emphasize: true }, { label: "Triple+", render: (p) => p.triplePlus }, { label: "X", render: (p) => p.pickedUpCount }]} />
@@ -1155,25 +1173,32 @@ function TournamentStandings({ players, rounds, holes, scores, activeRoundId = "
 
         {isFinalActive ? (
           <div className="overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <table className="w-full min-w-[760px] border-collapse text-sm text-amber-50 landscape:min-w-[1120px] landscape:text-xs">
+            <table className="w-full min-w-[760px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wider text-amber-100">
- ight">Final Strokes HCP</th>
-        y-1.5 text-right">Löcher</th>
-                  <th className="px-2.5 py-1.5 text-right">Gruppe</th>
+                  <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1">Platz</th>
+                  <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1">Spieler</th>
+                  <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">Quali</th>
+                  <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">Final Strokes HCP</th>
+                  <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">Löcher</th>
+                  <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">Gruppe</th>
                 </tr>
               </thead>
               <tbody>
                 {finalStandings.map((player, index) => (
-                  <Reac<table className="w-full min-w-[760px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">colSpan={6} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2.5 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-ambpx-2 py-1.5 landscape:px-1.5 landscape:py-1ierungsgruppe · Plätze 4–6</td>
-              px-2 py-1.5 landscape:px-1.5 landscape:py-1
+                  <React.Fragment key={player.id}>
+                    {index === 3 && (
+                      <tr>
+                        <td colSpan={6} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2.5 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-amber-200">Platzierungsgruppe · Plätze 4–6</td>
+                      </tr>
                     )}
-                    <tr px-2 py-1.5 landscape:px-1.5 landscape:py-1s("border-t border-amber-700/20", index < 3 && "bg-emeralpx-2 py-1.5 landscape:px-1.5 landscape:py-1                     <td className="px-2.5 py-1.5 font-serif text-lg px-2 py-1.5 landscape:px-1.5 landscape:py-1{player.finalRank}</td>
-                      <td classNampx-2 py-1.5 landscape:px-1.5 landscape:py-11.5 font-sember-100">{getPlayerLabel(player)}</td>
-                      <td className="px-2.5 py-1.5 xt-amber-100/75">{player.qualificationRank}</td>
-                      <td className="px-2.5 py-1.5 nt-serif text-xl font-bold text-amber-300">{player.finalHcpAdjustedStrokes ?? "–"}</td>
-                      <tpx-2.5 py-1.5 text-right text-amber-100">{player.finalPlayed}/18</td>
-                      <td classpy-1.5 text-right text-amber-100/75">{player.finalGroup === "championship" ? "1–3" : "4–6"}</td>
+                    <tr className={cls("border-t border-amber-700/20", index < 3 && "bg-emerald-500/5")}>
+                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 font-serif text-lg font-bold text-amber-300">{player.finalRank}</td>
+                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 font-semibold text-amber-100">{getPlayerLabel(player)}</td>
+                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right text-amber-100/75">{player.qualificationRank}</td>
+                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right font-serif text-xl font-bold text-amber-300 landscape:text-base">{player.finalHcpAdjustedStrokes ?? "–"}</td>
+                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right text-amber-100">{player.finalPlayed}/18</td>
+                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right text-amber-100/75">{player.finalGroup === "championship" ? "1–3" : "4–6"}</td>
                     </tr>
                   </React.Fragment>
                 ))}
@@ -1181,73 +1206,90 @@ function TournamentStandings({ players, rounds, holes, scores, activeRoundId = "
             </table>
           </div>
         ) : (
-          px-2 py-1.5 landscape:px-1.5 landscape:py-1e="overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scpx-2 py-1.5 landscape:px-1.5 landscape:py-1en">
-            <table className="w-full min-w-[760px] border-collapse text-sm text-amber-50 landpx-2 py-1.5 landscape:px-1.5 landscape:py-11120px] landscape:text-xs">
+          <div className="overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <table className="w-full min-w-[760px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">
               <thead>
-                <tr className="text-left text-xs upx-2 py-1.5 landscape:px-1.5 landscape:py-1king-wider tfont-serif text-xl font-bold text-amber-300 landscape:text-baseName="px-2.5 py-1.5">#</th>
-                  ="px-2.5 py-1.5">Spieler</th>
-   ound_px-2 py-1.5 landscape:px-1.5 landscape:py-1                  <th className="px-2.5 py-1.5 text-right">Gesamt</th>
+                <tr className="text-left text-xs uppercase tracking-wider text-amber-100">
+                  <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1">#</th>
+                  <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1">Spieler</th>
+                  {qualificationRounds.map((round) => <th key={round.round_id} className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">{round.round_name}</th>)}
+                  <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">Gesamt</th>
                 </tr>
- px-2 py-1.5 landscape:px-1.5 landscape:py-1                    {index === 3 && (
+              </thead>
+              <tbody>
+                {standings.map((player, index) => (
+                  <React.Fragment key={player.id}>
+                    {index === 3 && (
                       <tr>
-                        <td colSpan={qualificationRounds.length + 4}order-y-2 border-amber-400/70 bg-amber-500/10 px-2.5 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-amber-200">Cut-Linie ·  den Finaltag</td>
+                        <td colSpan={qualificationRounds.length + 4} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2.5 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-amber-200">Cut-Linie · Top 3 spielen den Finaltag</td>
                       </tr>
                     )}
-                    <tr className={cls("border-t border-amber-<table className="w-full min-w-[760px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">              bold text                        {getPlayerLabel(player)}
-                        {index < 3 && <span className="ml-2 rounded-full bgpx-2 py-1.5 landscape:px-1.5 landscape:py-120 px-2 py-0.5 text-[10px] font-bold upperpx-2 py-1.5 landscape:px-1.5 landscape:py-1-wide text-emerald-200">Final</span>}
+                    <tr className={cls("border-t border-amber-700/20", index < 3 && "bg-emerald-500/5")}>
+                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-amber-200/75">{index + 1}</td>
+                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 font-semibold text-amber-100">
+                        {getPlayerLabel(player)}
+                        {index < 3 && <span className="ml-2 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-200">Final</span>}
                       </td>
-                      {qualificationRoupx-2 py-1.5 landscape:px-1.5 landscape:py-1d) => {
-                        const result = player.roundResults.find(px-2 py-1.5 landscape:px-1.5 landscape:py-1m.round_id === round.round_id);
+                      {qualificationRounds.map((round) => {
+                        const result = player.roundResults.find((item) => item.round_id === round.round_id);
                         const isCounted = player.countedRoundIds.includes(round.round_id);
                         const isDropped = player.droppedRoundId === round.round_id;
                         return (
-                          <td key={round.round_id} className={cls("px-2.5 py-1", isCounted && "font-bold text-amber-300", isDropped && "text-amber-100/50 line-throt?.played ? result.points : "–"}</td>
+                          <td key={round.round_id} className={cls("px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right", isCounted && "font-bold text-amber-300", isDropped && "text-amber-100/50 line-through")}>{result?.played ? result.points : "–"}</td>
                         );
                       })}
-                      <td className="px-2.5 py-1.5 text-rif text-xl font-bold text-amber-300">{player.totalBestTwo ?? "–"}</td>
+                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right font-serif text-xl font-bold text-amber-300 landscape:text-base">{player.totalBestTwo ?? "–"}</td>
                     </tr>
-                  ent>
+                  </React.Fragment>
                 ))}
-              </tbopx-2 py-1.5 landscape:px-1.5 landscape:py-1   </table>
+              </tbody>
+            </table>
           </div>
         )}
       </CardContent>
     </Card>
- px-2 py-1.5 landscape:px-1.5 landscape:py-1on ScorecardArchive({ rounds, courses, players, roundPlayers, holes, scores, selectedCourseId = "" }) {
+  );
+}
+
+function ScorecardArchive({ rounds, courses, players, roundPlayers, holes, scores, selectedCourseId = "" }) {
   const availableRounds = rounds?.length ? rounds : fallbackRounds;
   const [selectedRoundId, setSelectedRoundId] = useState(availableRounds[0]?.round_id || "");
   const rawSelectedRound = availableRounds.find((round) => String(round.round_id) === String(selectedRoundId)) || availableRounds[0] || null;
   const selectedRound = rawSelectedRound
     ? {
         ...rawSelectedRound,
-        course_id: rawSelectedRound.course_id || (String(rawSelectedRound.round_id) === String(selectedRoundId) ? selectedC,
+        course_id: rawSelectedRound.course_id || (String(rawSelectedRound.round_id) === String(selectedRoundId) ? selectedCourseId : ""),
       }
     : null;
-  const eligiblePlayers = useMemo(() => getRoundPlayers(selectedRound?.round_id, players, roundlectedRopx-2 py-1.5 landscape:px-1.5 landscape:py-1, players, roundPlayers]);
+  const eligiblePlayers = useMemo(() => getRoundPlayers(selectedRound?.round_id, players, roundPlayers), [selectedRound?.round_id, players, roundPlayers]);
   const [selectedPlayerId, setSelectedPlayerId] = useState(eligiblePlayers[0]?.id || "");
 
   useEffect(() => {
-    if (!availableRounds.some((round) => String(round.round_id) === String(selectedRoundId))) setSepx-2 py-1.5 landscape:px-1.5 landscape:py-1(availableRofont-serif text-xl font-bold text-amber-300 landscape:text-baseunds, selectedRoundId]);
+    if (!availableRounds.some((round) => String(round.round_id) === String(selectedRoundId))) setSelectedRoundId(availableRounds[0]?.round_id || "");
+  }, [availableRounds, selectedRoundId]);
 
   useEffect(() => {
     if (!eligiblePlayers.some((p) => p.id === selectedPlayerId)) setSelectedPlayerId(eligiblePlayers[0]?.id || "");
   }, [eligiblePlayers, selectedPlayerId]);
 
   const selectedPlayer = eligiblePlayers.find((p) => String(p.id) === String(selectedPlayerId)) || eligiblePlayers[0] || null;
-  const rows = useMemo(() => buildScorecardRows(selectedPlayer, selectedRound, holes, scores), [selectedPlayer, selects, scores]);
+  const rows = useMemo(() => buildScorecardRows(selectedPlayer, selectedRound, holes, scores), [selectedPlayer, selectedRound, holes, scores]);
   const summary = useMemo(() => summarizeScorecard(rows), [rows]);
 
   const archiveRoundLabel = (round) => {
     const effectiveRound = {
       ...round,
-      course_id: round.course_id || (String(round.round_id) === String(selectedRoundId) ? selectedCourseId : ""),onst course = getRoundCourse(effectiveRound, courses);
+      course_id: round.course_id || (String(round.round_id) === String(selectedRoundId) ? selectedCourseId : ""),
+    };
+    const course = getRoundCourse(effectiveRound, courses);
     return `${round.round_name} · ${course?.course_name || "Kurs offen"}`;
   };
 
   return (
     <Card className="mb-3 rounded-2xl border-amber-700/40 bg-[#20170f]/90 shadow-xl landscape:rounded-xl">
       <CardContent className="p-3 landscape:p-2">
-        <div className="mbase tracking-[0.2em] text-amber-300/75">Scorekarten</p>
+        <div className="mb-3">
+          <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Scorekarten</p>
           <h2 className="font-serif text-lg text-amber-200">Klassische Scorekarte je Spieler</h2>
         </div>
         <div className="mb-3 grid gap-2 rounded-xl border border-amber-700/30 bg-black/25 p-2.5 landscape:grid-cols-4 landscape:items-end landscape:gap-2">
@@ -1279,89 +1321,110 @@ function TournamentStandings({ players, rounds, holes, scores, activeRoundId = "
                 <div key={label} className="rounded-2xl bg-amber-50/5 p-2.5 text-amber-50"><div className="text-amber-100">{label}</div><b className="text-amber-200">{value}</b></div>
               ))}
             </div>
-            <div className="overflow-x-auto rounded-2xl border border-amber-7h:none] [&::-webkit-scrollbar]:hidden landscape:rounded-xl">
-              <table className="w-full min-w-[760px] border-collapse text-sm text-amber-50 landscape:min-w-[1120px] landscape:text-xs">
+            <div className="overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden landscape:rounded-xl">
+              <table className="w-full min-w-[760px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">
                 <thead>
                   <tr className="text-left text-xs uppercase tracking-wider text-amber-100">
-                    <th className="sticky left-0 z-10 bg-[#20170f] px-2.5 py-1.5">Loch</th>
-                    <th className="px-2.5 py-1.5 text-right">Meter</th>
-                    <th className="px-2.5 py-1.5 text-right">Par</th>ext-right">Score</th>
-                    <th className="px-2.5 py-1.5 text-right">+/−</th>
-                    <th className="px-2.5 py-1.5 text-right">Netto</th>
-                    <th className="px-2.5 py-1.5 text-right">Brutto</th> text-right">Lady</th>
+                    <th className="sticky left-0 z-10 bg-[#20170f] px-2 py-1.5 landscape:px-1.5 landscape:py-1">Loch</th>
+                    <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">Meter</th>
+                    <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">Par</th>
+                    <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">HCP</th>
+                    <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">Score</th>
+                    <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">+/−</th>
+                    <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">Netto</th>
+                    <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">Brutto</th>
+                    <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">Putts</th>
+                    <th className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">Lady</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((row) => (
                     <tr key={row.hole.hole_number} className="border-t border-amber-700/20">
-                      <td className="sticky left-0 z-10 bg-[#20170f] px-2.5 py-1.5 font-semibold text-amber-100">{row.hole.hole_number}</td>
-                      <td className="px-2.5 py-1.5 text-right">{row.hole.meters}</td>
-                      <td className="px-2.5 py-1.5 text-right">{row.hole.par}</td>
-                      <td className="px-2.5 py-1.5 text-right">{row.hole.hcp}</td>
-                      <td className="px-2.5 py-1.5 text-right font-semibold text-amber-2<table className="w-full min-w-[760px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">1.5 text-right">{row.toPar == null ? "–" : formatToPar(row.toPar)}</td>
-                      <td className="px-2.5 py-1.5 text-right">{row.strokes == null ? "–" : row.netStableford}</tpx-2 py-1.5 landscape:px-1.5 landscape:py-1            <td className="px-2.5 py-1.5 text-rpx-2 py-1.5 landscape:px-1.5 landscape:py-1rokes == null ? "–" : row.grossStableford}</td>
-           px-2 py-1.5 landscape:px-1.5 landscape:py-1d className="px-2.5 py-1.5 text-right">{row.puttLabel}</tpx-2 py-1.5 landscape:px-1.5 landscape:py-1            <td className="px-2.5 py-1.5 text-right">{rowpx-2 py-1.5 landscape:px-1.5 landscape:py-1 : "–"}</td>
+                      <td className="sticky left-0 z-10 bg-[#20170f] px-2 py-1.5 landscape:px-1.5 landscape:py-1 font-semibold text-amber-100">{row.hole.hole_number}</td>
+                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">{row.hole.meters}</td>
+                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">{row.hole.par}</td>
+                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">{row.hole.hcp}</td>
+                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right font-semibold text-amber-200">{row.strokes == null ? "–" : row.isPickedUp ? "X" : row.strokes}</td>
+                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">{row.toPar == null ? "–" : formatToPar(row.toPar)}</td>
+                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">{row.strokes == null ? "–" : row.netStableford}</td>
+                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">{row.strokes == null ? "–" : row.grossStableford}</td>
+                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">{row.puttLabel}</td>
+                      <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">{row.isLady ? "✓" : "–"}</td>
                     </tr>
-                  ))px-2 py-1.5 landscape:px-1.5 landscape:py-1     </tbody>
+                  ))}
+                </tbody>
                 <tfoot>
-                  <px-2 py-1.5 landscape:px-1.5 landscape:py-1"border-t border-amber-500/40 bg-amber-500/10 font-bold texpx-2 py-1.5 landscape:px-1.5 landscape:py-1
-                    <td className="sticky left-0 z-10 bg-[#px-2 py-1.5 landscape:px-1.5 landscape:py-15 py-1.5">Total</td>
-                    <td className="px-px-2 py-1.5 landscape:px-1.5 landscape:py-1xt-right">–</td>
-                    <td className="px-2.5 py-1.5 text-right">{rows.reduce((sum, row) =r(row.hole.par || 0), 0)}</td>
-                    <td className="px-2.5 py-1.5 text-right                <td className="px-2.5 py-1.5 text-right text-amber-300">{summary.played ? summary.tota"}px-2 py-1.5 landscape:px-1.5 landscape:py-1             <td className="px-2.5 py-1.5 text-right">{summary.played ? formatToPar(s : "–"}</tdpx-2 py-1.5 landscape:px-1.5 landscape:py-1         <td className="px-2.5 py-1.5 text-right text-amber-300">{summarypx-2 py-1.5 landscape:px-1.5 landscape:py-1               <td className="px-2.5 py-1.5 text-right text-amber-300"px-2 py-1.5 landscape:px-1.5 landscape:py-1ssStablef                 <td className="px-2.5 py-1.5 text-right">3× px-2 py-1.5 landscape:px-1.5 landscape:py-1ePutts} · 4+× {summary.foutd>
-                    <td className="px-2.5 py-1.5 text-right">–</td>
+                  <tr className="border-t border-amber-500/40 bg-amber-500/10 font-bold text-amber-100">
+                    <td className="sticky left-0 z-10 bg-[#2a2117] px-2 py-1.5 landscape:px-1.5 landscape:py-1">Total</td>
+                    <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">–</td>
+                    <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">{rows.reduce((sum, row) => sum + Number(row.hole.par || 0), 0)}</td>
+                    <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">–</td>
+                    <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right text-amber-300">{summary.played ? summary.totalStrokes : "–"}</td>
+                    <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">{summary.played ? formatToPar(summary.toPar) : "–"}</td>
+                    <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right text-amber-300">{summary.netStableford}</td>
+                    <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right text-amber-300">{summary.grossStableford}</td>
+                    <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">3× {summary.threePutts} · 4+× {summary.fourPlusPutts}</td>
+                    <td className="px-2 py-1.5 landscape:px-1.5 landscape:py-1 text-right">–</td>
                   </tr>
-      foot>
-              <px-2 py-1.5 landscape:px-1.5 landscape:py-1       </div>
+                </tfoot>
+              </table>
+            </div>
           </>
         )}
       </CardContent>
-    </Carync function callSheetApi(payload) {
-px-2 py-1.5 landscape:px-1.5 landscape:py-1 new URL(GOOGLE_SHEETS_API_URL);
-  url.searchParams., JSON.stringify(payload));
-  url.searchParams.set(px-2 py-1.5 landscape:px-1.5 landscape:py-1String(Date.now()));
+    </Card>
+  );
+}
+
+async function callSheetApi(payload) {
+  const url = new URL(GOOGLE_SHEETS_API_URL);
+  url.searchParams.set("payload", JSON.stringify(payload));
+  url.searchParams.set("cacheBust", String(Date.now()));
   const response = await fetch(url.toString(), { method: "GET" });
-  if (!response.opx-2 py-1.5 landscape:px-1.5 landscape:py-1Error("Datenbank nicht erreichbar.");
-  const data = await response.jsopx-2 py-1.5 landscape:px-1.5 landscape:py-1ta && data.ok === false) throw new Error(data.error || "Datenbank meldet e);
+  if (!response.ok) throw new Error("Datenbank nicht erreichbar.");
+  const data = await response.json();
+  if (data && data.ok === false) throw new Error(data.error || "Datenbank meldet einen Fehler.");
   return data;
 }
 
 function LordOfTheHolesApp() {
   const cachedState = readLocalJson("lordOfTheHoles.cachedState", null);
-  const [playes] = useState(cachedState?.players?.length ? cachedState.players : fallbackPlayers);
-  const [allPlpx-2 py-1.5 landscape:px-1.5 landscape:py-1Playte(cachedState?.allPlayers?.length ? cachedSpx-2 py-1.5 landscape:px-1.5 landscape:py-1rs : fallbackPlayers);
-  const [courses, setCourses] = px-2 py-1.5 landscape:px-1.5 landscape:py-1ses?.length ? cachedState.courses : fallbackCourses);
-  const [rounds, setRounds] = useState(cachedStlength ? cachedSpx-2 py-1.5 landscape:px-1.5 landscape:py-1 fallbackRounds);
-  const [roundPlayers, setRoundPlayerpx-2 py-1.5 landscape:px-1.5 landscape:py-1(cachedState?.roundPlayers || []);
-  const [activeRound, setActiveRound] = useState(cachedState || null);
-  const px-2 py-1.5 landscape:px-1.5 landscape:py-1les] = useState(cachedState?.holes?.length ? cachedState.holes : fallbackHoles);
-  const [allHoles, setAlpx-2 py-1.5 landscape:px-1.5 landscape:py-1tate?.allHoles?.length ? cachedState.allHoles : fallbackHoles);
-  const [scores, setScores] px-2 py-1.5 landscape:px-1.5 landscape:py-1chedState?.scores?.length ? cachedState.rmalizeScoreRecord) : []);
-  const [allScores, setAllSpx-2 py-1.5 landscape:px-1.5 landscape:py-1tate(cachedState?.allScores?.length ? cachedState.allScores.map(normalizeScoreRec const [pendingScores, setpx-2 py-1.5 landscape:px-1.5 landscape:py-1] = useState(() => readLocalJson("lordOfTheHoles.pendingScores", []).map(noecord));
+  const [players, setPlayers] = useState(cachedState?.players?.length ? cachedState.players : fallbackPlayers);
+  const [allPlayers, setAllPlayers] = useState(cachedState?.allPlayers?.length ? cachedState.allPlayers : fallbackPlayers);
+  const [courses, setCourses] = useState(cachedState?.courses?.length ? cachedState.courses : fallbackCourses);
+  const [rounds, setRounds] = useState(cachedState?.rounds?.length ? cachedState.rounds : fallbackRounds);
+  const [roundPlayers, setRoundPlayers] = useState(cachedState?.roundPlayers || []);
+  const [activeRound, setActiveRound] = useState(cachedState?.activeRound || null);
+  const [holes, setHoles] = useState(cachedState?.holes?.length ? cachedState.holes : fallbackHoles);
+  const [allHoles, setAllHoles] = useState(cachedState?.allHoles?.length ? cachedState.allHoles : fallbackHoles);
+  const [scores, setScores] = useState(cachedState?.scores?.length ? cachedState.scores.map(normalizeScoreRecord) : []);
+  const [allScores, setAllScores] = useState(cachedState?.allScores?.length ? cachedState.allScores.map(normalizeScoreRecord) : []);
+  const [pendingScores, setPendingScores] = useState(() => readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord));
   const pendingScoresRef = useRef(readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord));
   const [localHandicaps, setLocalHandicaps] = useState({});
   const [scoredPlayerId, setScoredPlayerId] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerId", "florian"));
-  const [scoreEntryMode, setScoreEntryMode] = useStat  const [activeHole, setActiveHole] = useState(() => {
-    const cachedRoundId = cachedStattiveRoundId || cachedState?.activeRound?.round_id || "";
-    const cachedScoredPlayerId = readLocaTheHoles.scoredPlayerId", "");
-    return getFirstUnscoredHole(cachedState?.scores?.length ? cachedState.scores : cachedState?.allScores || [], cachedRoundId, cayerId, 1);
+  const [scoreEntryMode, setScoreEntryMode] = useState("player");
+  const [activeHole, setActiveHole] = useState(() => {
+    const cachedRoundId = cachedState?.selectedActiveRoundId || cachedState?.activeRound?.round_id || "";
+    const cachedScoredPlayerId = readLocalJson("lordOfTheHoles.scoredPlayerId", "");
+    return getFirstUnscoredHole(cachedState?.scores?.length ? cachedState.scores : cachedState?.allScores || [], cachedRoundId, cachedScoredPlayerId, 1);
   });
   const [view, setView] = useState("score");
-  const [mainMenu, setMainMenu] = uent");
+  const [mainMenu, setMainMenu] = useState("current");
   const [menuOpen, setMenuOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  cving, setSetupSaving] = useState(false);
+  const [setupSaving, setSetupSaving] = useState(false);
   const [backupSaving, setBackupSaving] = useState(false);
-  const [scoreSaveInFlight, setScoreSaveInFlightfalse);
+  const [scoreSaveInFlight, setScoreSaveInFlight] = useState(false);
   const pendingScoreSaveRef = useRef(Promise.resolve(true));
   const scoreSaveSequenceRef = useRef(0);
-  const initialHoleSynce(false);
+  const initialHoleSyncedRef = useRef(false);
   const [autoSync] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState("offline");
-  const [error, setEate("");
+  const [error, setError] = useState("");
   const [selectedCourseId, setSelectedCourseId] = useState(cachedState?.selectedCourseId || "");
-  const [selectedActiveRoundId, setSelectedA = useState(cachedState?.selectedActiveRoundId || "r1");
+  const [selectedActiveRoundId, setSelectedActiveRoundId] = useState(cachedState?.selectedActiveRoundId || "r1");
   const [myPlayerId, setMyPlayerId] = useState(() => readLocalJson("lordOfTheHoles.myPlayerId", ""));
   const [adminPinInput, setAdminPinInput] = useState("");
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
@@ -1951,7 +2014,7 @@ function LordOfTheHolesApp() {
                     <div className="mb-2 font-semibold text-amber-100">{getPlayerLabel(p)}<div className="text-xs font-normal text-amber-100/70">DGV-HCP eintragen · Spielvorgabe wird automatisch berechnet</div></div>
                     <div className="rounded-xl border border-amber-700/20 bg-black/20 p-2">
                       <label className="mb-1 block text-xs font-bold uppercase tracking-[0.16em] text-amber-300/80">DGV HCP / Handicap Index</label>
-                      <input inputMode="ed} value={hcpIndexValue} onChange={(e) => { setAdminEditing(true); setLocalHandicaps((current) => ({ ...current, [hcpIndexKey]: cleanHandicapInput(e.target.value) })); }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2.5 text-center text-amber-50 disabled:opacity-60" />
+                      <input inputMode="decimal" disabled={!isAdminUnlocked} value={hcpIndexValue} onChange={(e) => { setAdminEditing(true); setLocalHandicaps((current) => ({ ...current, [hcpIndexKey]: cleanHandicapInput(e.target.value) })); }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2.5 text-center text-amber-50 disabled:opacity-60" />
                       <div className="mt-2 grid grid-cols-2 gap-2 text-center text-xs text-amber-100/75">
                         <div className="rounded-xl bg-amber-50/5 p-2"><div>Goethe SpV</div><b className="text-lg text-amber-200">{goetheSpv}</b></div>
                         <div className="rounded-xl bg-amber-50/5 p-2"><div>Feininger SpV</div><b className="text-lg text-amber-200">{feiningerSpv}</b></div>
@@ -2046,7 +2109,8 @@ function LordOfTheHolesApp() {
               <tbody>
                 {tablePlayers.map((player, index) => {
                   const isMe = myPlayerId && String(player.id) === String(myPlayerId);
-                r key={player.id} className={cls("border-t border-amber-700/20", isMe && "bg-amber-500/15")}> 
+                  return (
+                    <tr key={player.id} className={cls("border-t border-amber-700/20", isMe && "bg-amber-500/15")}> 
                       <td className="px-2 py-2 text-amber-200/80">{index + 1}</td>
                       <td className="px-2 py-2 font-semibold text-amber-100">{getPlayerLabel(player)}</td>
                       <td className="px-2 py-2 text-right font-serif text-lg font-bold text-amber-300">
@@ -2104,7 +2168,8 @@ function LordOfTheHolesApp() {
                 </div>
               )}
               {visibleScoreMismatchMessage && (
-                <div className="mb-3 rounded-2xl border border-red-500/50 bg-red-950/                 <span className="underline underline-offset-4">Abweichung</span>
+                <div className="mb-3 rounded-2xl border border-red-500/50 bg-red-950/40 p-2.5 text-sm text-red-100">
+                  <span className="underline underline-offset-4">Abweichung</span>
                   <div className="mt-1 space-y-0.5">
                     {visibleScoreMismatchMessages.map((message) => (
                       <div key={message}>{message}</div>
@@ -2158,7 +2223,8 @@ function LordOfTheHolesApp() {
           <Card className="mb-3 rounded-2xl border-amber-700/40 bg-black/35 landscape:rounded-xl"><CardContent className="p-3 text-sm text-amber-100 landscape:p-2"><div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Aktuell gespielt</div><div className="mt-1 font-serif text-lg text-amber-200">{displayedActiveRound?.round_name || "Runde 1"}</div><div className="text-amber-100/65">{activeCourse?.course_name || "Kein Kurs ausgewählt"}</div></CardContent></Card>
           <Card className="mb-3 rounded-2xl border-amber-700/40 bg-[#20170f]/90 shadow-xl"><CardContent className="p-3"><div className="mb-3"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Leaderboard</p><h2 className="font-serif text-lg text-amber-200">Die Gefährten</h2></div>
             <LeaderboardTable title="Klassisches Zählspiel" players={strokePlayLeaderboard} columns={[{ label: "+/−", render: (p) => formatToPar(p.toPar, p.played), emphasize: true }, { label: "Schläge", render: (p) => (p.played ? p.total : "–") }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
-            <div id="net-stableford-board" className="scroll-Table title="Netto Stableford" players={netStablefordLeaderboard} columns={[{ label: "Punkte", render: (p) => p.netStableford, emphasize: true }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
+            <div id="net-stableford-board" className="scroll-mt-3">
+              <LeaderboardTable title="Netto Stableford" players={netStablefordLeaderboard} columns={[{ label: "Punkte", render: (p) => p.netStableford, emphasize: true }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
             </div>
             <div id="hcp-adjusted-board" className="scroll-mt-3">
               <LeaderboardTable title="Zählspiel HCP adjusted" players={hcpAdjustedStrokeLeaderboard} columns={[{ label: "+/−", render: (p) => formatToPar(p.hcpAdjustedToPar, p.played), emphasize: true }, { label: "Netto", render: (p) => (p.played ? p.hcpAdjustedTotal : "–") }, { label: "Löcher", render: (p) => String(p.played) + "/18" }]} />
@@ -2206,7 +2272,7 @@ function LordOfTheHolesApp() {
 
   return (
     <div className="min-h-screen bg-stone-950 text-amber-50">
-      <div className="fixed inset-0 bg-[radial-gradient(circle_at_30%_10%,rgba(245,158,gradient(circle_at_80%_15%,rgba(220,38,38,0.18),transparent_30%),linear-gradient(180deg,rgba(0,0,0,0.25),rgba(0,0,0,0.9))]" />
+      <div className="fixed inset-0 bg-[radial-gradient(circle_at_30%_10%,rgba(245,158,11,0.22),transparent_35%),radial-gradient(circle_at_80%_15%,rgba(220,38,38,0.18),transparent_30%),linear-gradient(180deg,rgba(0,0,0,0.25),rgba(0,0,0,0.9))]" />
       <main className="relative mx-auto max-w-md px-3 py-3">
         {renderHeader()}
         {renderStatusMessages()}
@@ -2214,7 +2280,9 @@ function LordOfTheHolesApp() {
         {renderActiveView()}
         <footer className="pb-4 pt-2 text-center text-[10px] uppercase tracking-[0.18em] text-amber-100/35">
           © Lord of the Holes Association
-        tupSavedMessage ? (
+        </footer>
+      </main>
+      {setupSavedMessage ? (
         <div className="fixed inset-x-3 top-4 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/50 bg-emerald-950/95 p-3 text-emerald-50 shadow-2xl shadow-black/60 backdrop-blur">
           <div className="flex items-start justify-between gap-3">
             <div>
