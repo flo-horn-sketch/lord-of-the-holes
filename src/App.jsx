@@ -505,7 +505,7 @@ function getRoundChapterLabel(round) {
   const stage = String(round?.stage || "").toLowerCase().trim();
   if (stage === "final" || roundId === "r4" || sortOrder === 4) return "Finaltag · Am Schicksalsberg";
   if (roundId === "r1" || sortOrder === 1) return "Runde 1 · Die Gefährten brechen auf";
-  if (roundId === "r2" || sortOrder === 2) return "Runde 2 · Durch die Minen";
+  if (roundId === "r2" || sortOrder === 2) return "Runde 2 · Durch die Minen von Moria";
   if (roundId === "r3" || sortOrder === 3) return "Runde 3 · Vor den Toren Mordors";
   return `${round?.round_name || "Runde"} · Kapitel der Runde`;
 }
