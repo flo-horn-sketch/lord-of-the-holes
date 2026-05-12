@@ -765,6 +765,7 @@ function LordOfTheHolesApp() {
   const [allScores, setAllScores] = useState(cachedState?.allScores?.length ? cachedState.allScores.map(normalizeScoreRecord) : []);
   const [pendingScores, setPendingScores] = useState(() => readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord));
   const pendingScoresRef = useRef(readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord));
+  const lastAutoHoleTargetRef = useRef("");
   const [localHandicaps, setLocalHandicaps] = useState({});
   const [scoredPlayerId, setScoredPlayerId] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerId", "florian"));
   const [scoreEntryMode, setScoreEntryMode] = useState("player");
@@ -883,7 +884,12 @@ function LordOfTheHolesApp() {
     const selectedPendingScores = pendingScoresRef.current.filter((score) => String(score.round_id || "") === String(selectedActiveRoundId));
     const mergedRoundScores = mergeScoresPreservingPending(selectedRoundScores, selectedPendingScores);
     setScores(mergedRoundScores);
-    setActiveHole(getFirstUnscoredHole(mergedRoundScores, selectedActiveRoundId, scoredPlayerId, 1));
+
+    const autoHoleTargetKey = `${selectedActiveRoundId}|${scoredPlayerId}`;
+    if (lastAutoHoleTargetRef.current !== autoHoleTargetKey) {
+      lastAutoHoleTargetRef.current = autoHoleTargetKey;
+      setActiveHole(getFirstUnscoredHole(mergedRoundScores, selectedActiveRoundId, scoredPlayerId, 1));
+    }
   }, [selectedActiveRoundId, allScores, scoredPlayerId]);
   useEffect(() => {
     if (!activePopupSoundKey) { lastPopupSoundKeyRef.current = ""; return; }
