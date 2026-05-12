@@ -714,6 +714,25 @@ function getLatestScoredHole(scores = [], roundId = "", fallbackHole = 1) {
   return Number(filteredScores[0]?.hole_number || fallbackHole || 1);
 }
 
+function getFirstUnscoredHole(scores = [], roundId = "", playerId = "", fallbackHole = 1) {
+  const scoredHoleNumbers = new Set(
+    (scores || [])
+      .filter((score) => {
+        if (!score || score.strokes === "" || score.strokes == null) return false;
+        if (roundId && String(score.round_id || "") !== String(roundId)) return false;
+        if (playerId && String(score.player_id || "") !== String(playerId)) return false;
+        return Number(score.hole_number) > 0;
+      })
+      .map((score) => Number(score.hole_number))
+  );
+
+  for (let holeNumber = 1; holeNumber <= 18; holeNumber += 1) {
+    if (!scoredHoleNumbers.has(holeNumber)) return holeNumber;
+  }
+
+  return Number(fallbackHole || 18);
+}
+
 function isNewerOrEqualScore(candidate, existing) {
   return getScoreTimestamp(candidate) >= getScoreTimestamp(existing);
 }
@@ -1387,7 +1406,8 @@ function LordOfTheHolesApp() {
   const [scoreEntryMode, setScoreEntryMode] = useState("player");
   const [activeHole, setActiveHole] = useState(() => {
     const cachedRoundId = cachedState?.selectedActiveRoundId || cachedState?.activeRound?.round_id || "";
-    return getLatestScoredHole(cachedState?.scores?.length ? cachedState.scores : cachedState?.allScores || [], cachedRoundId, 1);
+    const cachedScoredPlayerId = readLocalJson("lordOfTheHoles.scoredPlayerId", "");
+    return getFirstUnscoredHole(cachedState?.scores?.length ? cachedState.scores : cachedState?.allScores || [], cachedRoundId, cachedScoredPlayerId, 1);
   });
   const [view, setView] = useState("score");
   const [mainMenu, setMainMenu] = useState("current");
@@ -1533,8 +1553,10 @@ function LordOfTheHolesApp() {
     if (!selectedActiveRoundId) return;
     const selectedRoundScores = allScores.filter((score) => String(score.round_id || "") === String(selectedActiveRoundId));
     const selectedPendingScores = pendingScoresRef.current.filter((score) => String(score.round_id || "") === String(selectedActiveRoundId));
-    setScores(mergeScoresPreservingPending(selectedRoundScores, selectedPendingScores));
-  }, [selectedActiveRoundId, allScores]);
+    const mergedRoundScores = mergeScoresPreservingPending(selectedRoundScores, selectedPendingScores);
+    setScores(mergedRoundScores);
+    setActiveHole(getFirstUnscoredHole(mergedRoundScores, selectedActiveRoundId, scoredPlayerId, 1));
+  }, [selectedActiveRoundId, allScores, scoredPlayerId]);
 
   useEffect(() => {
     writeLocalJson("lordOfTheHoles.cachedState", {
@@ -1613,7 +1635,7 @@ function LordOfTheHolesApp() {
       setAllScores(nextAllScores);
       setScores(nextActiveScores);
       if (!initialHoleSyncedRef.current) {
-        setActiveHole(getLatestScoredHole(nextActiveScores, nextActiveRound?.round_id || "", 1));
+        setActiveHole(getFirstUnscoredHole(nextActiveScores, nextActiveRound?.round_id || "", scoredPlayerId, 1));
         initialHoleSyncedRef.current = true;
       }
       setConnectionStatus("online");
