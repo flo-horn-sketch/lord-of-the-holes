@@ -1451,6 +1451,7 @@ function LordOfTheHolesApp() {
     [scores, entryPlayerId, activeHole, displayedActiveRound?.round_id, isScorerEntryMode]
   );
   const hasCurrentScore = currentScore.strokes !== "" && currentScore.strokes != null;
+  const hasCurrentPutts = currentScore.putts_count !== "" && currentScore.putts_count != null;
   const officialScores = useMemo(() => getOfficialScores(scores), [scores]);
   const officialAllScores = useMemo(() => getOfficialScores(allScores), [allScores]);
   const roundMismatches = useMemo(
@@ -1743,8 +1744,12 @@ function LordOfTheHolesApp() {
   function goToNextHole() {
     if (activeHole === 18) return;
 
-    if (!hasCurrentScore) {
-      setScoreHintMessage("Erst Score eintragen, dann weiter.");
+    if (!hasCurrentScore || !hasCurrentPutts) {
+      const missingItems = [
+        !hasCurrentScore ? "Score" : "",
+        !hasCurrentPutts ? "Putts" : "",
+      ].filter(Boolean);
+      setScoreHintMessage(`Erst ${missingItems.join(" und ")} eintragen, dann weiter.`);
       window.setTimeout(() => setScoreHintMessage(""), 1800);
       return;
     }
