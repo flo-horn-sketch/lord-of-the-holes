@@ -2157,9 +2157,8 @@ function LordOfTheHolesApp() {
             </div>
           )}
         </div>
-        <div className="mt-2 flex jus
-          <div className="inline-flex items-center gap-2 rounded-full border border-amber-700/40 bg-black/35 px-2.5 py-1 text-[11px] text-amber-100/75">
-            <Icon size={14} className={connectionStatus === "online" ? "text-emerald-300" : "text-red-300"}>{connectionStatus === "online" ? "●" : "○"}</Icon>
+        <div className="mt-2 flex justify-center">
+          <div className="inline-flex items-center gap-2 rounded-full border border-amber-700/40 bg-black/35 px-2 py-1 text-[11px] text-amber-100/75"online" ? "text-emerald-300" : "text-red-300"}>{connectionStatus === "online" ? "●" : "○"}</Icon>
             {pendingScores.length ? `${pendingScores.length} Score${pendingScores.length === 1 ? "" : "s"} offen` : connectionStatus === "online" ? "Datenbank verbunden" : "Datenbank nicht verbunden"}
           </div>
         </div>
