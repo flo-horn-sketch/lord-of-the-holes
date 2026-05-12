@@ -1479,14 +1479,8 @@ function LordOfTheHolesApp() {
           <button type="button" onClick={() => setMenuOpen((value) => !value)} className="rounded-xl border border-amber-700/40 bg-black/25 px-3 py-1.5 text-lg leading-none text-amber-100" aria-label="Menü öffnen">☰</button>
         </div>
         <div className="relative text-center">
-          <div className="mx-auto mb-2 h-24 overflow-hidden rounded-3xl border border-amber-500/25 bg-black/35 shadow-xl shadow-black/40">
-            <img
-              src="/apple-touch-icon.png"
-              alt="Lord of the Holes"
-              className="h-full w-full object-cover object-center opacity-95"
-            />
-          </div>
-          <p className="mt-0.5 text-xs uppercase tracking-[0.22em] text-amber-100/75">{subtitle}</p>
+          <h1 className="font-serif text-3xl font-black tracking-wide text-amber-300 drop-shadow">Lord of the Holes</h1>
+          <p className="mt-0.5 text-xs text-amber-100/75">{subtitle}</p>
           {menuOpen && (
             <div className="absolute right-0 top-[58px] z-30 w-64 overflow-hidden rounded-2xl border border-amber-700/40 bg-stone-950/95 text-left shadow-2xl shadow-black/70 backdrop-blur">
               {[
