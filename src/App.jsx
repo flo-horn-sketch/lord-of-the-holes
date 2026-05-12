@@ -830,6 +830,13 @@ function LordOfTheHolesApp() {
   }) || { strokes: "", picked_up: false, over_two_putts: false, putts_count: "", lady: false }, [scores, entryPlayerId, activeHole, displayedActiveRound?.round_id, isScorerEntryMode]);
   const hasCurrentScore = currentScore.strokes !== "" && currentScore.strokes != null;
   const hasCurrentPutts = currentScore.putts_count !== "" && currentScore.putts_count != null;
+  const officialScoreForActiveHole = useMemo(() => findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", scoredPlayerId, activeHole, false), [scores, displayedActiveRound?.round_id, scoredPlayerId, activeHole]);
+  const controlScoreForActiveHole = useMemo(() => (myPlayerId ? findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", myPlayerId, activeHole, true) : null), [scores, displayedActiveRound?.round_id, myPlayerId, activeHole]);
+  const hasOfficialScoreForNext = officialScoreForActiveHole && officialScoreForActiveHole.strokes !== "" && officialScoreForActiveHole.strokes != null;
+  const hasOfficialPuttsForNext = officialScoreForActiveHole && officialScoreForActiveHole.putts_count !== "" && officialScoreForActiveHole.putts_count != null;
+  const hasControlScoreForNext = Boolean(myPlayerId && controlScoreForActiveHole && controlScoreForActiveHole.strokes !== "" && controlScoreForActiveHole.strokes != null);
+  const hasControlPuttsForNext = Boolean(myPlayerId && controlScoreForActiveHole && controlScoreForActiveHole.putts_count !== "" && controlScoreForActiveHole.putts_count != null);
+  const hasRequiredScoresForNext = Boolean(myPlayerId && hasOfficialScoreForNext && hasOfficialPuttsForNext && hasControlScoreForNext && hasControlPuttsForNext);
   const officialScores = useMemo(() => getOfficialScores(scores), [scores]);
   const officialAllScores = useMemo(() => getOfficialScores(allScores), [allScores]);
   const roundMismatches = useMemo(() => getMismatchesForRound(scores, displayedActiveRound?.round_id || "r1", visiblePlayers), [scores, displayedActiveRound?.round_id, visiblePlayers]);
@@ -929,7 +936,8 @@ function LordOfTheHolesApp() {
 
     return buildSummary(9) || buildSummary(18);
   }, [myPlayerId, displayedActiveRound?.round_id, visiblePlayers, displayCourseId, courses, holes, officialScores, roundSummaryDismissedKeys]);
-  const activePopupSoundKey = showSplash ? "" : roundSummaryPopup ? `roundSummary:${roundSummaryPopup.key}` : showFinalWinnerPopup ? `finalWinner:${finalWinnerPopupKey}` : displayedRoundHonorCelebration ? `roundHonor:${displayedRoundHonorCelebration.key}` : clearScoresConfirmOpen ? "clearScoresConfirm" : backupSavedMessage ? "backupSaved" : setupSavedMessage ? "setupSaved" : clearScoresError ? "clearScoresError" : error ? "error" : "";
+  const showPlayerSelectPopup = Boolean(!showSplash && !myPlayerId);
+  const activePopupSoundKey = showSplash || showPlayerSelectPopup ? "" : roundSummaryPopup ? `roundSummary:${roundSummaryPopup.key}` : showFinalWinnerPopup ? `finalWinner:${finalWinnerPopupKey}` : displayedRoundHonorCelebration ? `roundHonor:${displayedRoundHonorCelebration.key}` : clearScoresConfirmOpen ? "clearScoresConfirm" : backupSavedMessage ? "backupSaved" : setupSavedMessage ? "setupSaved" : clearScoresError ? "clearScoresError" : error ? "error" : "";
 
   useEffect(() => {
     if (!scoreablePlayers.some((p) => String(p.id) === String(scoredPlayerId))) setScoredPlayerId(scoreablePlayers[0]?.id || "");
@@ -1070,10 +1078,19 @@ function LordOfTheHolesApp() {
 
   function goToNextHole() {
     if (activeHole === 18) return;
-    if (!hasCurrentScore || !hasCurrentPutts) {
-      const missingItems = [!hasCurrentScore ? "Score" : "", !hasCurrentPutts ? "Putts" : ""].filter(Boolean);
-      setScoreHintMessage(`Erst ${missingItems.join(" und ")} eintragen, dann weiter.`);
-      window.setTimeout(() => setScoreHintMessage(""), 1800);
+    if (!hasRequiredScoresForNext) {
+      if (!myPlayerId) {
+        setScoreHintMessage("Bitte zuerst unter Einstellungen auswählen, wer du auf diesem Handy bist.");
+        window.setTimeout(() => setScoreHintMessage(""), 2400);
+        return;
+      }
+      const missingItems = [];
+      if (!hasOfficialScoreForNext) missingItems.push(`Score für ${getPlayerLabel(scoredPlayer) || "Spieler"}`);
+      if (!hasOfficialPuttsForNext) missingItems.push(`Putts für ${getPlayerLabel(scoredPlayer) || "Spieler"}`);
+      if (!hasControlScoreForNext) missingItems.push("mein Score");
+      if (!hasControlPuttsForNext) missingItems.push("meine Putts");
+      setScoreHintMessage(`Erst ${missingItems.join(", ")} eintragen, dann weiter.`);
+      window.setTimeout(() => setScoreHintMessage(""), 2400);
       return;
     }
     setScoreHintMessage("");
@@ -1302,7 +1319,7 @@ function LordOfTheHolesApp() {
 
               <div className="grid grid-cols-2 gap-2">
                 <Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 py-2 text-amber-100">Zurück</Button>
-                <Button disabled={activeHole === 18} onClick={goToNextHole} className={cls("rounded-2xl py-2 text-amber-50 disabled:opacity-50", hasCurrentScore && hasCurrentPutts ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>Loch {Math.min(18, Number(activeHole || 1) + 1)}</Button>
+                <Button disabled={activeHole === 18} onClick={goToNextHole} className={cls("rounded-2xl py-2 text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>Loch {Math.min(18, Number(activeHole || 1) + 1)}</Button>
               </div>
             </div>
           </CardContent>
@@ -1512,6 +1529,25 @@ function LordOfTheHolesApp() {
       <div className="fixed inset-0 bg-black/45" />
       <div className="fixed inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.06),rgba(0,0,0,0.58)_38%,rgba(0,0,0,0.86)_100%)]" />
       {showSplash ? <div className="fixed inset-0 z-[100] bg-black"><div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/lord-bg.webp')" }} /><div className="absolute inset-0 bg-black/20" /><div className="absolute inset-x-0 bottom-8 flex justify-center px-6 pb-[env(safe-area-inset-bottom)]"><button type="button" onClick={enterRoundFromSplash} className="w-full max-w-xs rounded-2xl border border-amber-300/55 bg-black/55 px-5 py-2.5 font-serif text-lg font-black tracking-wide text-amber-200 shadow-2xl shadow-black/70 backdrop-blur-sm active:scale-[0.98]">Runde betreten</button></div></div> : null}
+      {showPlayerSelectPopup ? (
+        <div className="fixed inset-0 z-[99] flex items-center justify-center bg-black/72 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-400/55 bg-stone-950 text-amber-50 shadow-2xl shadow-black/80">
+            <div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.22),transparent_45%),linear-gradient(180deg,rgba(41,37,36,0.94),rgba(12,10,9,1))] p-4 text-center">
+              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full border border-amber-300/45 bg-black/30 text-3xl">🧙</div>
+              <div className="text-[10px] uppercase tracking-[0.26em] text-amber-100/70">Dieses Handy gehört zu</div>
+              <div className="mt-2 font-serif text-xl font-black text-amber-200">Wer bist du?</div>
+              <p className="mt-2 text-sm text-amber-100/70">Wähle zuerst deinen Spieler. Erst dann kann die App offiziellen Score und deinen Kontrollscore sauber trennen.</p>
+              <div className="mt-4 rounded-2xl border border-amber-700/35 bg-black/25 p-2 text-left">
+                <label className="mb-1 block text-sm text-amber-100/80">Wer bin ich auf diesem Handy?</label>
+                <select value={myPlayerId} onChange={(e) => setMyPlayerId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50">
+                  <option value="">Spieler auswählen</option>
+                  {allPlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <main className="relative z-10 mx-auto max-w-md px-2 py-1.5">
         {renderHeader()}
         {renderStatusMessages()}
