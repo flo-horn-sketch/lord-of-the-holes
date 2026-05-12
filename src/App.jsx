@@ -1388,7 +1388,8 @@ function LordOfTheHolesApp() {
               const grossStableford = score ? getScoreStablefordPoints(score, hole.par, 0) : 0;
               const netStableford = score ? getScoreStablefordPoints(score, hole.par, shots) : 0;
               const hcpAdjustedStrokes = score && score.strokes !== "" && score.strokes != null ? Number(score.strokes || 0) - shots : null;
-              return { hole, score, shots, grossStableford, netStableford, hcpAdjustedStrokes };
+              const hcpAdjustedToPar = hcpAdjustedStrokes != null ? hcpAdjustedStrokes - Number(hole.par || 0) : null;
+              return { hole, score, shots, grossStableford, netStableford, hcpAdjustedStrokes, hcpAdjustedToPar };
             });
 
             const playedRows = playerScores.filter((row) => row.score && row.score.strokes !== "" && row.score.strokes != null);
@@ -1396,6 +1397,8 @@ function LordOfTheHolesApp() {
             const totalGrossStableford = playedRows.reduce((sum, row) => sum + Number(row.grossStableford || 0), 0);
             const totalNetStableford = playedRows.reduce((sum, row) => sum + Number(row.netStableford || 0), 0);
             const totalHcpAdjustedStrokes = playedRows.reduce((sum, row) => sum + Number(row.hcpAdjustedStrokes || 0), 0);
+            const totalParPlayed = playedRows.reduce((sum, row) => sum + Number(row.hole?.par || 0), 0);
+            const totalHcpAdjustedToPar = playedRows.length ? totalHcpAdjustedStrokes - totalParPlayed : null;
 
             return (
               <Card key={player.id} className="mb-3 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm">
@@ -1427,6 +1430,17 @@ function LordOfTheHolesApp() {
                           <td className="px-2 py-1.5 text-center font-bold text-amber-200">{scorecardHoles.reduce((sum, hole) => sum + Number(hole.par || 0), 0)}</td>
                         </tr>
                         <tr className="border-t border-amber-700/20">
+                          <td className="px-2 py-1.5 font-semibold text-amber-100">Vorgabe</td>
+                          {playerScores.map(({ hole, shots }) => (
+                            <td key={hole.hole_number} className="px-1.5 py-1.5 text-center font-bold tracking-[0.18em] text-amber-300">
+                              {Number(shots || 0) > 0 ? "|".repeat(Number(shots || 0)) : ""}
+                            </td>
+                          ))}
+                          <td className="px-2 py-1.5 text-center font-bold text-amber-300">
+                            {playedRows.length ? playedRows.reduce((sum, row) => sum + Number(row.shots || 0), 0) : ""}
+                          </td>
+                        </tr>
+                        <tr className="border-t border-amber-700/20">
                           <td className="px-2 py-1.5 font-semibold text-amber-100">Strokes</td>
                           {playerScores.map(({ hole, score }) => (
                             <td key={hole.hole_number} className="px-1 py-1.5 text-center">
@@ -1443,6 +1457,17 @@ function LordOfTheHolesApp() {
                             <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hcpAdjustedStrokes ?? "–"}</td>
                           ))}
                           <td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? totalHcpAdjustedStrokes : "–"}</td>
+                        </tr>
+                        <tr className="border-t border-amber-700/20">
+                          <td className="px-2 py-1.5 font-semibold text-amber-100">+/− HCP adjusted</td>
+                          {playerScores.map(({ hole, hcpAdjustedToPar }) => (
+                            <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">
+                              {hcpAdjustedToPar == null ? "–" : formatToPar(hcpAdjustedToPar, true)}
+                            </td>
+                          ))}
+                          <td className="px-2 py-1.5 text-center font-bold text-amber-300">
+                            {totalHcpAdjustedToPar == null ? "–" : formatToPar(totalHcpAdjustedToPar, true)}
+                          </td>
                         </tr>
                         <tr className="border-t border-amber-700/20">
                           <td className="px-2 py-1.5 font-semibold text-amber-100">Netto Stblf.</td>
