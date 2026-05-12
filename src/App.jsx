@@ -1660,7 +1660,7 @@ function LordOfTheHolesApp() {
               )}
               {visibleScoreMismatchMessage && (
                 <div className="mb-3 rounded-2xl border border-red-500/50 bg-red-950/40 p-2.5 text-sm text-red-100">
-                  Achtung: Offizieller Score und Eigenkontrolle unterscheiden sich.
+                  Abweichung
                   <div className="mt-1 space-y-0.5">
                     {visibleScoreMismatchMessages.map((message) => (
                       <div key={message}>{message}</div>
