@@ -1136,13 +1136,15 @@ function LordOfTheHolesApp() {
       if (nextDeviceAssignmentsResetAt && nextDeviceAssignmentsResetAt !== localDeviceAssignmentsResetAt) {
         setMyPlayerId("");
         setScoredPlayerId("");
+        setScoredPlayerByRound({});
         setScoreEntryMode("player");
         setRoundScorerPromptOpen(false);
         setPendingScores([]);
         pendingScoresRef.current = [];
         writeLocalJson("lordOfTheHoles.myPlayerId", "");
         writeLocalJson("lordOfTheHoles.scoredPlayerId", "");
-                writeLocalJson("lordOfTheHoles.pendingScores", []);
+        writeLocalJson("lordOfTheHoles.scoredPlayerByRound", {});
+        writeLocalJson("lordOfTheHoles.pendingScores", []);
         writeLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", nextDeviceAssignmentsResetAt);
         setDeviceAssignmentsResetAt(nextDeviceAssignmentsResetAt);
       } else if (nextDeviceAssignmentsResetAt && nextDeviceAssignmentsResetAt !== deviceAssignmentsResetAt) {
