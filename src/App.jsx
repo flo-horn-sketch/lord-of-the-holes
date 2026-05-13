@@ -896,7 +896,8 @@ function LordOfTheHolesApp() {
   const activeHoleData = holes.find((h) => Number(h.hole_number) === Number(activeHole)) || holes[Number(activeHole) - 1] || fallbackHoles.find((h) => h.course_id === displayCourseId && h.hole_number === Number(activeHole)) || fallbackHoles[0];
   const scoredPlayerBase = scoredPlayerId ? scoreablePlayers.find((p) => String(p.id) === String(scoredPlayerId)) : null;
   const scoredPlayer = scoredPlayerBase ? getPlayerForCourse(scoredPlayerBase, displayCourseId, courses) : null;
-  const myCurrentPlayer = myPlayerId ? getPlayerForCourse(visiblePlayers.find((player) => String(player.id) === String(myPlayerId)), displayCourseId, courses) : null;
+  const myCurrentPlayerBase = myPlayerId ? (visiblePlayers.find((player) => String(player.id) === String(myPlayerId)) || allPlayers.find((player) => String(player.id) === String(myPlayerId))) : null;
+  const myCurrentPlayer = myPlayerId ? getPlayerForCourse(myCurrentPlayerBase, displayCourseId, courses) : null;
   const isScorerEntryMode = scoreEntryMode === "scorer" && Boolean(myCurrentPlayer);
   const entryPlayerId = isScorerEntryMode ? myPlayerId : scoredPlayerId;
   const entryPlayer = isScorerEntryMode ? myCurrentPlayer : scoredPlayer;
@@ -929,7 +930,14 @@ function LordOfTheHolesApp() {
   const hasSelectedPlayerScoreMismatch = Boolean(selectedPlayerMismatch?.message);
   const hasOwnScoreMismatch = Boolean(ownPlayerMismatch?.message);
   const playerStats = useMemo(() => buildPlayerStats(playersWithCurrentHandicaps, holes, officialScores), [playersWithCurrentHandicaps, holes, officialScores]);
-  const myCurrentStats = useMemo(() => (myPlayerId ? playerStats.find((player) => String(player.id) === String(myPlayerId)) || null : null), [playerStats, myPlayerId]);
+  const myCurrentStats = useMemo(() => {
+    if (!myPlayerId) return null;
+    const existingStats = playerStats.find((player) => String(player.id) === String(myPlayerId));
+    if (existingStats) return existingStats;
+    const fallbackPlayer = getPlayerForCourse(allPlayers.find((player) => String(player.id) === String(myPlayerId)), displayCourseId, courses);
+    if (!fallbackPlayer) return null;
+    return buildPlayerStats([fallbackPlayer], holes, officialScores)[0] || null;
+  }, [playerStats, myPlayerId, allPlayers, displayCourseId, courses, holes, officialScores]);
   const strokePlayLeaderboard = useMemo(() => sortStrokePlay(playerStats), [playerStats]);
   const netStablefordLeaderboard = useMemo(() => sortStableford(playerStats, "netStableford"), [playerStats]);
   const grossStablefordLeaderboard = useMemo(() => sortStableford(playerStats, "grossStableford"), [playerStats]);
@@ -1652,7 +1660,7 @@ function LordOfTheHolesApp() {
                 </div>
               </div>
             ) : (
-              <div className="mb-2 rounded-xl border border-amber-700/30 bg-black/25 p-1.5 text-[10px] text-amber-100/75">Unter Einstellungen kannst du festlegen, wer du bist.</div>
+              <div className="mb-2 rounded-xl border border-amber-700/30 bg-black/25 p-1.5 text-[10px] text-amber-100/75">Wähle zuerst im Start-Popup deinen Spieler aus.</div>
             )}
 
             {myPlayerId && !currentAssignedScoredPlayerIsValid ? (
