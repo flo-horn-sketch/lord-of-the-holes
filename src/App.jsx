@@ -854,7 +854,6 @@ function LordOfTheHolesApp() {
   const [scoreHintMessage, setScoreHintMessage] = useState("");
   const [showSplash, setShowSplash] = useState(true);
   const [splashEntering, setSplashEntering] = useState(false);
-  const [splashEntering, setSplashEntering] = useState(false);
   const [appLocked, setAppLocked] = useState(() => readLocalJson("lordOfTheHoles.appLocked", false));
   const [lockUnlockOpen, setLockUnlockOpen] = useState(false);
   const [lockPasswordInput, setLockPasswordInput] = useState("");
