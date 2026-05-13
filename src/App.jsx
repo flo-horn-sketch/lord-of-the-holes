@@ -1033,6 +1033,7 @@ function LordOfTheHolesApp() {
 
     if (roundChanged) {
       lastRoundForScorerPromptRef.current = roundId;
+      setScoreEntryMode("player");
       if (storedPlayerIsValid) {
         setScoredPlayerId(storedPlayerId);
         setRoundScorerPromptOpen(false);
@@ -1049,7 +1050,12 @@ function LordOfTheHolesApp() {
       return;
     }
 
-    if (!scoredPlayerId) setRoundScorerPromptOpen(true);
+    if (!scoredPlayerId) {
+      setRoundScorerPromptOpen(true);
+      return;
+    }
+
+    setRoundScorerPromptOpen(false);
   }, [displayedActiveRound?.round_id, myPlayerId, scoreablePlayers, scoredPlayerByRound, scoredPlayerId, showSplash, appLocked, lockAdminBypass]);
 
   useEffect(() => { writeLocalJson("lordOfTheHoles.myPlayerId", myPlayerId); }, [myPlayerId]);
