@@ -647,12 +647,21 @@ function getScoreRelationLabel(score, par) {
   return `+${diff}`;
 }
 
+function triggerSoftVibration() {
+  try {
+    if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") navigator.vibrate(10);
+  } catch {}
+}
+
 function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", status = "", defaultValue = null, onChange, formatValue }) {
   const hasValue = value !== "" && value != null;
   const fallbackValue = defaultValue == null ? min : Number(defaultValue);
   const baseValue = Math.max(min, Math.min(max, Number(hasValue ? value : fallbackValue)));
   const shownValue = hasValue || defaultValue != null ? (formatValue ? formatValue(baseValue) : baseValue) : emptyLabel;
-  const setValue = (nextValue) => onChange(Math.max(min, Math.min(max, Number(nextValue || 0))));
+  const setValue = (nextValue) => {
+    triggerSoftVibration();
+    onChange(Math.max(min, Math.min(max, Number(nextValue || 0))));
+  };
   return (
     <div className="rounded-2xl border border-amber-500/35 bg-[linear-gradient(180deg,rgba(48,35,22,0.72),rgba(12,10,9,0.72))] p-2.5 shadow-[inset_0_1px_0_rgba(251,191,36,0.12),0_12px_32px_rgba(0,0,0,0.35)]">
       <div className="mb-1.5 flex items-center justify-between gap-2">
