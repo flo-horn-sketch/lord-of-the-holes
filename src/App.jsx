@@ -1156,9 +1156,7 @@ function LordOfTheHolesApp() {
       const nextActiveRoundId = String(nextActiveRound?.round_id || "");
       const lastSeenActiveRoundId = String(readLocalJson("lordOfTheHoles.lastSeenActiveRoundId", "") || "");
       if (nextActiveRoundId && lastSeenActiveRoundId && nextActiveRoundId !== lastSeenActiveRoundId) {
-        setScoredPlayerId("");
-        setScoreEntryMode("player");
-        lastLoadedRoundRef.current = "";
+        setShowSplash(true);
       }
       if (nextActiveRoundId) writeLocalJson("lordOfTheHoles.lastSeenActiveRoundId", nextActiveRoundId);
       const nextActivePlayers = data.activePlayers?.length ? data.activePlayers.map(withFallbackAlias) : getRoundPlayers(nextActiveRound?.round_id, nextAllPlayers, data.roundPlayers || []);
