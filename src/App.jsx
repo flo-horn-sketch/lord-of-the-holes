@@ -844,6 +844,7 @@ function LordOfTheHolesApp() {
   const [scoredPlayerByRound, setScoredPlayerByRound] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerByRound", {}));
   const [roundScorerPromptOpen, setRoundScorerPromptOpen] = useState(false);
   const [forcedScorerPromptRoundId, setForcedScorerPromptRoundId] = useState("");
+  const [serverRoundChangePromptId, setServerRoundChangePromptId] = useState("");
   const [scoreEntryMode, setScoreEntryMode] = useState("player");
   const [activeHole, setActiveHole] = useState(() => getFirstUnscoredHole(cachedState?.scores?.length ? cachedState.scores : cachedState?.allScores || [], cachedState?.selectedActiveRoundId || cachedState?.activeRound?.round_id || "", readLocalJson("lordOfTheHoles.scoredPlayerId", ""), 1, readLocalJson("lordOfTheHoles.myPlayerId", "")));
   const [view, setView] = useState("score");
@@ -1051,7 +1052,8 @@ function LordOfTheHolesApp() {
       if (storedPlayerIsValid) {
         setScoredPlayerId(storedPlayerId);
         setForcedScorerPromptRoundId("");
-        setRoundScorerPromptOpen(false);
+                        setServerRoundChangePromptId("");
+                        setRoundScorerPromptOpen(false);
       } else {
         setScoredPlayerId("");
         setForcedScorerPromptRoundId(roundId);
@@ -1060,19 +1062,19 @@ function LordOfTheHolesApp() {
       return;
     }
 
-    if (storedPlayerIsValid && !forcedScorerPromptRoundId) {
+    if (storedPlayerIsValid && !forcedScorerPromptRoundId && !serverRoundChangePromptId) {
       if (String(scoredPlayerId) !== String(storedPlayerId)) setScoredPlayerId(storedPlayerId);
       setRoundScorerPromptOpen(false);
       return;
     }
 
-    if (!scoredPlayerId || forcedScorerPromptRoundId) {
+    if (!scoredPlayerId || forcedScorerPromptRoundId || serverRoundChangePromptId) {
       setRoundScorerPromptOpen(true);
       return;
     }
 
     setRoundScorerPromptOpen(false);
-  }, [displayedActiveRound?.round_id, myPlayerId, scoreablePlayers, scorerAssignments, scoredPlayerId, showSplash, appLocked, lockAdminBypass, forcedScorerPromptRoundId]);
+  }, [displayedActiveRound?.round_id, myPlayerId, scoreablePlayers, scorerAssignments, scoredPlayerId, showSplash, appLocked, lockAdminBypass, forcedScorerPromptRoundId, serverRoundChangePromptId]);
 
   useEffect(() => { writeLocalJson("lordOfTheHoles.myPlayerId", myPlayerId); }, [myPlayerId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.appLocked", appLocked); }, [appLocked]);
@@ -1158,6 +1160,17 @@ function LordOfTheHolesApp() {
       const nextRounds = data.rounds?.length ? data.rounds : fallbackRounds;
       const nextCourses = data.courses?.length ? data.courses : fallbackCourses;
       const nextActiveRound = data.activeRound || nextRounds.find((round) => String(round.status).toLowerCase() === "active") || nextRounds[0] || fallbackRounds[0];
+      const nextActiveRoundId = String(nextActiveRound?.round_id || "");
+      const lastSeenActiveRoundId = String(readLocalJson("lordOfTheHoles.lastSeenActiveRoundId", "") || "");
+      if (nextActiveRoundId && lastSeenActiveRoundId && nextActiveRoundId !== lastSeenActiveRoundId) {
+        setScoredPlayerId("");
+        setScoreEntryMode("player");
+        setForcedScorerPromptRoundId(nextActiveRoundId);
+        setServerRoundChangePromptId(nextActiveRoundId);
+        lastRoundForScorerPromptRef.current = "";
+        if (!showSplash && (!normalizeBoolean(data.app_locked ?? data.appLocked) || lockAdminBypass)) setRoundScorerPromptOpen(true);
+      }
+      if (nextActiveRoundId) writeLocalJson("lordOfTheHoles.lastSeenActiveRoundId", nextActiveRoundId);
       const nextActivePlayers = data.activePlayers?.length ? data.activePlayers.map(withFallbackAlias) : getRoundPlayers(nextActiveRound?.round_id, nextAllPlayers, data.roundPlayers || []);
       setCourses(nextCourses);
       setRounds(nextRounds);
@@ -1168,6 +1181,7 @@ function LordOfTheHolesApp() {
       const nextRoundId = nextActiveRound?.round_id || fallbackRounds[0].round_id;
       setSelectedCourseId(nextActiveRound?.course_id || "");
       setSelectedActiveRoundId(nextRoundId);
+      if (nextRoundId) writeLocalJson("lordOfTheHoles.lastSeenActiveRoundId", nextRoundId);
       if (String(previousRoundId || "") !== String(nextRoundId || "")) {
         setScoredPlayerId("");
         setScoreEntryMode("player");
