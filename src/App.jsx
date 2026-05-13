@@ -696,6 +696,21 @@ function MiddleEarthTables({ players, holes, scores, mismatches }) {
   );
 }
 
+function buildRoundHcpAdjustedStandings(players, round, holes, scores, roundPlayers) {
+  if (!round?.round_id || !round?.course_id) return [];
+  const roundHoles = getRoundHoles(round, holes);
+  const roundPlayersList = getRoundPlayers(round.round_id, players, roundPlayers);
+  return roundPlayersList.map((player) => {
+    const playerForRound = getPlayerForCourse(player, round.course_id || "goethe");
+    const playerScores = (scores || []).filter((score) => String(score.round_id) === String(round.round_id) && String(score.player_id) === String(player.id) && score.strokes !== "" && score.strokes != null);
+    const grossStrokes = playerScores.reduce((sum, score) => sum + Number(score.strokes || 0), 0);
+    const hcpShotsUsed = playerScores.reduce((sum, score) => sum + getShotsOnHole(playerForRound.course_hcp, roundHoles.find((h) => Number(h.hole_number) === Number(score.hole_number))?.hcp), 0);
+    const hcpAdjustedStrokes = playerScores.length ? grossStrokes - hcpShotsUsed : null;
+    const isComplete = roundHoles.length > 0 && roundHoles.every((hole) => playerScores.some((score) => Number(score.hole_number) === Number(hole.hole_number)));
+    return { ...withFallbackAlias(player), grossStrokes, hcpShotsUsed, hcpAdjustedStrokes, played: playerScores.length, isComplete };
+  }).sort((a, b) => (a.hcpAdjustedStrokes == null && b.hcpAdjustedStrokes != null ? 1 : b.hcpAdjustedStrokes == null && a.hcpAdjustedStrokes != null ? -1 : Number(a.hcpAdjustedStrokes || 0) - Number(b.hcpAdjustedStrokes || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0)));
+}
+
 function TournamentStandings({ players, rounds, holes, scores, courses = fallbackCourses, activeRoundId = "" }) {
   const standings = useMemo(() => buildTournamentNetStandings(players, rounds, holes, scores, courses), [players, rounds, holes, scores, courses]);
   const finalStandings = useMemo(() => buildFinalNetStandings(players, rounds, holes, scores, courses), [players, rounds, holes, scores, courses]);
@@ -895,6 +910,41 @@ function LordOfTheHolesApp() {
 
     return buildSummary(9) || buildSummary(18);
   }, [myPlayerId, displayedActiveRound?.round_id, visiblePlayers, allPlayers, displayCourseId, courses, holes, officialScores, roundSummaryDismissedKeys]);
+  const completedQualificationHonor = useMemo(() => {
+    const qualificationRounds = getQualificationRounds(rounds);
+    for (const round of qualificationRounds) {
+      const key = `round_honor_${round.round_id}`;
+      if ((roundHonorDismissedKeys || []).includes(key)) continue;
+      const roundHoles = getRoundHoles(round, allHoles);
+      const roundPlayersList = getRoundPlayers(round.round_id, allPlayers, roundPlayers);
+      if (!roundHoles.length || !roundPlayersList.length) continue;
+      const complete = roundPlayersList.every((player) => roundHoles.every((hole) => officialAllScores.some((score) => String(score.round_id || "") === String(round.round_id) && String(score.player_id || "") === String(player.id) && Number(score.hole_number) === Number(hole.hole_number) && score.strokes !== "" && score.strokes != null)));
+      if (!complete) continue;
+      const standings = buildRoundHcpAdjustedStandings(allPlayers, round, allHoles, officialAllScores, roundPlayers);
+      const order = Number(round.sort_order || qualificationRounds.findIndex((item) => String(item.round_id) === String(round.round_id)) + 1);
+      const lordCount = order === 1 ? 1 : 2;
+      const butlerCount = order === 1 ? 1 : 2;
+      return { key, round, order, lords: standings.slice(0, lordCount), butlers: standings.slice(-butlerCount).reverse() };
+    }
+    return null;
+  }, [rounds, allHoles, allPlayers, roundPlayers, officialAllScores, roundHonorDismissedKeys]);
+
+  const simpleFinalWinner = useMemo(() => {
+    const finalRound = getFinalRound(rounds);
+    if (!finalRound?.round_id) return null;
+    const finalHoles = getRoundHoles(finalRound, allHoles);
+    const finalPlayers = getRoundPlayers(finalRound.round_id, allPlayers, roundPlayers);
+    if (!finalHoles.length || !finalPlayers.length) return null;
+    const complete = finalPlayers.every((player) => finalHoles.every((hole) => officialAllScores.some((score) => String(score.round_id || "") === String(finalRound.round_id) && String(score.player_id || "") === String(player.id) && Number(score.hole_number) === Number(hole.hole_number) && score.strokes !== "" && score.strokes != null)));
+    if (!complete) return null;
+    const finalStandings = buildFinalNetStandings(allPlayers, rounds, allHoles, officialAllScores, courses);
+    const winner = finalStandings.find((player) => Number(player.finalRank) === 1) || finalStandings[0] || null;
+    if (!winner) return null;
+    return { key: `${finalRound.round_id}_${winner.id}`, round: finalRound, winner };
+  }, [rounds, allHoles, allPlayers, roundPlayers, officialAllScores, courses]);
+
+  const showSimpleFinalWinner = Boolean(simpleFinalWinner && simpleFinalWinner.key !== winnerPopupDismissedKey);
+  const showSimpleGondorHonor = Boolean(completedQualificationHonor && !showSimpleFinalWinner && !roundSummaryPopup);
   const identityFlowActive = !showSplash && (!appLocked || lockAdminBypass);
   const showDevicePlayerGate = Boolean(identityFlowActive && (!myPlayerId || forceMyPlayerPromptOpen));
   const lockCountdown = useMemo(() => {
@@ -1748,6 +1798,41 @@ function LordOfTheHolesApp() {
         </div>
       ) : null}
       {showDevicePlayerGate ? <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm"><div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-500/45 bg-stone-950 text-amber-50 shadow-2xl shadow-black/80"><div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.20),transparent_45%),linear-gradient(180deg,rgba(41,37,36,0.94),rgba(12,10,9,1))] p-4 text-center"><div className="text-[10px] uppercase tracking-[0.24em] text-amber-300/75">Dieses Handy</div><div className="mt-1 font-serif text-2xl font-black text-amber-200">Wer bist du?</div><div className="mt-1 text-sm text-amber-100/70">Wähle deinen eigenen Spieler. Diese Auswahl bleibt auf diesem Handy gespeichert.</div><div className="mt-4 grid gap-2">{visiblePlayers.map((player) => <button key={player.id} type="button" onClick={() => { setMyPlayerId(player.id); writeLocalJson("lordOfTheHoles.myPlayerId", player.id); setForceMyPlayerPromptOpen(false); setScoreEntryMode("player"); }} className="rounded-2xl border border-amber-700/35 bg-stone-900 px-3 py-3 font-serif text-base font-bold text-amber-100 transition active:scale-[0.98]">{getPlayerLabel(player)}</button>)}</div></div></div></div> : null}
+      {showSimpleGondorHonor ? (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-400/60 bg-stone-950 text-center text-amber-50 shadow-2xl shadow-black/80">
+            <div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.28),transparent_45%),linear-gradient(180deg,rgba(120,53,15,0.55),rgba(12,10,9,1))] p-5">
+              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-amber-300/50 bg-black/30 text-3xl shadow-xl shadow-amber-950/40">⚜</div>
+              <div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/70">{completedQualificationHonor.round?.round_name || "Runde"} beendet</div>
+              <div className="mt-2 font-serif text-lg font-black text-amber-200">Gondors Erlass</div>
+              <div className="mt-1 text-sm text-amber-100/70">Die Runde ist gespielt. Der Hofstaat wird neu geordnet.</div>
+              <div className="mt-3 rounded-2xl border border-amber-500/35 bg-black/25 p-3 text-left">
+                <div className="text-xs uppercase tracking-[0.22em] text-amber-300/75">Herren von Gondor</div>
+                <div className="mt-2 space-y-1">{completedQualificationHonor.lords.map((player, index) => <div key={player.id} className="flex items-center justify-between gap-2 rounded-xl bg-amber-500/10 px-2 py-1.5"><span className="font-serif text-base font-black text-amber-200">{index + 1}. {getPlayerLabel(player)}</span><span className="text-xs text-amber-100/70">{player.hcpAdjustedStrokes}</span></div>)}</div>
+              </div>
+              <div className="mt-2 rounded-2xl border border-red-500/35 bg-black/25 p-3 text-left">
+                <div className="text-xs uppercase tracking-[0.22em] text-red-200/80">Schildträger im Dienst der Herren</div>
+                <div className="mt-2 space-y-1">{completedQualificationHonor.butlers.map((player) => <div key={player.id} className="flex items-center justify-between gap-2 rounded-xl bg-red-500/10 px-2 py-1.5"><span className="font-serif text-base font-black text-red-100">{getPlayerLabel(player)}</span><span className="text-xs text-red-100/70">{player.hcpAdjustedStrokes}</span></div>)}</div>
+              </div>
+            </div>
+            <div className="p-3"><button type="button" onClick={() => setRoundHonorDismissedKeys((current) => Array.from(new Set([...(current || []), completedQualificationHonor.key])))} className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-2.5 text-sm font-bold text-amber-50">Erlass zur Kenntnis nehmen ×</button></div>
+          </div>
+        </div>
+      ) : null}
+      {showSimpleFinalWinner ? (
+        <div className="fixed inset-0 z-[96] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-400/60 bg-stone-950 text-center text-amber-50 shadow-2xl shadow-black/80">
+            <div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.28),transparent_45%),linear-gradient(180deg,rgba(120,53,15,0.55),rgba(12,10,9,1))] p-5">
+              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-amber-300/50 bg-black/30 text-3xl shadow-xl shadow-amber-950/40">♛</div>
+              <div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/70">Finale beendet</div>
+              <div className="mt-2 font-serif text-lg font-black text-amber-200">Lord of the Holes 2026 ist</div>
+              <div className="mt-2 font-serif text-4xl font-black text-amber-300 drop-shadow">{getPlayerLabel(simpleFinalWinner.winner)}</div>
+              <div className="mt-2 rounded-2xl border border-amber-500/35 bg-black/25 p-2 text-sm text-amber-100">Final Strokes HCP: <b className="text-amber-200">{simpleFinalWinner.winner.finalHcpAdjustedStrokes ?? "–"}</b></div>
+            </div>
+            <div className="p-3"><button type="button" onClick={() => setWinnerPopupDismissedKey(simpleFinalWinner.key)} className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-2.5 text-sm font-bold text-amber-50">Krone anerkennen ×</button></div>
+          </div>
+        </div>
+      ) : null}
       {clearScoresConfirmOpen ? <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"><div className="w-full max-w-md rounded-3xl border border-red-500/60 bg-stone-950 p-4 text-red-50 shadow-2xl shadow-black/70"><div className="font-serif text-lg text-red-100">Alle Scores löschen?</div><p className="mt-2 text-sm text-red-100/80">Dadurch werden alle Einträge im Tab Scores gelöscht. Vorher wird automatisch ein Backup erstellt. Backup-Tabs bleiben erhalten.</p><div className="mt-2 grid grid-cols-2 gap-2"><button type="button" disabled={clearScoresSaving} onClick={() => setClearScoresConfirmOpen(false)} className="rounded-2xl border border-amber-700/40 bg-stone-900 px-3 py-2.5 text-sm font-bold text-amber-100 disabled:opacity-50">Abbrechen</button><button type="button" disabled={clearScoresSaving} onClick={clearAllScores} className="rounded-2xl border border-red-400/60 bg-red-700 px-3 py-2.5 text-sm font-bold text-red-50 disabled:opacity-50">{clearScoresSaving ? "Lösche ..." : "Ja, Scores löschen"}</button></div></div></div> : null}
     </div>
   );
