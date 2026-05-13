@@ -1259,7 +1259,36 @@ function LordOfTheHolesApp() {
             <span>{pendingScores.length ? `${pendingScores.length} offen` : connectionStatus === "online" ? "Datenbank verbunden" : "Datenbank offline"}</span>
           </div>
           <button type="button" onClick={() => setMenuOpen((value) => !value)} className="rounded-xl border border-amber-700/40 bg-black/45 px-2.5 py-1 text-base leading-none text-amber-100 shadow-lg shadow-black/40 backdrop-blur-sm" aria-label="Menü öffnen">☰</button>
-          {menuOpen ? <div className="absolute right-0 top-[34px] z-30 w-64 overflow-hidden rounded-2xl border border-amber-700/40 bg-stone-950/95 text-left shadow-2xl shadow-black/70 backdrop-blur">{[["current", "Aktuelle Runde"], ["roundTables", "Tabellen Runde"], ["tournament", "Turnier"], ["archive", "Scorekarten"], ["fun", "Mittelerde"], ["settings", "Einstellungen"], ["admin", "Admin"]].map(([value, label]) => <button key={value} type="button" onClick={() => setMainMenuAndView(value)} className={cls("block w-full border-b border-amber-700/20 px-4 py-3 text-left text-sm last:border-b-0", mainMenu === value ? "bg-amber-600 text-amber-50" : "bg-transparent text-amber-100")}>{label}</button>)}</div> : null}
+          {menuOpen ? <div className="absolute right-0 top-[34px] z-30 w-64 overflow-hidden rounded-2xl border border-amber-700/40 bg-stone-950/95 text-left shadow-2xl shadow-black/70 backdrop-blur">{[["current", "Scoring"], ["roundTables", "Tabellen Runde"], ["tournament", "Turnier"], ["archive", "Scorekarten"], ["fun", "Mittelerde"], ["settings", "Einstellungen"], ["admin", "Admin"]].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setMainMenuAndView(value)}
+              className={cls(
+                "block w-full border-b border-amber-700/20 text-left last:border-b-0",
+                value === "current" ? "px-4 py-4 text-base font-black" : "px-4 py-2.5 text-sm",
+                mainMenu === value
+                  ? value === "current"
+                    ? "bg-amber-600 text-amber-50"
+                    : "bg-amber-700/55 text-amber-50"
+                  : value === "current"
+                    ? "bg-amber-500/10 text-amber-200"
+                    : "bg-transparent text-amber-100/85"
+              )}
+            >
+              {value === "current" ? (
+                <span className="flex items-center justify-between gap-3">
+                  <span>
+                    <span className="block font-serif text-lg leading-tight">Scoring</span>
+                    <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-100/65">Score eingeben</span>
+                  </span>
+                  <span className="text-xl">➜</span>
+                </span>
+              ) : (
+                <span className="pl-2">{label}</span>
+              )}
+            </button>
+          ))}</div> : null}
         </div>
       </motion.header>
     );
