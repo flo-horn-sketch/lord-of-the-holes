@@ -659,13 +659,13 @@ function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", sta
         <div className="text-sm font-semibold text-amber-100">{label}</div>
         {status ? <div className="rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold text-amber-100/75">{status}</div> : null}
       </div>
-      <div className="grid grid-cols-[68px_1fr_68px] items-center gap-2.5">
-        <button type="button" onClick={() => setValue(baseValue - 1)} disabled={baseValue <= min} className="h-16 rounded-2xl border border-amber-700/50 bg-stone-950 text-3xl font-black leading-none text-amber-100 disabled:opacity-35">−</button>
-        <button type="button" onClick={() => setValue(baseValue)} className="h-16 rounded-2xl border border-amber-700/30 bg-stone-950/70 text-center shadow-inner shadow-black/60">
-          <div className="font-serif text-5xl font-black leading-none text-amber-200">{shownValue}</div>
+      <div className="grid grid-cols-[74px_1fr_74px] items-center gap-2.5">
+        <button type="button" onClick={() => setValue(baseValue - 1)} disabled={baseValue <= min} className="h-[72px] rounded-2xl border border-amber-700/50 bg-stone-950 text-4xl font-black leading-none text-amber-100 disabled:opacity-35">−</button>
+        <button type="button" onClick={() => setValue(baseValue)} className="h-[72px] rounded-2xl border border-amber-700/30 bg-stone-950/70 text-center shadow-inner shadow-black/60">
+          <div className="font-serif text-[3.35rem] font-black leading-none text-amber-200">{shownValue}</div>
           <div className="text-[9px] uppercase tracking-[0.16em] text-amber-100/50">{!hasValue && defaultValue != null ? "tippen" : label}</div>
         </button>
-        <button type="button" onClick={() => setValue(baseValue + 1)} disabled={baseValue >= max} className="h-16 rounded-2xl border border-amber-700/50 bg-stone-950 text-3xl font-black leading-none text-amber-100 disabled:opacity-35">+</button>
+        <button type="button" onClick={() => setValue(baseValue + 1)} disabled={baseValue >= max} className="h-[72px] rounded-2xl border border-amber-700/50 bg-stone-950 text-4xl font-black leading-none text-amber-100 disabled:opacity-35">+</button>
       </div>
     </div>
   );
@@ -1416,9 +1416,10 @@ function LordOfTheHolesApp() {
                 </div>
               ) : null}
 
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <span className="font-serif text-base text-amber-200">{getPlayerLabel(entryPlayer)} · Loch {activeHole}</span>
-                <span className="text-[10px] text-amber-100/65">Vorgabe <b className="text-amber-200 tracking-[0.18em]">{formatShotMarks(entryPlayerShotsOnActiveHole)}</b></span>
+              <div className="mb-1 flex justify-end">
+                <span className="rounded-full border border-amber-700/35 bg-black/25 px-2 py-0.5 text-[10px] text-amber-100/70">
+                  Vorgabe <b className="text-amber-200 tracking-[0.18em]">{formatShotMarks(entryPlayerShotsOnActiveHole)}</b>
+                </span>
               </div>
 
               <div className="mb-3">
