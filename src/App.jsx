@@ -317,6 +317,72 @@ function findScoreForPlayerHole(scores, roundId, playerId, holeNumber, wantContr
   return (scores || []).find((score) => String(score.round_id || "") === String(roundId || "") && String(score.player_id || "") === String(playerId || "") && Number(score.hole_number) === Number(holeNumber) && isScorerControlScore(score) === wantControlScore) || null;
 }
 
+function formatBoolDiff(value) {
+  return normalizeBoolean(value) ? "Ja" : "Nein";
+}
+
+function formatScoreDiff(score) {
+  if (!score || score.strokes === "" || score.strokes == null) return "–";
+  return normalizeBoolean(score.picked_up) ? "X" : String(score.strokes);
+}
+
+function formatPuttsDiff(score) {
+  if (!score || score.putts_count === "" || score.putts_count == null) return "–";
+  return String(score.putts_count);
+}
+
+function getScoreMismatchMessage(officialScore, controlScore) {
+  if (!officialScore || !controlScore) return "";
+  const officialHasScore = officialScore.strokes !== "" && officialScore.strokes != null;
+  const controlHasScore = controlScore.strokes !== "" && controlScore.strokes != null;
+  if (!officialHasScore || !controlHasScore) return "";
+
+  const differences = [];
+  if (Number(officialScore.strokes) !== Number(controlScore.strokes) || normalizeBoolean(officialScore.picked_up) !== normalizeBoolean(controlScore.picked_up)) {
+    differences.push(`Score: ${formatScoreDiff(officialScore)} ≠ ${formatScoreDiff(controlScore)}`);
+  }
+  if (normalizeBoolean(officialScore.lady) !== normalizeBoolean(controlScore.lady)) {
+    differences.push(`Lady: ${formatBoolDiff(officialScore.lady)} ≠ ${formatBoolDiff(controlScore.lady)}`);
+  }
+  if (normalizeBoolean(officialScore.over_two_putts) !== normalizeBoolean(controlScore.over_two_putts) || Number(officialScore.putts_count || 0) !== Number(controlScore.putts_count || 0)) {
+    differences.push(`Putts: ${formatPuttsDiff(officialScore)} ≠ ${formatPuttsDiff(controlScore)}`);
+  }
+  return differences.join(" · ");
+}
+
+function getMismatchesForHole(scores, roundId, holeNumber, players = []) {
+  const playerMap = new Map((players || []).map((player) => [String(player.id), player]));
+  const playerIds = Array.from(new Set((scores || [])
+    .filter((score) => String(score.round_id || "") === String(roundId || "") && Number(score.hole_number) === Number(holeNumber))
+    .map((score) => String(score.player_id || ""))
+    .filter(Boolean)));
+
+  return playerIds.map((playerId) => {
+    const officialScore = findScoreForPlayerHole(scores, roundId, playerId, holeNumber, false);
+    const controlScore = findScoreForPlayerHole(scores, roundId, playerId, holeNumber, true);
+    const message = getScoreMismatchMessage(officialScore, controlScore);
+    const player = playerMap.get(playerId) || { id: playerId, character_name: playerId, display_name: playerId };
+    return {
+      playerId,
+      player,
+      holeNumber,
+      officialScore,
+      controlScore,
+      officialScorerId: String(officialScore?.scorer_player_id || "").trim(),
+      message: message ? `Loch ${holeNumber} · ${player.character_name || player.display_name || playerId} · ${message}` : "",
+    };
+  }).filter((item) => Boolean(item.message));
+}
+
+function getMismatchesForRound(scores, roundId, players = []) {
+  const holeNumbers = Array.from(new Set((scores || [])
+    .filter((score) => String(score.round_id || "") === String(roundId || ""))
+    .map((score) => Number(score.hole_number))
+    .filter(Boolean)))
+    .sort((a, b) => a - b);
+  return holeNumbers.flatMap((holeNumber) => getMismatchesForHole(scores, roundId, holeNumber, players));
+}
+
 function buildPlayerStats(players, holes, scores) {
   return (players || []).map((p) => {
     const playerScores = (scores || []).filter((s) => String(s.player_id) === String(p.id) && s.strokes !== "" && s.strokes != null);
@@ -743,6 +809,14 @@ function LordOfTheHolesApp() {
   const hasRequiredScoresForNext = Boolean(myPlayerId && officialScoreForActiveHole?.strokes !== "" && officialScoreForActiveHole?.strokes != null && officialScoreForActiveHole?.putts_count !== "" && officialScoreForActiveHole?.putts_count != null && controlScoreForActiveHole?.strokes !== "" && controlScoreForActiveHole?.strokes != null && controlScoreForActiveHole?.putts_count !== "" && controlScoreForActiveHole?.putts_count != null);
   const officialScores = useMemo(() => getOfficialScores(scores), [scores]);
   const officialAllScores = useMemo(() => getOfficialScores(allScores), [allScores]);
+  const roundMismatches = useMemo(() => getMismatchesForRound(scores, displayedActiveRound?.round_id || "r1", visiblePlayers), [scores, displayedActiveRound?.round_id, visiblePlayers]);
+  const responsibleHoleMismatches = useMemo(() => myPlayerId ? roundMismatches.filter((item) => String(item.playerId) === String(myPlayerId) || String(item.officialScorerId) === String(myPlayerId)) : [], [roundMismatches, myPlayerId]);
+  const visibleScoreMismatchMessages = responsibleHoleMismatches.map((item) => item.message);
+  const hasScoreMismatch = responsibleHoleMismatches.length > 0;
+  const selectedPlayerMismatch = useMemo(() => responsibleHoleMismatches.find((item) => String(item.playerId) === String(scoredPlayerId) && Number(item.holeNumber) === Number(activeHole)) || responsibleHoleMismatches.find((item) => String(item.playerId) === String(scoredPlayerId)) || null, [responsibleHoleMismatches, scoredPlayerId, activeHole]);
+  const ownPlayerMismatch = useMemo(() => myPlayerId ? responsibleHoleMismatches.find((item) => String(item.playerId) === String(myPlayerId)) || null : null, [responsibleHoleMismatches, myPlayerId]);
+  const hasSelectedPlayerScoreMismatch = Boolean(selectedPlayerMismatch?.message);
+  const hasOwnScoreMismatch = Boolean(ownPlayerMismatch?.message);
   const playerStats = useMemo(() => buildPlayerStats(playersWithCurrentHandicaps, holes, officialScores), [playersWithCurrentHandicaps, holes, officialScores]);
   const strokePlayLeaderboard = useMemo(() => sortStrokePlay(playerStats), [playerStats]);
   const netStablefordLeaderboard = useMemo(() => sortStableford(playerStats, "netStableford"), [playerStats]);
@@ -1349,11 +1423,11 @@ function LordOfTheHolesApp() {
                 <div className="grid grid-cols-2 gap-2">{scoreablePlayers.map((player) => <button key={player.id} type="button" onClick={() => { setScoredPlayerId(player.id); saveLocalScoredPlayerForRound(displayedActiveRound?.round_id || "", player.id); }} className="rounded-2xl bg-stone-800 px-2 py-3 font-serif text-sm font-bold text-amber-100 active:scale-[0.98]">{getPlayerLabel(player)}</button>)}</div>
               </div>
             ) : (
-              <div className={cls("rounded-3xl transition-colors", scoringTintClass)}>
+              <div className={cls("rounded-3xl transition-colors", scoringTintClass, hasScoreMismatch && "rounded-3xl ring-1 ring-red-500/40")}>
                 {myCurrentPlayer ? (
                   <div className="mb-2 grid grid-cols-2 gap-2">
-                    <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-2xl border px-2 py-3 text-sm font-bold transition-colors", !isScorerEntryMode ? "border-[rgb(var(--score-accent)/0.45)] bg-amber-600 text-amber-50" : "border-amber-700/25 bg-stone-800 text-amber-100")}><span className="block truncate font-serif text-sm leading-none">{getPlayerLabel(scoredPlayer) || "Spieler"}</span></button>
-                    <button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl border px-2 py-1.5 text-xs font-bold transition-colors", isScorerEntryMode ? "border-[rgb(var(--score-accent)/0.45)] bg-sky-900/65 text-sky-50" : "border-amber-700/25 bg-stone-800 text-amber-100")}><span className="block truncate font-serif text-sm leading-none">Mein Score</span></button>
+                    <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-2xl border px-2 py-3 text-sm font-bold transition-colors", !isScorerEntryMode ? "border-[rgb(var(--score-accent)/0.45)] bg-amber-600 text-amber-50" : "border-amber-700/25 bg-stone-800 text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/70")}><span className="block truncate font-serif text-sm leading-none">{getPlayerLabel(scoredPlayer) || "Spieler"}{hasSelectedPlayerScoreMismatch ? " ⚠" : ""}</span></button>
+                    <button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl border px-2 py-1.5 text-xs font-bold transition-colors", isScorerEntryMode ? "border-[rgb(var(--score-accent)/0.45)] bg-sky-900/65 text-sky-50" : "border-amber-700/25 bg-stone-800 text-amber-100", hasOwnScoreMismatch && "ring-1 ring-red-400/70")}><span className="block truncate font-serif text-sm leading-none">Mein Score{hasOwnScoreMismatch ? " ⚠" : ""}</span></button>
                   </div>
                 ) : null}
                 <div className="mb-1.5 grid grid-cols-[auto_1fr] items-center gap-2 rounded-2xl border border-[rgb(var(--score-accent)/0.30)] bg-black/25 px-3 py-2 text-[10px] text-amber-100/70"><div className="font-serif text-xl font-black leading-none text-amber-200">Loch {activeHole}</div><div className="flex items-center justify-end gap-2.5 text-right text-[11px]"><span>Par <b className="text-amber-200">{activeHoleData.par}</b></span><span>HCP <b className="text-amber-200">{activeHoleData.hcp}</b></span><span>{activeHoleData.meters} m</span><span>Vorgabe <b className="text-amber-200 tracking-[0.18em]">{formatShotMarks(entryPlayerShotsOnActiveHole)}</b></span></div></div>
@@ -1534,7 +1608,7 @@ function LordOfTheHolesApp() {
   }
 
   function renderFunView() {
-    return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3"><div className="landscape:mx-auto landscape:max-w-none landscape:pb-6"><MiddleEarthTables players={playersWithCurrentHandicaps} holes={holes} scores={officialScores} mismatches={[]} /></div></motion.section>;
+    return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3"><div className="landscape:mx-auto landscape:max-w-none landscape:pb-6"><MiddleEarthTables players={playersWithCurrentHandicaps} holes={holes} scores={officialScores} mismatches={roundMismatches} /></div></motion.section>;
   }
 
   function renderActiveView() {
