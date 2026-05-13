@@ -48,7 +48,7 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
-const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbyPOg_6IyhMcup8m-jX6_e0vj3MKn_9y_xRccdsphQrQlhg2vkpRMo2lqdvahbxL-Xu/exec";
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbx-u4AbUuNBQcgRN0auYkNx41-Gudhu5T0_odRw83JJtZOT_QbrGFW2ynoU-lLe7e8/exec";
 const ADMIN_PASSWORD = "weimar";
 const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T11:00:00+02:00");
 
@@ -858,6 +858,7 @@ function LordOfTheHolesApp() {
   const [lockPasswordInput, setLockPasswordInput] = useState("");
   const [lockAdminBypass, setLockAdminBypass] = useState(false);
   const [lockCountdownNow, setLockCountdownNow] = useState(() => new Date());
+  const [deviceAssignmentsResetAt, setDeviceAssignmentsResetAt] = useState(() => readLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", ""));
   const introAudioRef = useRef(null);
   const lastPopupSoundKeyRef = useRef("");
   const [clearScoresConfirmOpen, setClearScoresConfirmOpen] = useState(false);
@@ -1034,6 +1035,7 @@ function LordOfTheHolesApp() {
 
   useEffect(() => { writeLocalJson("lordOfTheHoles.myPlayerId", myPlayerId); }, [myPlayerId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.appLocked", appLocked); }, [appLocked]);
+  useEffect(() => { writeLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", deviceAssignmentsResetAt); }, [deviceAssignmentsResetAt]);
   useEffect(() => {
     if (!appLocked) return undefined;
     const timer = window.setInterval(() => setLockCountdownNow(new Date()), 1000);
@@ -1091,6 +1093,18 @@ function LordOfTheHolesApp() {
         const nextAppLocked = normalizeBoolean(data.app_locked ?? data.appLocked);
         setAppLocked(nextAppLocked);
         if (nextAppLocked && !lockAdminBypass) setShowSplash(true);
+      }
+      const nextDeviceAssignmentsResetAt = String(data.device_assignments_reset_at || data.deviceAssignmentsResetAt || "");
+      if (nextDeviceAssignmentsResetAt && nextDeviceAssignmentsResetAt !== deviceAssignmentsResetAt) {
+        setMyPlayerId("");
+        setScoredPlayerId("");
+        setScoredPlayerByRound({});
+        setScoreEntryMode("player");
+        setRoundScorerPromptOpen(false);
+        writeLocalJson("lordOfTheHoles.myPlayerId", "");
+        writeLocalJson("lordOfTheHoles.scoredPlayerId", "");
+        writeLocalJson("lordOfTheHoles.scoredPlayerByRound", {});
+        setDeviceAssignmentsResetAt(nextDeviceAssignmentsResetAt);
       }
       const nextAllPlayers = (data.players?.length ? data.players : fallbackPlayers).map(withFallbackAlias);
       const nextRounds = data.rounds?.length ? data.rounds : fallbackRounds;
@@ -1221,6 +1235,49 @@ function LordOfTheHolesApp() {
     try { const result = await callSheetApi({ action: "clearScores" }); setScores([]); setAllScores([]); setPendingScores([]); pendingScoresRef.current = []; writeLocalJson("lordOfTheHoles.pendingScores", []); writeLocalJson("lordOfTheHoles.cachedState", null); setConnectionStatus("online"); setClearScoresConfirmOpen(false); setBackupSavedMessage(result?.backup_sheet_name ? `Backup erstellt: ${result.backup_sheet_name}` : ""); setSetupSavedMessage("Alle Scores wurden gelöscht. Backups bleiben erhalten."); await loadData({ silent: true }); }
     catch (err) { setConnectionStatus("offline"); const message = err.message || "Scores konnten nicht gelöscht werden."; setClearScoresError(message); setError(message); }
     finally { setClearScoresSaving(false); }
+  }
+
+  async function clearScoresAndDeviceAssignments() {
+    await clearAllScores();
+    setMyPlayerId("");
+    setScoredPlayerId(scoreablePlayers[0]?.id || "");
+    setScoredPlayerByRound({});
+    setScoreEntryMode("player");
+    setRoundScorerPromptOpen(false);
+    setRoundSummaryDismissedKeys([]);
+    setWinnerPopupDismissedKey("");
+    setRoundHonorDismissedKeys([]);
+    writeLocalJson("lordOfTheHoles.myPlayerId", "");
+    writeLocalJson("lordOfTheHoles.scoredPlayerId", "");
+    writeLocalJson("lordOfTheHoles.scoredPlayerByRound", {});
+    writeLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", []);
+    writeLocalJson("lordOfTheHoles.winnerPopupDismissedKey", "");
+    writeLocalJson("lordOfTheHoles.roundHonorDismissedKeys", []);
+    setSetupSavedMessage("Scores wurden gelöscht. Die Geräte-Zuordnung wurde auf diesem Gerät zurückgesetzt.");
+  }
+
+  async function resetDeviceAssignmentsForAll() {
+    setSetupSavedMessage("");
+    try {
+      const result = await callSheetApi({ action: "resetDeviceAssignments" });
+      const resetAt = String(result?.device_assignments_reset_at || result?.deviceAssignmentsResetAt || new Date().toISOString());
+      setDeviceAssignmentsResetAt(resetAt);
+      setMyPlayerId("");
+      setScoredPlayerId("");
+      setScoredPlayerByRound({});
+      setScoreEntryMode("player");
+      setRoundScorerPromptOpen(false);
+      writeLocalJson("lordOfTheHoles.myPlayerId", "");
+      writeLocalJson("lordOfTheHoles.scoredPlayerId", "");
+      writeLocalJson("lordOfTheHoles.scoredPlayerByRound", {});
+      writeLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", resetAt);
+      setConnectionStatus("online");
+      setError("");
+      setSetupSavedMessage("Wer bin ich / Wen zähle ich wurde für alle Geräte zurückgesetzt.");
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Geräte-Zuordnung konnte nicht für alle zurückgesetzt werden.");
+    }
   }
 
   async function saveFullSetup() {
@@ -1407,6 +1464,8 @@ function LordOfTheHolesApp() {
             <Button disabled={!isAdminUnlocked || backupSaving} onClick={createRoundBackup} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-700/80 py-2 text-emerald-50 disabled:opacity-50">{backupSaving ? "Erstelle Backup ..." : "Backup für aktive Runde erstellen"}</Button>
             {appLocked ? <Button disabled={!isAdminUnlocked} onClick={() => { setGlobalAppLock(false); setLockAdminBypass(false); }} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-800/70 py-2 text-emerald-50 disabled:opacity-50">App für alle freigeben</Button> : <Button disabled={!isAdminUnlocked} onClick={() => { setMenuOpen(false); setLockAdminBypass(false); setGlobalAppLock(true); }} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">App für alle sperren</Button>}
             <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={() => { setClearScoresError(""); setClearScoresConfirmOpen(true); }} className="mt-2 w-full rounded-2xl border border-red-500/50 bg-red-950/60 py-2 text-red-100 disabled:opacity-50">Scores löschen</Button>
+            <Button disabled={!isAdminUnlocked || connectionStatus !== "online"} onClick={resetDeviceAssignmentsForAll} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">Wer bin ich / Wen zähle ich bei allen zurücksetzen</Button>
+            <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={clearScoresAndDeviceAssignments} className="mt-2 w-full rounded-2xl border border-red-400/50 bg-red-950/80 py-2 text-red-100 disabled:opacity-50">Scores + Geräte-Zuordnung zurücksetzen</Button>
           </CardContent>
         </Card>
       </motion.section>
