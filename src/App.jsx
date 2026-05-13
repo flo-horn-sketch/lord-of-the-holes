@@ -2114,7 +2114,6 @@ function LordOfTheHolesApp() {
   );
 }
 
-}
 
 export default function LordOfTheHolesPWA() {
   return (
