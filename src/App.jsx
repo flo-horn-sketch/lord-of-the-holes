@@ -837,14 +837,11 @@ function LordOfTheHolesApp() {
   const [allScores, setAllScores] = useState(cachedState?.allScores?.length ? cachedState.allScores.map(normalizeScoreRecord) : []);
   const [pendingScores, setPendingScores] = useState(() => readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord).filter(isValidScorePayload));
   const pendingScoresRef = useRef(readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord).filter(isValidScorePayload));
-  const lastRoundForScorerPromptRef = useRef("");
+  const lastLoadedRoundRef = useRef("");
   const lastAutoHoleTargetRef = useRef("");
   const [localHandicaps, setLocalHandicaps] = useState({});
   const [scoredPlayerId, setScoredPlayerId] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerId", ""));
-  const [scoredPlayerByRound, setScoredPlayerByRound] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerByRound", {}));
   const [roundScorerPromptOpen, setRoundScorerPromptOpen] = useState(false);
-  const [forcedScorerPromptRoundId, setForcedScorerPromptRoundId] = useState("");
-  const [serverRoundChangePromptId, setServerRoundChangePromptId] = useState("");
   const [scoreEntryMode, setScoreEntryMode] = useState("player");
   const [activeHole, setActiveHole] = useState(() => getFirstUnscoredHole(cachedState?.scores?.length ? cachedState.scores : cachedState?.allScores || [], cachedState?.selectedActiveRoundId || cachedState?.activeRound?.round_id || "", readLocalJson("lordOfTheHoles.scoredPlayerId", ""), 1, readLocalJson("lordOfTheHoles.myPlayerId", "")));
   const [view, setView] = useState("score");
@@ -1019,7 +1016,7 @@ function LordOfTheHolesApp() {
 
     return buildSummary(9) || buildSummary(18);
   }, [myPlayerId, displayedActiveRound?.round_id, visiblePlayers, displayCourseId, courses, holes, officialScores, roundSummaryDismissedKeys]);
-  const showPlayerSelectPopup = Boolean(!showSplash && !myPlayerId);
+  const showPlayerSelectPopup = false;
   const lockCountdown = useMemo(() => {
     const diffMs = Math.max(0, LOCK_COUNTDOWN_TARGET.getTime() - lockCountdownNow.getTime());
     const totalSeconds = Math.floor(diffMs / 1000);
@@ -1029,6 +1026,18 @@ function LordOfTheHolesApp() {
     const seconds = totalSeconds % 60;
     return { days, hours, minutes, seconds };
   }, [lockCountdownNow]);
+  const identityRoundId = String(displayedActiveRound?.round_id || "");
+  const currentScorerAssignment = useMemo(
+    () => getScorerAssignmentForRound(identityRoundId, myPlayerId),
+    [identityRoundId, myPlayerId, scorerAssignments]
+  );
+  const currentAssignedScoredPlayerId = String(currentScorerAssignment?.scored_player_id || currentScorerAssignment?.scoredPlayerId || "");
+  const currentAssignedScoredPlayerIsValid = Boolean(
+    currentAssignedScoredPlayerId && scoreablePlayers.some((player) => String(player.id) === String(currentAssignedScoredPlayerId))
+  );
+  const identityFlowActive = !showSplash && (!appLocked || lockAdminBypass);
+  const needsMyPlayerSelection = Boolean(identityFlowActive && !myPlayerId);
+  const needsScoredPlayerSelection = Boolean(identityFlowActive && myPlayerId && identityRoundId && !currentAssignedScoredPlayerIsValid);
   const activePopupSoundKey = showSplash || showPlayerSelectPopup ? "" : roundSummaryPopup ? `roundSummary:${roundSummaryPopup.key}` : showFinalWinnerPopup ? `finalWinner:${finalWinnerPopupKey}` : displayedRoundHonorCelebration ? `roundHonor:${displayedRoundHonorCelebration.key}` : clearScoresConfirmOpen ? "clearScoresConfirm" : backupSavedMessage ? "backupSaved" : setupSavedMessage ? "setupSaved" : clearScoresError ? "clearScoresError" : error ? "error" : "";
 
   useEffect(() => {
@@ -1039,42 +1048,28 @@ function LordOfTheHolesApp() {
 
   useEffect(() => {
     const roundId = String(displayedActiveRound?.round_id || "");
-    if (!roundId || !myPlayerId || !scoreablePlayers.length || showSplash || (appLocked && !lockAdminBypass)) return;
+    if (!roundId || !myPlayerId || showSplash || (appLocked && !lockAdminBypass)) return;
 
     const assignment = getScorerAssignmentForRound(roundId, myPlayerId);
-    const storedPlayerId = String(assignment?.scored_player_id || assignment?.scoredPlayerId || "");
-    const storedPlayerIsValid = storedPlayerId && scoreablePlayers.some((player) => String(player.id) === String(storedPlayerId));
-    const roundChanged = lastRoundForScorerPromptRef.current !== roundId;
+    const nextScoredPlayerId = String(assignment?.scored_player_id || assignment?.scoredPlayerId || "");
+    const nextScoredPlayerIsValid = nextScoredPlayerId && scoreablePlayers.some((player) => String(player.id) === String(nextScoredPlayerId));
 
-    if (roundChanged) {
-      lastRoundForScorerPromptRef.current = roundId;
+    if (lastLoadedRoundRef.current !== roundId) {
+      lastLoadedRoundRef.current = roundId;
       setScoreEntryMode("player");
-      if (storedPlayerIsValid) {
-        setScoredPlayerId(storedPlayerId);
-        setForcedScorerPromptRoundId("");
-                        setServerRoundChangePromptId("");
-                        setRoundScorerPromptOpen(false);
-      } else {
-        setScoredPlayerId("");
-        setForcedScorerPromptRoundId(roundId);
-        setRoundScorerPromptOpen(true);
-      }
+      setScoredPlayerId(nextScoredPlayerIsValid ? nextScoredPlayerId : "");
+      setRoundScorerPromptOpen(!nextScoredPlayerIsValid);
       return;
     }
 
-    if (storedPlayerIsValid && !forcedScorerPromptRoundId && !serverRoundChangePromptId) {
-      if (String(scoredPlayerId) !== String(storedPlayerId)) setScoredPlayerId(storedPlayerId);
+    if (nextScoredPlayerIsValid) {
+      if (String(scoredPlayerId || "") !== String(nextScoredPlayerId)) setScoredPlayerId(nextScoredPlayerId);
       setRoundScorerPromptOpen(false);
-      return;
-    }
-
-    if (!scoredPlayerId || forcedScorerPromptRoundId || serverRoundChangePromptId) {
+    } else {
+      if (scoredPlayerId) setScoredPlayerId("");
       setRoundScorerPromptOpen(true);
-      return;
     }
-
-    setRoundScorerPromptOpen(false);
-  }, [displayedActiveRound?.round_id, myPlayerId, scoreablePlayers, scorerAssignments, scoredPlayerId, showSplash, appLocked, lockAdminBypass, forcedScorerPromptRoundId, serverRoundChangePromptId]);
+  }, [displayedActiveRound?.round_id, myPlayerId, scoreablePlayers, scorerAssignments, scoredPlayerId, showSplash, appLocked, lockAdminBypass]);
 
   useEffect(() => { writeLocalJson("lordOfTheHoles.myPlayerId", myPlayerId); }, [myPlayerId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.appLocked", appLocked); }, [appLocked]);
@@ -1085,7 +1080,7 @@ function LordOfTheHolesApp() {
     return () => window.clearInterval(timer);
   }, [appLocked]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerId", scoredPlayerId); }, [scoredPlayerId]);
-  useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerByRound", scoredPlayerByRound); }, [scoredPlayerByRound]);
+  
   useEffect(() => { writeLocalJson("lordOfTheHoles.winnerPopupDismissedKey", winnerPopupDismissedKey); }, [winnerPopupDismissedKey]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundHonorDismissedKeys", roundHonorDismissedKeys); }, [roundHonorDismissedKeys]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scorecardRoundId", scorecardRoundId); }, [scorecardRoundId]);
@@ -1142,15 +1137,13 @@ function LordOfTheHolesApp() {
       if (nextDeviceAssignmentsResetAt && nextDeviceAssignmentsResetAt !== localDeviceAssignmentsResetAt) {
         setMyPlayerId("");
         setScoredPlayerId("");
-        setScoredPlayerByRound({});
         setScoreEntryMode("player");
         setRoundScorerPromptOpen(false);
         setPendingScores([]);
         pendingScoresRef.current = [];
         writeLocalJson("lordOfTheHoles.myPlayerId", "");
         writeLocalJson("lordOfTheHoles.scoredPlayerId", "");
-        writeLocalJson("lordOfTheHoles.scoredPlayerByRound", {});
-        writeLocalJson("lordOfTheHoles.pendingScores", []);
+                writeLocalJson("lordOfTheHoles.pendingScores", []);
         writeLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", nextDeviceAssignmentsResetAt);
         setDeviceAssignmentsResetAt(nextDeviceAssignmentsResetAt);
       } else if (nextDeviceAssignmentsResetAt && nextDeviceAssignmentsResetAt !== deviceAssignmentsResetAt) {
@@ -1165,13 +1158,7 @@ function LordOfTheHolesApp() {
       if (nextActiveRoundId && lastSeenActiveRoundId && nextActiveRoundId !== lastSeenActiveRoundId) {
         setScoredPlayerId("");
         setScoreEntryMode("player");
-        setForcedScorerPromptRoundId(nextActiveRoundId);
-        setServerRoundChangePromptId(nextActiveRoundId);
-        setRoundScorerPromptOpen(false);
-        lastRoundForScorerPromptRef.current = "";
-        if (!normalizeBoolean(data.app_locked ?? data.appLocked) || lockAdminBypass) {
-          setShowSplash(true);
-        }
+        lastLoadedRoundRef.current = "";
       }
       if (nextActiveRoundId) writeLocalJson("lordOfTheHoles.lastSeenActiveRoundId", nextActiveRoundId);
       const nextActivePlayers = data.activePlayers?.length ? data.activePlayers.map(withFallbackAlias) : getRoundPlayers(nextActiveRound?.round_id, nextAllPlayers, data.roundPlayers || []);
@@ -1188,7 +1175,7 @@ function LordOfTheHolesApp() {
       if (String(previousRoundId || "") !== String(nextRoundId || "")) {
         setScoredPlayerId("");
         setScoreEntryMode("player");
-        window.setTimeout(() => prepareScorerPromptForRound(nextRoundId, true), 0);
+        lastLoadedRoundRef.current = "";
       }
       applyPlayers(nextActivePlayers, nextAllPlayers, nextCourses);
       setHoles(normalizeHoles(data.activeHoles?.length ? data.activeHoles : data.holes).filter((hole) => !nextActiveRound?.course_id || String(hole.course_id) === String(nextActiveRound.course_id)));
@@ -1342,15 +1329,13 @@ function LordOfTheHolesApp() {
       setDeviceAssignmentsResetAt(resetAt);
       setMyPlayerId("");
       setScoredPlayerId("");
-      setScoredPlayerByRound({});
       setScoreEntryMode("player");
-      setRoundScorerPromptOpen(false);
+        setRoundScorerPromptOpen(false);
       setPendingScores([]);
       pendingScoresRef.current = [];
       writeLocalJson("lordOfTheHoles.myPlayerId", "");
       writeLocalJson("lordOfTheHoles.scoredPlayerId", "");
-      writeLocalJson("lordOfTheHoles.scoredPlayerByRound", {});
-      writeLocalJson("lordOfTheHoles.pendingScores", []);
+            writeLocalJson("lordOfTheHoles.pendingScores", []);
       writeLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", resetAt);
       setConnectionStatus("online");
       setError("");
@@ -1480,28 +1465,6 @@ function LordOfTheHolesApp() {
     ) || null;
   }
 
-  function prepareScorerPromptForRound(nextRoundId, forcePrompt = false) {
-    const roundId = String(nextRoundId || "");
-    if (!roundId) return;
-    lastRoundForScorerPromptRef.current = roundId;
-    setScoreEntryMode("player");
-    const assignment = getScorerAssignmentForRound(roundId, myPlayerId);
-    const storedPlayerId = String(assignment?.scored_player_id || assignment?.scoredPlayerId || "");
-    const playersForRound = getRoundPlayers(roundId, allPlayers, roundPlayers);
-    const availableForRound = myPlayerId ? playersForRound.filter((player) => String(player.id) !== String(myPlayerId)) : playersForRound;
-    const validPlayers = availableForRound.length ? availableForRound : playersForRound;
-    const storedPlayerIsValid = storedPlayerId && validPlayers.some((player) => String(player.id) === String(storedPlayerId));
-    if (storedPlayerIsValid && !forcePrompt) {
-      setScoredPlayerId(storedPlayerId);
-      setForcedScorerPromptRoundId("");
-      setRoundScorerPromptOpen(false);
-    } else {
-      setScoredPlayerId("");
-      setForcedScorerPromptRoundId(roundId);
-      if (myPlayerId && !showSplash && (!appLocked || lockAdminBypass)) setRoundScorerPromptOpen(true);
-    }
-  }
-
   async function saveScorerAssignmentForRound(roundId, scoredPlayerIdValue) {
     if (!roundId || !myPlayerId || !scoredPlayerIdValue) return false;
     const nextAssignment = {
@@ -1522,12 +1485,7 @@ function LordOfTheHolesApp() {
     } catch (err) {
       setConnectionStatus("offline");
       setError(err.message || "Zähler-Zuordnung konnte nicht gespeichert werden.");
-      return false;
-    }
-  }
-
-  function setMainMenuAndView(value) {
-    setMainMenu(value);
+      resetRoundScorerPromptOpen(false);nMenu(value);
     setMenuOpen(false);
     if (value === "current") setView("score");
     if (value === "roundTables") setView("leaderboard");
@@ -1604,7 +1562,7 @@ function LordOfTheHolesApp() {
           <CardContent className="p-3">
             <div className="mb-2"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Admin</p><h2 className="font-serif text-lg text-amber-200">Turnierverwaltung</h2><p className="mt-1 text-sm text-amber-100/65">Aktive Runde und Spielvorgaben sind sichtbar, aber erst nach Passworteingabe bearbeitbar.</p></div>
             {!isAdminUnlocked ? <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Admin-Passwort</label><input type="password" value={adminPinInput} onChange={(e) => setAdminPinInput(e.target.value)} placeholder="Passwort eingeben" className="mb-3 w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" /><Button onClick={() => { if (adminPinInput === ADMIN_PASSWORD) { setIsAdminUnlocked(true); setError(""); } else { setError("Admin-Passwort ist falsch."); } }} className="w-full rounded-2xl bg-amber-600 py-2 text-amber-50">Admin entsperren</Button></div> : <div className="mb-2 rounded-2xl border border-emerald-700/30 bg-emerald-950/30 p-3 text-sm text-emerald-100">Admin entsperrt. Änderungen können gespeichert werden.</div>}
-            <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Aktive Runde</label><select value={selectedActiveRoundId} onChange={(e) => { const nextRoundId = e.target.value; const nextRound = (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(nextRoundId)); const nextCourseId = nextRound?.course_id || selectedCourseId || ""; setAdminEditing(true); setSelectedActiveRoundId(nextRoundId); setSelectedCourseId(nextCourseId); prepareScorerPromptForRound(nextRoundId, true); saveAdminRoundCourse(nextRoundId, nextCourseId); }} disabled={!isAdminUnlocked || setupSaving} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:opacity-60"><option value="">Runde auswählen</option>{(rounds.length ? rounds : fallbackRounds).map((round) => <option key={round.round_id} value={round.round_id}>{round.round_name}</option>)}</select></div>
+            <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Aktive Runde</label><select value={selectedActiveRoundId} onChange={(e) => { const nextRoundId = e.target.value; const nextRound = (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(nextRoundId)); const nextCourseId = nextRound?.course_id || selectedCourseId || ""; setAdminEditing(true); setSelectedActiveRoundId(nextRoundId); setSelectedCourseId(nextCourseId); setScoredPlayerId(""); lastLoadedRoundRef.current = ""; setScoreEntryMode("player"); saveAdminRoundCourse(nextRoundId, nextCourseId); }} disabled={!isAdminUnlocked || setupSaving} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:opacity-60"><option value="">Runde auswählen</option>{(rounds.length ? rounds : fallbackRounds).map((round) => <option key={round.round_id} value={round.round_id}>{round.round_name}</option>)}</select></div>
             <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Kurs für aktive Runde</label><select value={selectedCourseId} onChange={(e) => { const nextCourseId = e.target.value; setAdminEditing(true); setSelectedCourseId(nextCourseId); saveAdminRoundCourse(selectedActiveRoundId, nextCourseId); }} disabled={!isAdminUnlocked || setupSaving} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:opacity-60"><option value="">Kurs auswählen</option>{(courses.length ? courses : fallbackCourses).map((course) => <option key={course.course_id} value={course.course_id}>{course.course_name}</option>)}</select></div>
             <div className="space-y-2">{allPlayers.map((p) => { const hcpIndexKey = `hcp_index_${p.id}`; const hcpIndexValue = localHandicaps[hcpIndexKey] ?? String(p.handicap_index ?? p.dgv_hcp ?? p.hcp_index ?? ""); const previewPlayer = { ...p, handicap_index: hcpIndexValue === "" || hcpIndexValue === "-" ? 0 : Number(String(hcpIndexValue).replace(",", ".")) }; const goetheSpv = getCourseHandicap(previewPlayer, "goethe", courses); const feiningerSpv = getCourseHandicap(previewPlayer, "feininger", courses); return <div key={p.id} className="rounded-xl border border-amber-700/30 bg-black/25 p-2"><div className="mb-2 font-semibold text-amber-100">{getPlayerLabel(p)}<div className="text-xs font-normal text-amber-100/70">DGV-HCP eintragen · Spielvorgabe wird automatisch berechnet</div></div><div className="rounded-xl border border-amber-700/20 bg-black/25 p-2"><label className="mb-1 block text-xs font-bold uppercase tracking-[0.16em] text-amber-300/80">DGV HCP / Handicap Index</label><input inputMode="decimal" disabled={!isAdminUnlocked} value={hcpIndexValue} onChange={(e) => { setAdminEditing(true); setLocalHandicaps((current) => ({ ...current, [hcpIndexKey]: cleanHandicapInput(e.target.value) })); }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-center text-amber-50 disabled:opacity-60" /><div className="mt-2 grid grid-cols-2 gap-2 text-center text-xs text-amber-100/75"><div className="rounded-xl bg-amber-50/5 p-2"><div>Goethe SpV</div><b className="text-lg text-amber-200">{goetheSpv}</b></div><div className="rounded-xl bg-amber-50/5 p-2"><div>Feininger SpV</div><b className="text-lg text-amber-200">{feiningerSpv}</b></div></div></div></div>; })}</div>
             <Button disabled={!isAdminUnlocked || setupSaving} onClick={saveFullSetup} className="mt-2 w-full rounded-2xl bg-amber-600 py-2 text-amber-50 disabled:opacity-50">{setupSaving ? "Speichere ..." : "HCP-Werte speichern"}</Button>
@@ -1620,7 +1578,7 @@ function LordOfTheHolesApp() {
   }
 
   function renderSettingsView() {
-    return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}><Card className="mb-2 rounded-2xl border border-amber-500/30 bg-[linear-gradient(180deg,rgba(48,35,22,0.86),rgba(18,13,9,0.82))] shadow-[inset_0_1px_0_rgba(251,191,36,0.10),0_18px_46px_rgba(0,0,0,0.38)] backdrop-blur-sm"><CardContent className="p-3"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Einstellungen</p><h2 className="font-serif text-lg text-amber-200">Mein Handy</h2><p className="mt-1 text-sm text-amber-100/65">Diese Einstellung wird nur lokal auf diesem Handy gespeichert.</p><div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Wer bin ich auf diesem Handy?</label><select value={myPlayerId} onChange={(e) => setMyPlayerId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50"><option value="">Spieler auswählen</option>{allPlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}</select><p className="mt-2 text-xs text-amber-100/60">Dieser Spieler wird auf diesem Handy beim Score-Zählen ausgeblendet, damit man sich nicht selbst zählt.</p></div><div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Wen zähle ich?</label><select value={scoredPlayerId} onChange={(e) => { const nextPlayerId = e.target.value; setScoredPlayerId(nextPlayerId); if (displayedActiveRound?.round_id) setScoredPlayerByRound((current) => ({ ...(current || {}), [displayedActiveRound.round_id]: nextPlayerId })); }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50"><option value="">Spieler auswählen</option>{scoreablePlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}</select><p className="mt-2 text-xs text-amber-100/60">Dieser Spieler ist links im Score-Bereich vorausgewählt.</p></div></CardContent></Card></motion.section>;
+    return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}><Card className="mb-2 rounded-2xl border border-amber-500/30 bg-[linear-gradient(180deg,rgba(48,35,22,0.86),rgba(18,13,9,0.82))] shadow-[inset_0_1px_0_rgba(251,191,36,0.10),0_18px_46px_rgba(0,0,0,0.38)] backdrop-blur-sm"><CardContent className="p-3"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Einstellungen</p><h2 className="font-serif text-lg text-amber-200">Mein Handy</h2><p className="mt-1 text-sm text-amber-100/65">Diese Einstellung wird nur lokal auf diesem Handy gespeichert.</p><div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Wer bin ich auf diesem Handy?</label><select value={myPlayerId} onChange={(e) => setMyPlayerId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50"><option value="">Spieler auswählen</option>{allPlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}</select><p className="mt-2 text-xs text-amber-100/60">Dieser Spieler wird auf diesem Handy beim Score-Zählen ausgeblendet, damit man sich nicht selbst zählt.</p></div><div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Wen zähle ich?</label><select value={scoredPlayerId} onChange={(e) => { const nextPlayerId = e.target.value; setScoredPlayerId(nextPlayerId); if (displayedActiveRound?.round_id && nextPlayerId) saveScorerAssignmentForRound(displayedActiveRound.round_id, nextPlayerId); }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50"><option value="">Spieler auswählen</option>{scoreablePlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}</select><p className="mt-2 text-xs text-amber-100/60">Dieser Spieler ist links im Score-Bereich vorausgewählt.</p></div></CardContent></Card></motion.section>;
   }
 
   function renderPopupStandingsTable() {
@@ -2040,18 +1998,18 @@ function LordOfTheHolesApp() {
       {setupSavedMessage ? <div className="fixed inset-x-3 top-4 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/50 bg-emerald-950/95 p-3 text-emerald-50 shadow-2xl shadow-black/60 backdrop-blur"><div className="flex items-start justify-between gap-2"><div><div className="font-serif text-lg text-emerald-100">Gespeichert</div><div className="mt-0.5 text-sm text-emerald-100/85">{setupSavedMessage}</div></div><button type="button" onClick={() => setSetupSavedMessage("")} className="rounded-xl border border-emerald-400/40 bg-black/25 px-3 py-1 text-sm font-bold text-emerald-50">×</button></div></div> : null}
       {backupSavedMessage ? <div className="fixed inset-x-3 top-4 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/50 bg-emerald-950/95 p-3 text-emerald-50 shadow-2xl shadow-black/60 backdrop-blur"><div className="flex items-start justify-between gap-2"><div><div className="font-serif text-lg text-emerald-100">Backup erstellt</div><div className="mt-0.5 text-sm text-emerald-100/85">{backupSavedMessage}</div></div><button type="button" onClick={() => setBackupSavedMessage("")} className="rounded-xl border border-emerald-400/40 bg-black/25 px-3 py-1 text-sm font-bold text-emerald-50">×</button></div></div> : null}
       {renderPopupStandingsTable()}
-      {((!myPlayerId || roundScorerPromptOpen || forcedScorerPromptRoundId) && !showSplash && (!appLocked || lockAdminBypass)) ? (
+      {(needsMyPlayerSelection || needsScoredPlayerSelection) ? (
         <div className="fixed inset-0 z-[94] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
           <div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-500/45 bg-stone-950 text-amber-50 shadow-2xl shadow-black/80">
             <div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.20),transparent_45%),linear-gradient(180deg,rgba(41,37,36,0.94),rgba(12,10,9,1))] p-4 text-center">
               <div className="text-[10px] uppercase tracking-[0.24em] text-amber-300/75">Start der Runde</div>
-              <div className="mt-1 font-serif text-2xl font-black text-amber-200">{!myPlayerId ? "Wer bist du?" : "Wen zählst du?"}</div>
+              <div className="mt-1 font-serif text-2xl font-black text-amber-200">{needsMyPlayerSelection ? "Wer bist du?" : "Wen zählst du?"}</div>
               <div className="mt-1 text-sm text-amber-100/70">
-                {!myPlayerId
+                {needsMyPlayerSelection
                   ? "Wähle zuerst deinen eigenen Spieler. Danach wählst du direkt, wen du in dieser Runde zählst."
                   : `${displayedActiveRound?.round_name || "Diese Runde"} beginnt. Wähle deinen Gefährten für die Scorekarte.`}
               </div>
-              {!myPlayerId ? (
+              {needsMyPlayerSelection ? (
                 <div className="mt-4 grid gap-2">
                   {visiblePlayers.map((player) => (
                     <button
