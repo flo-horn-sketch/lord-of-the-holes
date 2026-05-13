@@ -1354,17 +1354,12 @@ function LordOfTheHolesApp() {
               <div className="grid grid-cols-[1fr_auto] items-center gap-2">
                 <div>
                   <div className="text-[9px] uppercase tracking-[0.18em] text-amber-300/75">Aktuell gespielt</div>
-                  <div className="font-serif text-base leading-tight text-amber-200">{displayedActiveRound?.round_name || "Runde 1"} · Loch {activeHole}</div>
+                  <div className="font-serif text-base leading-tight text-amber-200">{displayedActiveRound?.round_name || "Runde 1"}</div>
                   <div className="text-[10px] text-amber-100/70">{getRoundChapterLabel(displayedActiveRound).replace(`${displayedActiveRound?.round_name || ""} · `, "")}</div>
                   <div className="text-[10px] text-amber-100/65">{activeCourse?.course_name || "Kein Kurs ausgewählt"}</div>
                 </div>
                 <div className="text-right">
-                  {hasScoreMismatch ? <div className="mb-1 rounded-full border border-red-400/50 bg-red-950/50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-red-100">Abweichung</div> : null}
-                  <div className="grid grid-cols-3 gap-1 rounded-xl border border-amber-700/50 bg-black/30 p-1.5 text-center text-[10px] text-amber-50">
-                    <div><div className="text-amber-100/70">Par</div><b className="text-amber-200">{activeHoleData.par}</b></div>
-                    <div><div className="text-amber-100/70">HCP</div><b className="text-amber-200">{activeHoleData.hcp}</b></div>
-                    <div><div className="text-amber-100/70">m</div><b className="text-amber-200">{activeHoleData.meters}</b></div>
-                  </div>
+                  {hasScoreMismatch ? <div className="rounded-full border border-red-400/50 bg-red-950/50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-red-100">Abweichung</div> : null}
                 </div>
               </div>
             </div>
@@ -1416,10 +1411,14 @@ function LordOfTheHolesApp() {
                 </div>
               ) : null}
 
-              <div className="mb-1 flex justify-end">
-                <span className="rounded-full border border-amber-700/35 bg-black/25 px-2 py-0.5 text-[10px] text-amber-100/70">
-                  Vorgabe <b className="text-amber-200 tracking-[0.18em]">{formatShotMarks(entryPlayerShotsOnActiveHole)}</b>
-                </span>
+              <div className="mb-1.5 grid grid-cols-[auto_1fr] items-center gap-2 rounded-2xl border border-amber-700/35 bg-black/25 px-2 py-1 text-[10px] text-amber-100/70">
+                <div className="font-serif text-lg font-black leading-none text-amber-200">Loch {activeHole}</div>
+                <div className="flex items-center justify-end gap-2 text-right">
+                  <span>Par <b className="text-amber-200">{activeHoleData.par}</b></span>
+                  <span>HCP <b className="text-amber-200">{activeHoleData.hcp}</b></span>
+                  <span>{activeHoleData.meters} m</span>
+                  <span>Vorgabe <b className="text-amber-200 tracking-[0.18em]">{formatShotMarks(entryPlayerShotsOnActiveHole)}</b></span>
+                </div>
               </div>
 
               <div className="mb-3">
