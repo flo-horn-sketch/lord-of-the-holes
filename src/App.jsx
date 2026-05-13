@@ -50,6 +50,7 @@ class AppErrorBoundary extends React.Component {
 
 const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbyPOg_6IyhMcup8m-jX6_e0vj3MKn_9y_xRccdsphQrQlhg2vkpRMo2lqdvahbxL-Xu/exec";
 const ADMIN_PASSWORD = "weimar";
+const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T11:00:00+02:00");
 
 const fallbackAliases = {
   florian: "Sliceron",
@@ -854,6 +855,7 @@ function LordOfTheHolesApp() {
   const [lockUnlockOpen, setLockUnlockOpen] = useState(false);
   const [lockPasswordInput, setLockPasswordInput] = useState("");
   const [lockAdminBypass, setLockAdminBypass] = useState(false);
+  const [lockCountdownNow, setLockCountdownNow] = useState(() => new Date());
   const introAudioRef = useRef(null);
   const lastPopupSoundKeyRef = useRef("");
   const [clearScoresConfirmOpen, setClearScoresConfirmOpen] = useState(false);
@@ -999,6 +1001,15 @@ function LordOfTheHolesApp() {
     return buildSummary(9) || buildSummary(18);
   }, [myPlayerId, displayedActiveRound?.round_id, visiblePlayers, displayCourseId, courses, holes, officialScores, roundSummaryDismissedKeys]);
   const showPlayerSelectPopup = Boolean(!showSplash && !myPlayerId);
+  const lockCountdown = useMemo(() => {
+    const diffMs = Math.max(0, LOCK_COUNTDOWN_TARGET.getTime() - lockCountdownNow.getTime());
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return { days, hours, minutes, seconds };
+  }, [lockCountdownNow]);
   const activePopupSoundKey = showSplash || showPlayerSelectPopup ? "" : roundSummaryPopup ? `roundSummary:${roundSummaryPopup.key}` : showFinalWinnerPopup ? `finalWinner:${finalWinnerPopupKey}` : displayedRoundHonorCelebration ? `roundHonor:${displayedRoundHonorCelebration.key}` : clearScoresConfirmOpen ? "clearScoresConfirm" : backupSavedMessage ? "backupSaved" : setupSavedMessage ? "setupSaved" : clearScoresError ? "clearScoresError" : error ? "error" : "";
 
   useEffect(() => {
@@ -1009,6 +1020,11 @@ function LordOfTheHolesApp() {
 
   useEffect(() => { writeLocalJson("lordOfTheHoles.myPlayerId", myPlayerId); }, [myPlayerId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.appLocked", appLocked); }, [appLocked]);
+  useEffect(() => {
+    if (!appLocked) return undefined;
+    const timer = window.setInterval(() => setLockCountdownNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, [appLocked]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerId", scoredPlayerId); }, [scoredPlayerId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.winnerPopupDismissedKey", winnerPopupDismissedKey); }, [winnerPopupDismissedKey]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundHonorDismissedKeys", roundHonorDismissedKeys); }, [roundHonorDismissedKeys]);
@@ -1767,7 +1783,12 @@ function LordOfTheHolesApp() {
       <div className="fixed inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/lord-bg.webp')" }} />
       <div className="fixed inset-0 bg-black/45" />
       <div className="fixed inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.06),rgba(0,0,0,0.58)_38%,rgba(0,0,0,0.86)_100%)]" />
-      {((showSplash || appLocked) && !lockAdminBypass) ? <div className="fixed inset-0 z-[100] bg-black"><div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/lord-bg.webp')" }} /><div className="absolute inset-0 bg-black/25" />{!appLocked ? <div className="absolute inset-x-0 bottom-8 flex justify-center px-6 pb-[env(safe-area-inset-bottom)]"><button type="button" onClick={enterRoundFromSplash} className="w-full max-w-xs rounded-2xl border border-amber-300/55 bg-black/55 px-5 py-2.5 font-serif text-lg font-black tracking-wide text-amber-200 shadow-2xl shadow-black/70 backdrop-blur-sm active:scale-[0.98]">Runde betreten</button></div> : <div className="absolute inset-x-4 bottom-10 mx-auto max-w-sm rounded-3xl border border-amber-500/35 bg-black/55 p-4 text-center text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm"><div className="font-serif text-xl font-black text-amber-200">Der Rat ist noch nicht einberufen.</div><div className="mt-2 text-sm text-amber-100/80">In Bruchtal werden Stimmen gesenkt, alte Karten entrollt und verdächtig ernste Blicke ausgetauscht. Die Gefährten werden bald gerufen.</div><div className="mt-3 text-xs uppercase tracking-[0.18em] text-amber-300/70">Bitte noch einen Augenblick an der Pforte warten</div></div>}{appLocked ? <button type="button" onClick={() => setLockUnlockOpen(true)} className="absolute bottom-3 left-3 h-8 w-8 rounded-full text-[10px] text-amber-100/10" aria-label="Admin-Zugang">•</button> : null}{appLocked && lockUnlockOpen ? <div className="absolute inset-x-4 bottom-8 mx-auto max-w-xs rounded-2xl border border-amber-700/35 bg-black/70 p-3 text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm"><div className="mb-2 text-xs uppercase tracking-[0.18em] text-amber-300/70">Admin</div><input type="password" value={lockPasswordInput} onChange={(e) => setLockPasswordInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") enterLockedAppAsAdmin(); }} placeholder="Passwort" className="mb-2 w-full rounded-xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" autoFocus /><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => { setLockUnlockOpen(false); setLockPasswordInput(""); }} className="rounded-xl bg-stone-800 py-2 text-sm font-bold text-amber-100">Abbrechen</button><button type="button" onClick={enterLockedAppAsAdmin} className="rounded-xl bg-amber-600 py-2 text-sm font-bold text-amber-50">Admin rein</button></div></div> : null}</div> : null}
+      {((showSplash || appLocked) && !lockAdminBypass) ? <div className="fixed inset-0 z-[100] bg-black"><div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/lord-bg.webp')" }} /><div className="absolute inset-0 bg-black/25" />{!appLocked ? <div className="absolute inset-x-0 bottom-8 flex justify-center px-6 pb-[env(safe-area-inset-bottom)]"><button type="button" onClick={enterRoundFromSplash} className="w-full max-w-xs rounded-2xl border border-amber-300/55 bg-black/55 px-5 py-2.5 font-serif text-lg font-black tracking-wide text-amber-200 shadow-2xl shadow-black/70 backdrop-blur-sm active:scale-[0.98]">Runde betreten</button></div> : <div className="absolute inset-x-4 bottom-10 mx-auto max-w-sm rounded-3xl border border-amber-500/35 bg-black/55 p-4 text-center text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm"><div className="font-serif text-xl font-black text-amber-200">Der Rat ist noch nicht einberufen.</div><div className="mt-2 text-sm text-amber-100/80">In Bruchtal werden Stimmen gesenkt, alte Karten entrollt und verdächtig ernste Blicke ausgetauscht. Die Gefährten werden bald gerufen.</div><div className="mt-4 grid grid-cols-4 gap-1.5 rounded-2xl border border-amber-500/25 bg-black/35 p-2 text-center">
+                  <div><div className="font-serif text-xl font-black text-amber-200">{lockCountdown.days}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Tage</div></div>
+                  <div><div className="font-serif text-xl font-black text-amber-200">{String(lockCountdown.hours).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Std</div></div>
+                  <div><div className="font-serif text-xl font-black text-amber-200">{String(lockCountdown.minutes).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Min</div></div>
+                  <div><div className="font-serif text-xl font-black text-amber-200">{String(lockCountdown.seconds).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Sek</div></div>
+                </div><div className="mt-3 text-xs uppercase tracking-[0.18em] text-amber-300/70">Bis zum Ruf der Gefährten · 22.05.2026 · 11:00 Uhr</div></div>}{appLocked ? <button type="button" onClick={() => setLockUnlockOpen(true)} className="absolute bottom-3 left-3 h-8 w-8 rounded-full text-[10px] text-amber-100/10" aria-label="Admin-Zugang">•</button> : null}{appLocked && lockUnlockOpen ? <div className="absolute inset-x-4 bottom-8 mx-auto max-w-xs rounded-2xl border border-amber-700/35 bg-black/70 p-3 text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm"><div className="mb-2 text-xs uppercase tracking-[0.18em] text-amber-300/70">Admin</div><input type="password" value={lockPasswordInput} onChange={(e) => setLockPasswordInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") enterLockedAppAsAdmin(); }} placeholder="Passwort" className="mb-2 w-full rounded-xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" autoFocus /><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => { setLockUnlockOpen(false); setLockPasswordInput(""); }} className="rounded-xl bg-stone-800 py-2 text-sm font-bold text-amber-100">Abbrechen</button><button type="button" onClick={enterLockedAppAsAdmin} className="rounded-xl bg-amber-600 py-2 text-sm font-bold text-amber-50">Admin rein</button></div></div> : null}</div> : null}
       {showPlayerSelectPopup ? (
         <div className="fixed inset-0 z-[99] flex items-center justify-center bg-black/72 px-4 backdrop-blur-sm">
           <div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-400/55 bg-stone-950 text-amber-50 shadow-2xl shadow-black/80">
