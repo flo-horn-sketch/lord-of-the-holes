@@ -1436,6 +1436,9 @@ function LordOfTheHolesApp() {
     setSplashEntering(false);
     if (!data) return;
     setLockAdminBypass(true);
+    setIsAdminUnlocked(true);
+    setMainMenu("admin");
+    setView("admin");
     setShowSplash(false);
     setLockUnlockOpen(false);
     setLockPasswordInput("");
