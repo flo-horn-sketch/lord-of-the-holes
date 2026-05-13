@@ -1028,7 +1028,11 @@ function LordOfTheHolesApp() {
     return { days, hours, minutes, seconds };
   }, [lockCountdownNow]);
   const identityRoundId = String(displayedActiveRound?.round_id || "");
-  const currentAssignedScoredPlayerId = getLocalScoredPlayerForRound(identityRoundId);showSplash && (!appLocked || lockAdminBypass);
+  const currentAssignedScoredPlayerId = getLocalScoredPlayerForRound(identityRoundId);
+  const currentAssignedScoredPlayerIsValid = Boolean(
+    currentAssignedScoredPlayerId && scoreablePlayers.some((player) => String(player.id) === String(currentAssignedScoredPlayerId))
+  );
+  const identityFlowActive = !showSplash && (!appLocked || lockAdminBypass);
   const needsMyPlayerSelection = Boolean(identityFlowActive && !myPlayerId);
   const needsScoredPlayerSelection = false;
   const activePopupSoundKey = showSplash || showPlayerSelectPopup ? "" : roundSummaryPopup ? `roundSummary:${roundSummaryPopup.key}` : showFinalWinnerPopup ? `finalWinner:${finalWinnerPopupKey}` : displayedRoundHonorCelebration ? `roundHonor:${displayedRoundHonorCelebration.key}` : clearScoresConfirmOpen ? "clearScoresConfirm" : backupSavedMessage ? "backupSaved" : setupSavedMessage ? "setupSaved" : clearScoresError ? "clearScoresError" : error ? "error" : "";
@@ -1040,9 +1044,6 @@ function LordOfTheHolesApp() {
   }, [scoreablePlayers, scoredPlayerId, myPlayerId, scoreEntryMode, activeHole]);
 
   useEffect(() => {
-    const roundId = String(displayedActiveRound?.round_id || "");
-    if (!roundId || !myPlayerId || showSplash || (appLocked && !lockAdminBypass)) return;
-    const storedPlayerId = getLocalScoredPlayerFuseEffect(() => {
     const roundId = String(displayedActiveRound?.round_id || "");
     if (!roundId || !myPlayerId || showSplash || (appLocked && !lockAdminBypass)) return;
     const storedPlayerId = getLocalScoredPlayerForRound(roundId);
@@ -1058,7 +1059,15 @@ function LordOfTheHolesApp() {
       if (scoredPlayerId) setScoredPlayerId("");
       setRoundScorerPromptOpen(true);
     }
-  }, [displayedActiveRound?.round_id, myPlayerId, scoreablePlayers, scoredPlayerByRound, scoredPlayerId, showSplash, appLocked, lockAdminBypass]);terval(timer);
+  }, [displayedActiveRound?.round_id, myPlayerId, scoreablePlayers, scoredPlayerByRound, scoredPlayerId, showSplash, appLocked, lockAdminBypass]);
+
+  useEffect(() => { writeLocalJson("lordOfTheHoles.myPlayerId", myPlayerId); }, [myPlayerId]);
+  useEffect(() => { writeLocalJson("lordOfTheHoles.appLocked", appLocked); }, [appLocked]);
+  useEffect(() => { writeLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", deviceAssignmentsResetAt); }, [deviceAssignmentsResetAt]);
+  useEffect(() => {
+    if (!appLocked) return undefined;
+    const timer = window.setInterval(() => setLockCountdownNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
   }, [appLocked]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerId", scoredPlayerId); }, [scoredPlayerId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerByRound", scoredPlayerByRound); }, [scoredPlayerByRound]);
@@ -1539,7 +1548,59 @@ function LordOfTheHolesApp() {
   }
 
   function renderSettingsView() {
-    return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}><Card className="mb-2 rounded-2xl border border-amber-500/30 bg-[linear-gradient(180deg,rgba(48,35,22,0.86),rgba(18,13,9,0.82))] shadow-[inset_0_1px_0_rgba(251,191,36,0.10),0_18px_46px_rgba(0,0,0,0.38)] backdrop-blur-sm"><CardContent className="p-3"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Einstellungen</p><h2 className="font-serif text-lg text-amber-200">Mein Handy</h2><p className="mt-1 text-sm text-amber-100/65">Diese Einstellung wird nur lokal auf diesem Handy gespeichert.</p><div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Wer bin ich auf diesem Handy?</label><select value={myPlayerId} onChange={(e) => setMyPlayerId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50"><option value="">Spieler auswählen</option>{allPlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}</select><p className="mt-2 text-xs text-amber-100/60">Dieser Spieler wird auf diesem Handy beim Score-Zählen ausgeblendet, damit man sich nicht selbst zählt.</p></div><div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Wen zähle ich?</label><select value={scoredPlayerId} onChange={(e) => { const nextPlayerId = e.target.value; setScoredPlayerId(nextPlayerId); if (displayedActiveRound?.round_id && nextPlayerId) saveScorerAssignmentForRound(displayedActiveRound.round_id, nextPlayerId); }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50"><option value="">Spieler auswählen</option>{scoreablePlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}</select><p className="mt-2 text-xs text-amber-100/60">Dieser Spieler ist links im Score-Bereich vorausgewählt.</p></div></Caif (displayedActiveRound?.round_id && nextPlayerId) saveLocalScoredPlayerForRound(displayedActiveRound.round_id, nextPlayerId);nst isNetStableford = standingsPopup === "netStableford";
+    return (
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
+        <Card className="mb-2 rounded-2xl border border-amber-500/30 bg-[linear-gradient(180deg,rgba(48,35,22,0.86),rgba(18,13,9,0.82))] shadow-xl backdrop-blur-sm">
+          <CardContent className="p-3">
+            <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Einstellungen</p>
+            <h2 className="font-serif text-lg text-amber-200">Mein Handy</h2>
+            <p className="mt-1 text-sm text-amber-100/65">Diese Einstellung wird nur lokal auf diesem Handy gespeichert.</p>
+
+            <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
+              <label className="mb-1 block text-sm text-amber-100/80">Wer bin ich auf diesem Handy?</label>
+              <select
+                value={myPlayerId}
+                onChange={(e) => {
+                  setMyPlayerId(e.target.value);
+                  setScoreEntryMode("player");
+                }}
+                className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50"
+              >
+                <option value="">Spieler auswählen</option>
+                {allPlayers.map((player) => (
+                  <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>
+                ))}
+              </select>
+              <p className="mt-2 text-xs text-amber-100/60">Dieser Spieler wird auf diesem Handy beim Score-Zählen ausgeblendet, damit man sich nicht selbst zählt.</p>
+            </div>
+
+            <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
+              <label className="mb-1 block text-sm text-amber-100/80">Wen zähle ich?</label>
+              <select
+                value={scoredPlayerId}
+                onChange={(e) => {
+                  const nextPlayerId = e.target.value;
+                  setScoredPlayerId(nextPlayerId);
+                  if (displayedActiveRound?.round_id && nextPlayerId) saveLocalScoredPlayerForRound(displayedActiveRound.round_id, nextPlayerId);
+                }}
+                className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50"
+              >
+                <option value="">Spieler auswählen</option>
+                {scoreablePlayers.map((player) => (
+                  <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>
+                ))}
+              </select>
+              <p className="mt-2 text-xs text-amber-100/60">Dieser Spieler ist im Score-Bereich vorausgewählt und wird pro Runde lokal gespeichert.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.section>
+    );
+  }
+
+  function renderPopupStandingsTable() {
+    if (!standingsPopup) return null;
+    const isNetStableford = standingsPopup === "netStableford";
     const isStrokePlay = standingsPopup === "strokePlay";
     const title = isStrokePlay ? "Klassisches Zählspiel" : isNetStableford ? "Netto Stableford" : "Strokes HCP adjusted";
     const tablePlayers = isStrokePlay ? strokePlayLeaderboard : isNetStableford ? netStablefordLeaderboard : hcpAdjustedStrokeLeaderboard;
@@ -1607,7 +1668,7 @@ function LordOfTheHolesApp() {
                       type="button"
                       onClick={() => {
                         setScoredPlayerId(player.id);
-                        saveScorerAssignmentForRound(displayedActiveRound?.round_id || "", player.id);
+                        saveLocalScoredPlayerForRound(displayedActiveRound?.round_id || "", player.id);
                         setRoundScorerPromptOpen(false);
                       }}
                       className="rounded-2xl bg-stone-800 px-2 py-3 font-serif text-sm font-bold text-amber-100 active:scale-[0.98]"
@@ -1619,7 +1680,7 @@ function LordOfTheHolesApp() {
               </div>
             ) : null}
 
-            <divsaveLocalScoredPlayerForRound(displayedActiveRound?.round_id || "", player.id);")}>
+            <div className={cls("rounded-3xl", hasScoreMismatch ? "ring-1 ring-red-500/45" : "")}>
               {myCurrentPlayer ? (
                 <div className="mb-2 grid grid-cols-2 gap-2">
                   <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-2xl px-2 py-3 text-sm font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "bg-stone-800 text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/60")}>
