@@ -313,12 +313,7 @@ function getScoreTimestamp(score) {
 }
 
 function isValidScorePayload(score) {
-  return Boolean(
-    score &&
-    String(score.round_id || "").trim() &&
-    String(score.player_id || "").trim() &&
-    Number(score.hole_number) > 0
-  );
+  return Boolean(score && String(score.round_id || "").trim() && String(score.player_id || "").trim() && Number(score.hole_number) > 0);
 }
 
 function isNewerOrEqualScore(candidate, existing) {
@@ -328,11 +323,11 @@ function isNewerOrEqualScore(candidate, existing) {
 function mergeScoresPreservingPending(sheetScores = [], pendingScores = []) {
   const map = new Map();
   sheetScores.forEach((score) => {
-    if (!score || !score.player_id || !score.hole_number) return;
+    if (!isValidScorePayload(score)) return;
     map.set(getScoreIdentityKey(score), normalizeScoreRecord(score));
   });
   pendingScores.forEach((score) => {
-    if (!score || !score.player_id || !score.hole_number) return;
+    if (!isValidScorePayload(score)) return;
     const key = getScoreIdentityKey(score);
     const existing = map.get(key);
     if (!existing || isNewerOrEqualScore(score, existing)) map.set(key, normalizeScoreRecord(score));
@@ -573,11 +568,9 @@ function buildRoundHcpAdjustedStandings(players, round, holes, scores, roundPlay
 
 function getRoundHonorCelebration(players, rounds, holes, scores, roundPlayers, dismissedKeys = []) {
   const qualificationRounds = getQualificationRounds(rounds);
-
   const sameHcpAdjustedScore = (a, b) => Number(a?.hcpAdjustedStrokes) === Number(b?.hcpAdjustedStrokes);
   const buildCutoffDecision = (standings, count, side) => {
     if (!standings.length || count <= 0) return { fixed: [], playoff: [], slotsOpen: 0, hasPlayoff: false };
-
     if (side === "top") {
       const boundary = standings[count - 1];
       if (!boundary) return { fixed: standings.slice(0, count), playoff: [], slotsOpen: 0, hasPlayoff: false };
@@ -587,7 +580,6 @@ function getRoundHonorCelebration(players, rounds, holes, scores, roundPlayers, 
       if (tiedAtBoundary.length > slotsOpen) return { fixed, playoff: tiedAtBoundary, slotsOpen, hasPlayoff: true };
       return { fixed: standings.slice(0, count), playoff: [], slotsOpen: 0, hasPlayoff: false };
     }
-
     const boundaryIndex = Math.max(0, standings.length - count);
     const boundary = standings[boundaryIndex];
     if (!boundary) return { fixed: standings.slice(-count).reverse(), playoff: [], slotsOpen: 0, hasPlayoff: false };
@@ -597,7 +589,6 @@ function getRoundHonorCelebration(players, rounds, holes, scores, roundPlayers, 
     if (tiedAtBoundary.length > slotsOpen) return { fixed, playoff: tiedAtBoundary, slotsOpen, hasPlayoff: true };
     return { fixed: standings.slice(-count).reverse(), playoff: [], slotsOpen: 0, hasPlayoff: false };
   };
-
   for (const round of qualificationRounds) {
     if (!round?.round_id || !round?.course_id) continue;
     const popupKey = `round_honor_${round.round_id}`;
@@ -745,10 +736,8 @@ function MiddleEarthTables({ players, holes, scores, mismatches }) {
   const greenKeepers = [...funPlayers].sort((a, b) => Number(b.greenInRegulation || 0) - Number(a.greenInRegulation || 0) || Number(b.underRegulation || 0) - Number(a.underRegulation || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
   const birdieHunters = [...funPlayers].sort((a, b) => Number((b.birdies || 0) + (b.eaglesOrBetter || 0)) - Number((a.birdies || 0) + (a.eaglesOrBetter || 0)) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
   const bogeyBunkers = [...funPlayers].sort((a, b) => Number(b.doubleBogeyPlus || 0) - Number(a.doubleBogeyPlus || 0) || Number(b.triplePlus || 0) - Number(a.triplePlus || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
-  const comebackKings = [...funPlayers].filter((p) => p.backMinusFront != null).sort((a, b) => Number(a.backMinusFront) - Number(b.backMinusFront));
   const hardestHoles = [...funHoles].sort((a, b) => Number(b.avgToPar || 0) - Number(a.avgToPar || 0));
   const favoriteHoles = [...funHoles].sort((a, b) => Number(a.avgToPar || 0) - Number(b.avgToPar || 0));
-  const hcpRaiders = [...funPlayers].sort((a, b) => Number(b.hcpBonus || 0) - Number(a.hcpBonus || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
   const mithrilMiners = [...funPlayers].sort((a, b) => Number(b.pointsPerHcpShot || 0) - Number(a.pointsPerHcpShot || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
   return (
     <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm landscape:rounded-xl">
@@ -805,15 +794,8 @@ async function callSheetApi(payload) {
 function getFirstUnscoredHole(scores = [], roundId = "", playerId = "", fallbackHole = 1, scorerPlayerId = "") {
   const hasCompletedScore = (targetPlayerId, holeNumber, wantControlScore) => {
     const score = findScoreForPlayerHole(scores, roundId, targetPlayerId, holeNumber, wantControlScore);
-    return Boolean(
-      score &&
-      score.strokes !== "" &&
-      score.strokes != null &&
-      score.putts_count !== "" &&
-      score.putts_count != null
-    );
+    return Boolean(score && score.strokes !== "" && score.strokes != null && score.putts_count !== "" && score.putts_count != null);
   };
-
   for (let holeNumber = 1; holeNumber <= 18; holeNumber += 1) {
     const officialComplete = playerId ? hasCompletedScore(playerId, holeNumber, false) : false;
     const controlComplete = scorerPlayerId ? hasCompletedScore(scorerPlayerId, holeNumber, true) : false;
@@ -829,7 +811,6 @@ function LordOfTheHolesApp() {
   const [courses, setCourses] = useState(cachedState?.courses?.length ? cachedState.courses : fallbackCourses);
   const [rounds, setRounds] = useState(cachedState?.rounds?.length ? cachedState.rounds : fallbackRounds);
   const [roundPlayers, setRoundPlayers] = useState(cachedState?.roundPlayers || []);
-  const [scorerAssignments, setScorerAssignments] = useState([]);
   const [activeRound, setActiveRound] = useState(cachedState?.activeRound || null);
   const [holes, setHoles] = useState(cachedState?.holes?.length ? cachedState.holes : fallbackHoles.filter((h) => h.course_id === "goethe"));
   const [allHoles, setAllHoles] = useState(cachedState?.allHoles?.length ? cachedState.allHoles : fallbackHoles);
@@ -841,7 +822,6 @@ function LordOfTheHolesApp() {
   const lastAutoHoleTargetRef = useRef("");
   const [localHandicaps, setLocalHandicaps] = useState({});
   const [scoredPlayerId, setScoredPlayerId] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerId", ""));
-  const [roundScorerPromptOpen, setRoundScorerPromptOpen] = useState(false);
   const [scoredPlayerByRound, setScoredPlayerByRound] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerByRound", {}));
   const [scoreEntryMode, setScoreEntryMode] = useState("player");
   const [activeHole, setActiveHole] = useState(() => getFirstUnscoredHole(cachedState?.scores?.length ? cachedState.scores : cachedState?.allScores || [], cachedState?.selectedActiveRoundId || cachedState?.activeRound?.round_id || "", readLocalJson("lordOfTheHoles.scoredPlayerId", ""), 1, readLocalJson("lordOfTheHoles.myPlayerId", "")));
@@ -911,8 +891,6 @@ function LordOfTheHolesApp() {
     return String(s.player_id) === String(entryPlayerId) && !isScorerControlScore(s);
   }) || { strokes: "", picked_up: false, over_two_putts: false, putts_count: "", lady: false }, [scores, entryPlayerId, activeHole, displayedActiveRound?.round_id, isScorerEntryMode]);
   const canEnterScores = Boolean(displayedActiveRound?.round_id && myPlayerId && scoredPlayerId && entryPlayerId && entryPlayer && Number(activeHole) > 0);
-  const hasCurrentScore = currentScore.strokes !== "" && currentScore.strokes != null;
-  const hasCurrentPutts = currentScore.putts_count !== "" && currentScore.putts_count != null;
   const officialScoreForActiveHole = useMemo(() => findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", scoredPlayerId, activeHole, false), [scores, displayedActiveRound?.round_id, scoredPlayerId, activeHole]);
   const controlScoreForActiveHole = useMemo(() => (myPlayerId ? findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", myPlayerId, activeHole, true) : null), [scores, displayedActiveRound?.round_id, myPlayerId, activeHole]);
   const hasOfficialScoreForNext = officialScoreForActiveHole && officialScoreForActiveHole.strokes !== "" && officialScoreForActiveHole.strokes != null;
@@ -961,28 +939,18 @@ function LordOfTheHolesApp() {
   const showFinalWinnerPopup = Boolean(finalWinnerCelebration && finalWinnerPopupKey !== winnerPopupDismissedKey);
   const roundSummaryPopup = useMemo(() => {
     if (!myPlayerId || !displayedActiveRound?.round_id) return null;
-
     const roundId = displayedActiveRound.round_id;
     const playerBase = visiblePlayers.find((player) => String(player.id) === String(myPlayerId));
     const player = getPlayerForCourse(playerBase, displayCourseId, courses);
     if (!player) return null;
-
     const sortedHoles = (holes.length ? holes : fallbackHoles.filter((hole) => String(hole.course_id) === String(displayCourseId))).sort((a, b) => Number(a.hole_number) - Number(b.hole_number));
-
     const buildSummary = (checkpoint) => {
       const summaryKey = `round_summary_${roundId}_${myPlayerId}_${checkpoint}`;
       if ((roundSummaryDismissedKeys || []).includes(summaryKey)) return null;
-
       const checkpointHoles = sortedHoles.filter((hole) => Number(hole.hole_number) <= checkpoint);
       if (checkpointHoles.length < checkpoint) return null;
-
       const rows = checkpointHoles.map((hole) => {
-        const score = officialScores.find(
-          (item) =>
-            String(item.round_id || "") === String(roundId) &&
-            String(item.player_id || "") === String(myPlayerId) &&
-            Number(item.hole_number) === Number(hole.hole_number)
-        );
+        const score = officialScores.find((item) => String(item.round_id || "") === String(roundId) && String(item.player_id || "") === String(myPlayerId) && Number(item.hole_number) === Number(hole.hole_number));
         const shots = getShotsOnHole(player.course_hcp, hole.hcp);
         const grossStableford = score ? getScoreStablefordPoints(score, hole.par, 0) : 0;
         const netStableford = score ? getScoreStablefordPoints(score, hole.par, shots) : 0;
@@ -991,9 +959,7 @@ function LordOfTheHolesApp() {
         const gir = strokes != null && putts != null && !normalizeBoolean(score?.picked_up) ? strokes - putts <= Number(hole.par || 0) - 2 : false;
         return { hole, score, shots, grossStableford, netStableford, strokes, putts, gir };
       });
-
       if (rows.some((row) => row.strokes == null)) return null;
-
       const strokes = rows.reduce((sum, row) => sum + Number(row.strokes || 0), 0);
       const par = rows.reduce((sum, row) => sum + Number(row.hole.par || 0), 0);
       const putts = rows.reduce((sum, row) => sum + Number(row.putts || 0), 0);
@@ -1004,29 +970,10 @@ function LordOfTheHolesApp() {
       const pars = rows.filter((row) => row.strokes != null && row.strokes - Number(row.hole.par || 0) === 0 && !normalizeBoolean(row.score?.picked_up)).length;
       const girCount = rows.filter((row) => row.gir).length;
       const pickedUp = rows.filter((row) => normalizeBoolean(row.score?.picked_up)).length;
-
-      return {
-        key: summaryKey,
-        checkpoint,
-        title: checkpoint === 9 ? "Halbzeit-Chronik" : "Runden-Chronik",
-        subtitle: checkpoint === 9 ? "Nach 9 Löchern" : "Nach 18 Löchern",
-        playerName: getPlayerLabel(player),
-        strokes,
-        toPar: strokes - par,
-        hcpAdjustedStrokes: strokes - hcpShots,
-        netStableford,
-        grossStableford,
-        putts,
-        birdiesOrBetter,
-        pars,
-        girCount,
-        pickedUp,
-      };
+      return { key: summaryKey, checkpoint, title: checkpoint === 9 ? "Halbzeit-Chronik" : "Runden-Chronik", subtitle: checkpoint === 9 ? "Nach 9 Löchern" : "Nach 18 Löchern", playerName: getPlayerLabel(player), strokes, toPar: strokes - par, hcpAdjustedStrokes: strokes - hcpShots, netStableford, grossStableford, putts, birdiesOrBetter, pars, girCount, pickedUp };
     };
-
     return buildSummary(9) || buildSummary(18);
   }, [myPlayerId, displayedActiveRound?.round_id, visiblePlayers, displayCourseId, courses, holes, officialScores, roundSummaryDismissedKeys]);
-  const showPlayerSelectPopup = false;
   const lockCountdown = useMemo(() => {
     const diffMs = Math.max(0, LOCK_COUNTDOWN_TARGET.getTime() - lockCountdownNow.getTime());
     const totalSeconds = Math.floor(diffMs / 1000);
@@ -1038,23 +985,17 @@ function LordOfTheHolesApp() {
   }, [lockCountdownNow]);
   const identityRoundId = String(displayedActiveRound?.round_id || "");
   const currentAssignedScoredPlayerId = getLocalScoredPlayerForRound(identityRoundId);
-  const currentAssignedScoredPlayerIsValid = Boolean(
-    currentAssignedScoredPlayerId && scoreablePlayers.some((player) => String(player.id) === String(currentAssignedScoredPlayerId))
-  );
+  const currentAssignedScoredPlayerIsValid = Boolean(currentAssignedScoredPlayerId && scoreablePlayers.some((player) => String(player.id) === String(currentAssignedScoredPlayerId)));
+  const identityFlowActive = !showSplash && (!appLocked || lockAdminBypass);
+  const needsMyPlayerSelection = Boolean(identityFlowActive && !myPlayerId);
+  const activePopupSoundKey = showSplash || roundSummaryPopup ? "" : showFinalWinnerPopup ? `finalWinner:${finalWinnerPopupKey}` : displayedRoundHonorCelebration ? `roundHonor:${displayedRoundHonorCelebration.key}` : clearScoresConfirmOpen ? "clearScoresConfirm" : backupSavedMessage ? "backupSaved" : setupSavedMessage ? "setupSaved" : clearScoresError ? "clearScoresError" : error ? "error" : "";
 
   useEffect(() => {
     if (!identityRoundId || !myPlayerId || showSplash || (appLocked && !lockAdminBypass)) return;
     if (currentAssignedScoredPlayerIsValid && String(scoredPlayerId || "") !== String(currentAssignedScoredPlayerId)) {
       setScoredPlayerId(currentAssignedScoredPlayerId);
-      setRoundScorerPromptOpen(false);
-    } else if (scoredPlayerId) {
-      setRoundScorerPromptOpen(false);
     }
   }, [identityRoundId, myPlayerId, currentAssignedScoredPlayerId, currentAssignedScoredPlayerIsValid, scoredPlayerId, showSplash, appLocked, lockAdminBypass]);
-  const identityFlowActive = !showSplash && (!appLocked || lockAdminBypass);
-  const needsMyPlayerSelection = Boolean(identityFlowActive && !myPlayerId);
-  const needsScoredPlayerSelection = false;
-  const activePopupSoundKey = showSplash || showPlayerSelectPopup ? "" : roundSummaryPopup ? `roundSummary:${roundSummaryPopup.key}` : showFinalWinnerPopup ? `finalWinner:${finalWinnerPopupKey}` : displayedRoundHonorCelebration ? `roundHonor:${displayedRoundHonorCelebration.key}` : clearScoresConfirmOpen ? "clearScoresConfirm" : backupSavedMessage ? "backupSaved" : setupSavedMessage ? "setupSaved" : clearScoresError ? "clearScoresError" : error ? "error" : "";
 
   useEffect(() => {
     if (scoredPlayerId && !scoreablePlayers.some((p) => String(p.id) === String(scoredPlayerId))) setScoredPlayerId("");
@@ -1071,13 +1012,8 @@ function LordOfTheHolesApp() {
       lastLoadedRoundRef.current = roundId;
       setScoreEntryMode("player");
     }
-    if (storedPlayerIsValid) {
-      if (String(scoredPlayerId || "") !== String(storedPlayerId)) setScoredPlayerId(storedPlayerId);
-      setRoundScorerPromptOpen(false);
-    } else if (!scoredPlayerId) {
-      setRoundScorerPromptOpen(true);
-    } else {
-      setRoundScorerPromptOpen(false);
+    if (storedPlayerIsValid && String(scoredPlayerId || "") !== String(storedPlayerId)) {
+      setScoredPlayerId(storedPlayerId);
     }
   }, [displayedActiveRound?.round_id, myPlayerId, scoreablePlayers, scoredPlayerByRound, scoredPlayerId, showSplash, appLocked, lockAdminBypass]);
 
@@ -1085,14 +1021,8 @@ function LordOfTheHolesApp() {
   useEffect(() => { writeLocalJson("lordOfTheHoles.appLocked", appLocked); }, [appLocked]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", deviceAssignmentsResetAt); }, [deviceAssignmentsResetAt]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoresResetAt", scoresResetAt); }, [scoresResetAt]);
-  useEffect(() => {
-    if (!appLocked) return undefined;
-    const timer = window.setInterval(() => setLockCountdownNow(new Date()), 1000);
-    return () => window.clearInterval(timer);
-  }, [appLocked]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerId", scoredPlayerId); }, [scoredPlayerId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerByRound", scoredPlayerByRound); }, [scoredPlayerByRound]);
-  
   useEffect(() => { writeLocalJson("lordOfTheHoles.winnerPopupDismissedKey", winnerPopupDismissedKey); }, [winnerPopupDismissedKey]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundHonorDismissedKeys", roundHonorDismissedKeys); }, [roundHonorDismissedKeys]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scorecardRoundId", scorecardRoundId); }, [scorecardRoundId]);
@@ -1112,7 +1042,6 @@ function LordOfTheHolesApp() {
     const selectedPendingScores = pendingScoresRef.current.filter((score) => String(score.round_id || "") === String(selectedActiveRoundId));
     const mergedRoundScores = mergeScoresPreservingPending(selectedRoundScores, selectedPendingScores);
     setScores(mergedRoundScores);
-
     const autoHoleTargetKey = `${selectedActiveRoundId}|${scoredPlayerId}`;
     if (lastAutoHoleTargetRef.current !== autoHoleTargetKey) {
       lastAutoHoleTargetRef.current = autoHoleTargetKey;
@@ -1125,6 +1054,11 @@ function LordOfTheHolesApp() {
     lastPopupSoundKeyRef.current = activePopupSoundKey;
     playPopupSound();
   }, [activePopupSoundKey]);
+  useEffect(() => {
+    if (!appLocked) return undefined;
+    const timer = window.setInterval(() => setLockCountdownNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, [appLocked]);
 
   function applyPlayers(nextActivePlayers, nextAllPlayers = nextActivePlayers, courseList = courses) {
     setPlayers(nextActivePlayers.map(withFallbackAlias));
@@ -1172,24 +1106,18 @@ function LordOfTheHolesApp() {
       const nextActiveRound = data.activeRound || nextRounds.find((round) => String(round.status).toLowerCase() === "active") || nextRounds[0] || fallbackRounds[0];
       const nextActiveRoundId = String(nextActiveRound?.round_id || "");
       const lastSeenActiveRoundId = String(readLocalJson("lordOfTheHoles.lastSeenActiveRoundId", "") || "");
-      if (nextActiveRoundId && lastSeenActiveRoundId && nextActiveRoundId !== lastSeenActiveRoundId) {
-        setScoredPlayerId("");
-        setScoreEntryMode("player");
-        lastLoadedRoundRef.current = "";
-      }
+      const roundChanged = Boolean(nextActiveRoundId && lastSeenActiveRoundId && nextActiveRoundId !== lastSeenActiveRoundId);
       if (nextActiveRoundId) writeLocalJson("lordOfTheHoles.lastSeenActiveRoundId", nextActiveRoundId);
       const nextActivePlayers = data.activePlayers?.length ? data.activePlayers.map(withFallbackAlias) : getRoundPlayers(nextActiveRound?.round_id, nextAllPlayers, data.roundPlayers || []);
       setCourses(nextCourses);
       setRounds(nextRounds);
       setRoundPlayers(data.roundPlayers || []);
-      setScorerAssignments([]);
       setActiveRound(nextActiveRound);
       const previousRoundId = selectedActiveRoundId;
       const nextRoundId = nextActiveRound?.round_id || fallbackRounds[0].round_id;
       setSelectedCourseId(nextActiveRound?.course_id || "");
       setSelectedActiveRoundId(nextRoundId);
-      if (nextRoundId) writeLocalJson("lordOfTheHoles.lastSeenActiveRoundId", nextRoundId);
-      if (String(previousRoundId || "") !== String(nextRoundId || "")) {
+      if (String(previousRoundId || "") !== String(nextRoundId || "") || roundChanged) {
         setScoredPlayerId("");
         setScoreEntryMode("player");
         lastLoadedRoundRef.current = "";
@@ -1220,9 +1148,7 @@ function LordOfTheHolesApp() {
     const safeRoundId = String(displayedActiveRound?.round_id || "").trim();
     const safePlayerId = String(entryPlayerId || "").trim();
     const safeHoleNumber = Number(activeHole || 0);
-    if (!safeRoundId || !safePlayerId || !safeHoleNumber) {
-      throw new Error("Score kann noch nicht gespeichert werden: Runde, Spieler oder Loch fehlt.");
-    }
+    if (!safeRoundId || !safePlayerId || !safeHoleNumber) throw new Error("Score kann noch nicht gespeichert werden: Runde, Spieler oder Loch fehlt.");
     const next = normalizeScoreRecord({ round_id: safeRoundId, player_id: safePlayerId, hole_number: safeHoleNumber, strokes: currentScore.strokes ?? "", picked_up: normalizeBoolean(currentScore.picked_up), over_two_putts: normalizeBoolean(currentScore.over_two_putts), putts_count: currentScore.putts_count ?? "", lady: normalizeBoolean(currentScore.lady), scorer_player_id: isScorerEntryMode ? entryPlayerId : myPlayerId || "", updated_at: new Date().toISOString(), ...patch });
     const sameScore = (score) => String(score.round_id) === String(next.round_id) && String(score.player_id) === String(next.player_id) && Number(score.hole_number) === Number(next.hole_number) && isScorerControlScore(score) === isScorerControlScore(next);
     const updateList = (current) => current.some(sameScore) ? current.map((s) => sameScore(s) ? next : s) : [...current, next];
@@ -1282,12 +1208,8 @@ function LordOfTheHolesApp() {
       return;
     }
     let next;
-    try {
-      next = optimisticUpdate(patch);
-    } catch (err) {
-      setError(err.message || "Score kann noch nicht gespeichert werden.");
-      return;
-    }
+    try { next = optimisticUpdate(patch); }
+    catch (err) { setError(err.message || "Score kann noch nicht gespeichert werden."); return; }
     addPendingScore(next);
     setSaving(true);
     try { await callSheetApi({ action: "upsertScore", score: next }); removePendingScore(next); setConnectionStatus("online"); setError(""); }
@@ -1337,6 +1259,11 @@ function LordOfTheHolesApp() {
       pendingScoresRef.current = emptyScores;
       writeLocalJson("lordOfTheHoles.pendingScores", emptyScores);
       writeLocalJson("lordOfTheHoles.cachedState", null);
+      if (result?.scores_reset_at || result?.scoresResetAt) {
+        const resetAt = String(result.scores_reset_at || result.scoresResetAt);
+        setScoresResetAt(resetAt);
+        writeLocalJson("lordOfTheHoles.scoresResetAt", resetAt);
+      }
       setActiveHole(1);
       setConnectionStatus("online");
       setClearScoresConfirmOpen(false);
@@ -1353,11 +1280,6 @@ function LordOfTheHolesApp() {
     }
   }
 
-  async function clearScoresAndDeviceAssignments() {
-    await clearAllScores();
-    setSetupSavedMessage("Scores wurden gelöscht. Backups bleiben erhalten.");
-  }
-
   async function resetDeviceAssignmentsForAll() {
     setSetupSavedMessage("");
     try {
@@ -1365,20 +1287,19 @@ function LordOfTheHolesApp() {
       const resetAt = String(result?.device_assignments_reset_at || result?.deviceAssignmentsResetAt || new Date().toISOString());
       setDeviceAssignmentsResetAt(resetAt);
       setMyPlayerId("");
-        setScoredPlayerId("");
-        setScoredPlayerByRound({});
-        setScoreEntryMode("player");
-        setRoundScorerPromptOpen(false);
-        setPendingScores([]);
-        pendingScoresRef.current = [];
-        writeLocalJson("lordOfTheHoles.myPlayerId", "");
-        writeLocalJson("lordOfTheHoles.scoredPlayerId", "");
-        writeLocalJson("lordOfTheHoles.scoredPlayerByRound", {});
-        writeLocalJson("lordOfTheHoles.pendingScores", []);
+      setScoredPlayerId("");
+      setScoredPlayerByRound({});
+      setScoreEntryMode("player");
+      setPendingScores([]);
+      pendingScoresRef.current = [];
+      writeLocalJson("lordOfTheHoles.myPlayerId", "");
+      writeLocalJson("lordOfTheHoles.scoredPlayerId", "");
+      writeLocalJson("lordOfTheHoles.scoredPlayerByRound", {});
+      writeLocalJson("lordOfTheHoles.pendingScores", []);
       writeLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", resetAt);
       setConnectionStatus("online");
       setError("");
-      setSetupSavedMessage("Spieler- und Zähler-Zuordnungen wurden zurückgesetzt. Andere Geräte übernehmen den Reset beim nächsten Laden/Synchronisieren.");
+      setSetupSavedMessage("Spieler- und Zähler-Zuordnungen wurden zurückgesetzt.");
     } catch (err) {
       setConnectionStatus("offline");
       setError(err.message || "Spieler-/Zähler-Zuordnungen konnten nicht zurückgesetzt werden.");
@@ -1402,7 +1323,6 @@ function LordOfTheHolesApp() {
     finally { setSetupSaving(false); }
   }
 
-
   async function saveAdminRoundCourse(nextRoundId, nextCourseId) {
     if (!isAdminUnlocked || !nextRoundId) return;
     setSetupSavedMessage("");
@@ -1420,16 +1340,7 @@ function LordOfTheHolesApp() {
         action: "saveSetup",
         round_id: nextRoundId,
         course_id: nextCourseId || "",
-        players: nextAllPlayers.map((p) => ({
-          id: p.id,
-          character_name: p.character_name,
-          display_name: p.display_name,
-          alias_name: p.alias_name || fallbackAliases[p.id] || "",
-          sort_order: p.sort_order,
-          handicap_index: p.handicap_index,
-          course_hcp_goethe: p.course_hcp_goethe,
-          course_hcp_feininger: p.course_hcp_feininger,
-        })),
+        players: nextAllPlayers.map((p) => ({ id: p.id, character_name: p.character_name, display_name: p.display_name, alias_name: p.alias_name || fallbackAliases[p.id] || "", sort_order: p.sort_order, handicap_index: p.handicap_index, course_hcp_goethe: p.course_hcp_goethe, course_hcp_feininger: p.course_hcp_feininger })),
       });
       setAllPlayers(nextAllPlayers.map(withFallbackAlias));
       setConnectionStatus("online");
@@ -1478,10 +1389,7 @@ function LordOfTheHolesApp() {
   }
 
   async function enterLockedAppAsAdmin() {
-    if (lockPasswordInput !== ADMIN_PASSWORD) {
-      setError("Passwort ist falsch.");
-      return;
-    }
+    if (lockPasswordInput !== ADMIN_PASSWORD) { setError("Passwort ist falsch."); return; }
     if (splashEntering) return;
     setSplashEntering(true);
     const data = await loadData({ silent: true });
@@ -1504,6 +1412,15 @@ function LordOfTheHolesApp() {
   function saveLocalScoredPlayerForRound(roundId, scoredPlayerIdValue) {
     if (!roundId || !scoredPlayerIdValue) return;
     setScoredPlayerByRound((current) => ({ ...(current || {}), [roundId]: scoredPlayerIdValue }));
+  }
+
+  function removeLocalScoredPlayerForRound(roundId) {
+    if (!roundId) return;
+    setScoredPlayerByRound((current) => {
+      const next = { ...(current || {}) };
+      delete next[roundId];
+      return next;
+    });
   }
 
   function setMainMenuAndView(value) {
@@ -1608,7 +1525,6 @@ function LordOfTheHolesApp() {
             <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Einstellungen</p>
             <h2 className="font-serif text-lg text-amber-200">Mein Handy</h2>
             <p className="mt-1 text-sm text-amber-100/65">Diese Einstellung wird nur lokal auf diesem Handy gespeichert.</p>
-
             <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
               <label className="mb-1 block text-sm text-amber-100/80">Zähler auf diesem Gerät</label>
               <select
@@ -1619,23 +1535,16 @@ function LordOfTheHolesApp() {
                   setScoreEntryMode("player");
                   if (displayedActiveRound?.round_id && nextMyPlayerId && String(scoredPlayerId) === String(nextMyPlayerId)) {
                     setScoredPlayerId("");
-                    setScoredPlayerByRound((current) => {
-                      const next = { ...(current || {}) };
-                      delete next[displayedActiveRound.round_id];
-                      return next;
-                    });
+                    removeLocalScoredPlayerForRound(displayedActiveRound.round_id);
                   }
                 }}
                 className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50"
               >
                 <option value="">Spieler auswählen</option>
-                {allPlayers.map((player) => (
-                  <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>
-                ))}
+                {allPlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}
               </select>
               <p className="mt-2 text-xs text-amber-100/60">Diese Auswahl gilt grundsätzlich nur für dieses Gerät und bleibt auch bei Rundenwechseln gespeichert.</p>
             </div>
-
             <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
               <label className="mb-1 block text-sm text-amber-100/80">Spieler für die aktive Runde</label>
               <select
@@ -1644,23 +1553,14 @@ function LordOfTheHolesApp() {
                   const nextPlayerId = e.target.value;
                   setScoredPlayerId(nextPlayerId);
                   if (displayedActiveRound?.round_id) {
-                    if (nextPlayerId) {
-                      saveLocalScoredPlayerForRound(displayedActiveRound.round_id, nextPlayerId);
-                    } else {
-                      setScoredPlayerByRound((current) => {
-                        const next = { ...(current || {}) };
-                        delete next[displayedActiveRound.round_id];
-                        return next;
-                      });
-                    }
+                    if (nextPlayerId) saveLocalScoredPlayerForRound(displayedActiveRound.round_id, nextPlayerId);
+                    else removeLocalScoredPlayerForRound(displayedActiveRound.round_id);
                   }
                 }}
                 className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50"
               >
                 <option value="">Spieler auswählen</option>
-                {scoreablePlayers.map((player) => (
-                  <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>
-                ))}
+                {scoreablePlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}
               </select>
               <p className="mt-2 text-xs text-amber-100/60">Diese Auswahl gilt nur für die aktive Runde ({displayedActiveRound?.round_name || "aktuelle Runde"}) und wird lokal auf diesem Gerät gespeichert.</p>
             </div>
@@ -1693,12 +1593,9 @@ function LordOfTheHolesApp() {
                     <div className="text-[11px] text-amber-100/65">{activeCourse?.course_name || "Kein Kurs ausgewählt"}</div>
                   </div>
                 </div>
-                <div className="text-right">
-                  {hasScoreMismatch ? <div className="rounded-full border border-red-400/50 bg-red-950/50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-red-100">Abweichung</div> : null}
-                </div>
+                <div className="text-right">{hasScoreMismatch ? <div className="rounded-full border border-red-400/50 bg-red-950/50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-red-100">Abweichung</div> : null}</div>
               </div>
             </div>
-
             {myCurrentStats ? (
               <div className="mb-2 w-full rounded-xl border border-amber-700/30 bg-black/25 p-1.5 text-left">
                 <div className="mb-1 flex items-center justify-between gap-2">
@@ -1706,115 +1603,27 @@ function LordOfTheHolesApp() {
                   <div className="font-serif text-xs text-amber-200">{getPlayerLabel(myCurrentStats)}</div>
                 </div>
                 <div className="grid grid-cols-3 gap-1.5 text-center text-[11px]">
-                  <button type="button" onClick={() => setStandingsPopup("strokePlay")} className="rounded-xl border border-amber-500/20 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(0,0,0,0.18))] p-1.5 text-amber-50 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)] transition active:scale-[0.98]">
-                    <div className="text-amber-100">Tats. Strokes</div>
-                    <b className="text-base text-amber-200">{myCurrentStats.played ? myCurrentStats.total : "–"}</b>
-                    <div className="mt-0.5 text-[9px] text-amber-100/70">Platz {strokePlayLeaderboard.findIndex((player) => String(player.id) === String(myPlayerId)) >= 0 ? strokePlayLeaderboard.findIndex((player) => String(player.id) === String(myPlayerId)) + 1 : "–"}</div>
-                  </button>
-                  <button type="button" onClick={() => setStandingsPopup("hcpAdjusted")} className="rounded-xl border border-amber-500/20 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(0,0,0,0.18))] p-1.5 text-amber-50 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)] transition active:scale-[0.98]">
-                    <div className="text-amber-100">HCP +/−</div>
-                    <b className="text-base text-amber-200">{myCurrentStats.played ? formatToPar(myCurrentStats.hcpAdjustedToPar, true) : "–"}</b>
-                    <div className="mt-0.5 text-[9px] text-amber-100/70">Platz {myHcpAdjustedStrokeRank || "–"}</div>
-                  </button>
-                  <button type="button" onClick={() => setStandingsPopup("netStableford")} className="rounded-xl border border-amber-500/20 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(0,0,0,0.18))] p-1.5 text-amber-50 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)] transition active:scale-[0.98]">
-                    <div className="text-amber-100">Netto Stbl</div>
-                    <b className="text-base text-amber-200">{myCurrentStats.netStableford}</b>
-                    <div className="mt-0.5 text-[9px] text-amber-100/70">Platz {myNetStablefordRank || "–"}</div>
-                  </button>
+                  <button type="button" onClick={() => setStandingsPopup("strokePlay")} className="rounded-xl border border-amber-500/20 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(0,0,0,0.18))] p-1.5 text-amber-50 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)] transition active:scale-[0.98]"><div className="text-amber-100">Tats. Strokes</div><b className="text-base text-amber-200">{myCurrentStats.played ? myCurrentStats.total : "–"}</b><div className="mt-0.5 text-[9px] text-amber-100/70">Platz {strokePlayLeaderboard.findIndex((player) => String(player.id) === String(myPlayerId)) >= 0 ? strokePlayLeaderboard.findIndex((player) => String(player.id) === String(myPlayerId)) + 1 : "–"}</div></button>
+                  <button type="button" onClick={() => setStandingsPopup("hcpAdjusted")} className="rounded-xl border border-amber-500/20 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(0,0,0,0.18))] p-1.5 text-amber-50 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)] transition active:scale-[0.98]"><div className="text-amber-100">HCP +/−</div><b className="text-base text-amber-200">{myCurrentStats.played ? formatToPar(myCurrentStats.hcpAdjustedToPar, true) : "–"}</b><div className="mt-0.5 text-[9px] text-amber-100/70">Platz {myHcpAdjustedStrokeRank || "–"}</div></button>
+                  <button type="button" onClick={() => setStandingsPopup("netStableford")} className="rounded-xl border border-amber-500/20 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(0,0,0,0.18))] p-1.5 text-amber-50 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)] transition active:scale-[0.98]"><div className="text-amber-100">Netto Stbl</div><b className="text-base text-amber-200">{myCurrentStats.netStableford}</b><div className="mt-0.5 text-[9px] text-amber-100/70">Platz {myNetStablefordRank || "–"}</div></button>
                 </div>
               </div>
-            ) : (
-              <div className="mb-2 rounded-xl border border-amber-700/30 bg-black/25 p-1.5 text-[10px] text-amber-100/75">Wähle zuerst im Start-Popup deinen Spieler aus.</div>
-            )}
-
+            ) : <div className="mb-2 rounded-xl border border-amber-700/30 bg-black/25 p-1.5 text-[10px] text-amber-100/75">Wähle zuerst im Start-Popup deinen Spieler aus.</div>}
             {myPlayerId && (!scoredPlayerId || !currentAssignedScoredPlayerIsValid) ? (
               <div className="mb-2 rounded-2xl border border-amber-500/45 bg-stone-950/75 p-2 shadow-xl shadow-black/30 backdrop-blur-sm">
-                <div className="mb-2 text-center">
-                  <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300/75">Neue Zähl-Zuordnung</div>
-                  <div className="font-serif text-lg font-black text-amber-200">Wen zählst du?</div>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {scoreablePlayers.map((player) => (
-                    <button
-                      key={player.id}
-                      type="button"
-                      onClick={() => {
-                        setScoredPlayerId(player.id);
-                        saveLocalScoredPlayerForRound(displayedActiveRound?.round_id || "", player.id);
-                        setRoundScorerPromptOpen(false);
-                      }}
-                      className="rounded-2xl bg-stone-800 px-2 py-3 font-serif text-sm font-bold text-amber-100 active:scale-[0.98]"
-                    >
-                      {getPlayerLabel(player)}
-                    </button>
-                  ))}
-                </div>
+                <div className="mb-2 text-center"><div className="text-[10px] uppercase tracking-[0.2em] text-amber-300/75">Neue Zähl-Zuordnung</div><div className="font-serif text-lg font-black text-amber-200">Wen zählst du?</div></div>
+                <div className="grid grid-cols-2 gap-2">{scoreablePlayers.map((player) => <button key={player.id} type="button" onClick={() => { setScoredPlayerId(player.id); saveLocalScoredPlayerForRound(displayedActiveRound?.round_id || "", player.id); }} className="rounded-2xl bg-stone-800 px-2 py-3 font-serif text-sm font-bold text-amber-100 active:scale-[0.98]">{getPlayerLabel(player)}</button>)}</div>
               </div>
             ) : null}
-
             <div className={cls("rounded-3xl", hasScoreMismatch ? "ring-1 ring-red-500/45" : "")}>
-              {myCurrentPlayer ? (
-                <div className="mb-2 grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-2xl px-2 py-3 text-sm font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "bg-stone-800 text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/60")}>
-                    <span className="block truncate font-serif text-sm leading-none">{getPlayerLabel(scoredPlayer) || "Spieler"}</span>{hasSelectedPlayerScoreMismatch ? <span className="ml-1">⚠</span> : null}
-                  </button>
-                  <button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl px-2 py-1.5 text-xs font-bold", isScorerEntryMode ? "bg-amber-600 text-amber-50" : "bg-stone-800 text-amber-100", hasOwnScoreMismatch && "ring-1 ring-red-400/60")}>
-                    <span className="block truncate font-serif text-sm leading-none">Mein Score</span>{hasOwnScoreMismatch ? <span className="ml-1">⚠</span> : null}
-                  </button>
-                </div>
-              ) : null}
-
-              {visibleScoreMismatchMessages.length ? (
-                <div className="mb-2 rounded-xl border border-red-500/50 bg-red-950/40 p-1.5 text-xs text-red-100">
-                  <span className="underline underline-offset-4">Palantír meldet Abweichung</span>
-                  <div className="mt-1 space-y-0.5">{visibleScoreMismatchMessages.map((message) => <div key={message}>{message}</div>)}</div>
-                </div>
-              ) : null}
-
-              <div className="mb-1.5 grid grid-cols-[auto_1fr] items-center gap-2 rounded-2xl border border-amber-700/35 bg-black/25 px-3 py-2 text-[10px] text-amber-100/70">
-                <div className="font-serif text-xl font-black leading-none text-amber-200">Loch {activeHole}</div>
-                <div className="flex items-center justify-end gap-2.5 text-right text-[11px]">
-                  <span>Par <b className="text-amber-200">{activeHoleData.par}</b></span>
-                  <span>HCP <b className="text-amber-200">{activeHoleData.hcp}</b></span>
-                  <span>{activeHoleData.meters} m</span>
-                  <span>Vorgabe <b className="text-amber-200 tracking-[0.18em]">{formatShotMarks(entryPlayerShotsOnActiveHole)}</b></span>
-                </div>
-              </div>
-
-              <div className="mb-3">
-                <ScoreStepper
-                  value={normalizeBoolean(currentScore.picked_up) ? 0 : currentScore.strokes ?? ""}
-                  par={activeHoleData?.par || 4}
-                  pickedUpStrokes={pickedUpStrokes}
-                  disabled={!canEnterScores}
-                  onChange={(scoreValue) =>
-                    Number(scoreValue) === 0 || Number(scoreValue) >= Number(pickedUpStrokes || 0)
-                      ? saveScore({ strokes: pickedUpStrokes, picked_up: true })
-                      : saveScore({ strokes: scoreValue, picked_up: false })
-                  }
-                />
-              </div>
-
-              <div className="mb-3">
-                <PuttStepper value={currentScore.putts_count} disabled={!canEnterScores} onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })} />
-              </div>
-
-              <div className="mb-3 rounded-2xl border border-amber-700/40 bg-black/25 p-2">
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <div className="text-xs font-semibold text-amber-100">Lady</div>
-                    <div className="text-[10px] text-amber-100/65">Markiert eine Lady.</div>
-                  </div>
-                  <input type="checkbox" disabled={!canEnterScores} checked={normalizeBoolean(currentScore.lady)} onChange={(e) => saveScore({ lady: e.target.checked })} className="h-6 w-6 accent-amber-500 disabled:opacity-40" />
-                </div>
-              </div>
-
+              {myCurrentPlayer ? <div className="mb-2 grid grid-cols-2 gap-2"><button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-2xl px-2 py-3 text-sm font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "bg-stone-800 text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/60")}><span className="block truncate font-serif text-sm leading-none">{getPlayerLabel(scoredPlayer) || "Spieler"}</span>{hasSelectedPlayerScoreMismatch ? <span className="ml-1">⚠</span> : null}</button><button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl px-2 py-1.5 text-xs font-bold", isScorerEntryMode ? "bg-amber-600 text-amber-50" : "bg-stone-800 text-amber-100", hasOwnScoreMismatch && "ring-1 ring-red-400/60")}><span className="block truncate font-serif text-sm leading-none">Mein Score</span>{hasOwnScoreMismatch ? <span className="ml-1">⚠</span> : null}</button></div> : null}
+              {visibleScoreMismatchMessages.length ? <div className="mb-2 rounded-xl border border-red-500/50 bg-red-950/40 p-1.5 text-xs text-red-100"><span className="underline underline-offset-4">Palantír meldet Abweichung</span><div className="mt-1 space-y-0.5">{visibleScoreMismatchMessages.map((message) => <div key={message}>{message}</div>)}</div></div> : null}
+              <div className="mb-1.5 grid grid-cols-[auto_1fr] items-center gap-2 rounded-2xl border border-amber-700/35 bg-black/25 px-3 py-2 text-[10px] text-amber-100/70"><div className="font-serif text-xl font-black leading-none text-amber-200">Loch {activeHole}</div><div className="flex items-center justify-end gap-2.5 text-right text-[11px]"><span>Par <b className="text-amber-200">{activeHoleData.par}</b></span><span>HCP <b className="text-amber-200">{activeHoleData.hcp}</b></span><span>{activeHoleData.meters} m</span><span>Vorgabe <b className="text-amber-200 tracking-[0.18em]">{formatShotMarks(entryPlayerShotsOnActiveHole)}</b></span></div></div>
+              <div className="mb-3"><ScoreStepper value={normalizeBoolean(currentScore.picked_up) ? 0 : currentScore.strokes ?? ""} par={activeHoleData?.par || 4} pickedUpStrokes={pickedUpStrokes} disabled={!canEnterScores} onChange={(scoreValue) => Number(scoreValue) === 0 || Number(scoreValue) >= Number(pickedUpStrokes || 0) ? saveScore({ strokes: pickedUpStrokes, picked_up: true }) : saveScore({ strokes: scoreValue, picked_up: false })} /></div>
+              <div className="mb-3"><PuttStepper value={currentScore.putts_count} disabled={!canEnterScores} onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })} /></div>
+              <div className="mb-3 rounded-2xl border border-amber-700/40 bg-black/25 p-2"><div className="flex items-center justify-between gap-2"><div><div className="text-xs font-semibold text-amber-100">Lady</div><div className="text-[10px] text-amber-100/65">Markiert eine Lady.</div></div><input type="checkbox" disabled={!canEnterScores} checked={normalizeBoolean(currentScore.lady)} onChange={(e) => saveScore({ lady: e.target.checked })} className="h-6 w-6 accent-amber-500 disabled:opacity-40" /></div></div>
               {scoreHintMessage ? <div className="mb-2 rounded-xl border border-amber-500/40 bg-amber-950/50 p-1.5 text-center text-xs font-semibold text-amber-100">{scoreHintMessage}</div> : null}
-
-              <div className="grid grid-cols-2 gap-2">
-                <Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 py-3 text-base font-bold text-amber-100">Zurück</Button>
-                <Button disabled={activeHole === 18 || !canEnterScores} onClick={goToNextHole} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>Loch {Math.min(18, Number(activeHole || 1) + 1)}</Button>
-              </div>
+              <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 py-3 text-base font-bold text-amber-100">Zurück</Button><Button disabled={activeHole === 18 || !canEnterScores} onClick={goToNextHole} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>Loch {Math.min(18, Number(activeHole || 1) + 1)}</Button></div>
             </div>
           </CardContent>
         </Card>
@@ -1827,54 +1636,18 @@ function LordOfTheHolesApp() {
     const tableRound = availableRounds.find((round) => String(round.round_id) === String(roundTableRoundId)) || displayedActiveRound || availableRounds[0] || fallbackRounds[0];
     const tableCourseId = tableRound?.course_id || displayCourseId || "goethe";
     const tableCourse = (courses.length ? courses : fallbackCourses).find((course) => String(course.course_id) === String(tableCourseId));
-    const tableHoles = (allHoles.length ? allHoles : fallbackHoles)
-      .filter((hole) => String(hole.course_id) === String(tableCourseId))
-      .sort((a, b) => Number(a.hole_number) - Number(b.hole_number));
+    const tableHoles = (allHoles.length ? allHoles : fallbackHoles).filter((hole) => String(hole.course_id) === String(tableCourseId)).sort((a, b) => Number(a.hole_number) - Number(b.hole_number));
     const tablePlayers = getPlayersForCourse(getRoundPlayers(tableRound?.round_id, allPlayers, roundPlayers), tableCourseId, courses);
     const tableScores = officialAllScores.filter((score) => String(score.round_id || "") === String(tableRound?.round_id || ""));
     const tableStats = buildPlayerStats(tablePlayers, tableHoles, tableScores);
-    const tableStrokePlayLeaderboard = sortStrokePlay(tableStats);
-    const tableNetStablefordLeaderboard = sortStableford(tableStats, "netStableford");
-    const tableGrossStablefordLeaderboard = sortStableford(tableStats, "grossStableford");
-    const tableHcpAdjustedStrokeLeaderboard = sortHcpAdjustedStrokePlay(tableStats);
-    const tablePuttPenaltyLeaderboard = [...tableStats].sort((a, b) => Number(b.puttPenaltyEuro || 0) - Number(a.puttPenaltyEuro || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
-
     return (
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
         <div className="landscape:mx-auto landscape:max-w-none landscape:pb-6">
           <Card className="mb-2 rounded-2xl border border-amber-500/30 bg-[linear-gradient(180deg,rgba(48,35,22,0.86),rgba(18,13,9,0.82))] shadow-[inset_0_1px_0_rgba(251,191,36,0.10),0_18px_46px_rgba(0,0,0,0.38)] backdrop-blur-sm">
-            <CardContent className="p-3 text-sm text-amber-100">
-              <div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Tabellen Runde</div>
-              <div className="mt-1 font-serif text-lg text-amber-200">{tableRound?.round_name || "Runde"}</div>
-              <div className="text-amber-100/65">{tableCourse?.course_name || "Kurs"}</div>
-              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {availableRounds.map((round) => (
-                  <button
-                    key={round.round_id}
-                    type="button"
-                    onClick={() => setRoundTableRoundId(round.round_id)}
-                    className={cls(
-                      "rounded-xl border px-2 py-2 text-xs font-bold",
-                      String(tableRound?.round_id) === String(round.round_id)
-                        ? "border-amber-400/60 bg-amber-600 text-amber-50"
-                        : "border-amber-700/35 bg-black/25 text-amber-100"
-                    )}
-                  >
-                    {round.round_name || round.round_id}
-                  </button>
-                ))}
-              </div>
-            </CardContent>
+            <CardContent className="p-3 text-sm text-amber-100"><div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Tabellen Runde</div><div className="mt-1 font-serif text-lg text-amber-200">{tableRound?.round_name || "Runde"}</div><div className="text-amber-100/65">{tableCourse?.course_name || "Kurs"}</div><div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">{availableRounds.map((round) => <button key={round.round_id} type="button" onClick={() => setRoundTableRoundId(round.round_id)} className={cls("rounded-xl border px-2 py-2 text-xs font-bold", String(tableRound?.round_id) === String(round.round_id) ? "border-amber-400/60 bg-amber-600 text-amber-50" : "border-amber-700/35 bg-black/25 text-amber-100")}>{round.round_name || round.round_id}</button>)}</div></CardContent>
           </Card>
           <Card className="mb-2 rounded-2xl border border-amber-500/30 bg-[linear-gradient(180deg,rgba(48,35,22,0.86),rgba(18,13,9,0.82))] shadow-[inset_0_1px_0_rgba(251,191,36,0.10),0_18px_46px_rgba(0,0,0,0.38)] backdrop-blur-sm">
-            <CardContent className="p-3">
-              <div className="mb-2"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Leaderboard</p></div>
-              <LeaderboardTable title="Klassisches Zählspiel" players={tableStrokePlayLeaderboard} columns={[{ label: "+/−", render: (p) => formatToPar(p.toPar, p.played), emphasize: true }, { label: "Schläge", render: (p) => p.played ? p.total : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} />
-              <LeaderboardTable title="Netto Stableford" players={tableNetStablefordLeaderboard} columns={[{ label: "Punkte", render: (p) => p.netStableford, emphasize: true }, { label: "Löcher", render: (p) => `${p.played}/18` }]} />
-              <LeaderboardTable title="Zählspiel HCP adjusted" players={tableHcpAdjustedStrokeLeaderboard} columns={[{ label: "+/−", render: (p) => formatToPar(p.hcpAdjustedToPar, p.played), emphasize: true }, { label: "Netto", render: (p) => p.played ? p.hcpAdjustedTotal : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} />
-              <LeaderboardTable title="Brutto Punkte" players={tableGrossStablefordLeaderboard} columns={[{ label: "Punkte", render: (p) => p.grossStableford, emphasize: true }, { label: "Schläge", render: (p) => p.played ? p.total : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} />
-              <LeaderboardTable title="Putt-Kasse" players={tablePuttPenaltyLeaderboard} columns={[{ label: "3 Putts", render: (p) => `${p.threePutts} × 2 €` }, { label: "4+ Putts", render: (p) => `${p.fourPlusPutts} × 4 €` }, { label: "Gesamt", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} />
-            </CardContent>
+            <CardContent className="p-3"><div className="mb-2"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Leaderboard</p></div><LeaderboardTable title="Klassisches Zählspiel" players={sortStrokePlay(tableStats)} columns={[{ label: "+/−", render: (p) => formatToPar(p.toPar, p.played), emphasize: true }, { label: "Schläge", render: (p) => p.played ? p.total : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Netto Stableford" players={sortStableford(tableStats, "netStableford")} columns={[{ label: "Punkte", render: (p) => p.netStableford, emphasize: true }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Zählspiel HCP adjusted" players={sortHcpAdjustedStrokePlay(tableStats)} columns={[{ label: "+/−", render: (p) => formatToPar(p.hcpAdjustedToPar, p.played), emphasize: true }, { label: "Netto", render: (p) => p.played ? p.hcpAdjustedTotal : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Brutto Punkte" players={sortStableford(tableStats, "grossStableford")} columns={[{ label: "Punkte", render: (p) => p.grossStableford, emphasize: true }, { label: "Schläge", render: (p) => p.played ? p.total : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Putt-Kasse" players={[...tableStats].sort((a, b) => Number(b.puttPenaltyEuro || 0) - Number(a.puttPenaltyEuro || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0))} columns={[{ label: "3 Putts", render: (p) => `${p.threePutts} × 2 €` }, { label: "4+ Putts", render: (p) => `${p.fourPlusPutts} × 4 €` }, { label: "Gesamt", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} /></CardContent>
           </Card>
         </div>
       </motion.section>
@@ -1900,56 +1673,18 @@ function LordOfTheHolesApp() {
     const archiveRound = availableRounds.find((round) => String(round.round_id) === String(scorecardRoundId)) || displayedActiveRound || availableRounds[0] || fallbackRounds[0];
     const archiveCourseId = archiveRound?.course_id || displayCourseId || "goethe";
     const archiveCourse = (courses.length ? courses : fallbackCourses).find((course) => String(course.course_id) === String(archiveCourseId));
-    const scorecardHoles = (allHoles.length ? allHoles : fallbackHoles)
-      .filter((hole) => String(hole.course_id) === String(archiveCourseId))
-      .sort((a, b) => Number(a.hole_number) - Number(b.hole_number));
+    const scorecardHoles = (allHoles.length ? allHoles : fallbackHoles).filter((hole) => String(hole.course_id) === String(archiveCourseId)).sort((a, b) => Number(a.hole_number) - Number(b.hole_number));
     const scorecardPlayers = getPlayersForCourse(getRoundPlayers(archiveRound?.round_id, allPlayers, roundPlayers), archiveCourseId, courses);
     const scorecardScores = officialAllScores.filter((score) => String(score.round_id || "") === String(archiveRound?.round_id || ""));
-
     return (
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
         <div className="landscape:mx-auto landscape:max-w-none landscape:pb-6">
           <Card className="mb-2 rounded-2xl border border-amber-500/30 bg-[linear-gradient(180deg,rgba(48,35,22,0.86),rgba(18,13,9,0.82))] shadow-[inset_0_1px_0_rgba(251,191,36,0.10),0_18px_46px_rgba(0,0,0,0.38)] backdrop-blur-sm">
-            <CardContent className="p-3">
-              <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Scorekarten</p>
-              <div className="mt-0.5 text-sm font-semibold text-amber-300/85">Chroniken der Runde</div>
-              <h2 className="font-serif text-lg text-amber-200">{archiveRound?.round_name || "Aktive Runde"}</h2>
-              <p className="mt-1 text-sm text-amber-100/70">{archiveCourse?.course_name || "Kurs"} · klassische Scorekarte je Spieler</p>
-
-              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {availableRounds.map((round) => (
-                  <button
-                    key={round.round_id}
-                    type="button"
-                    onClick={() => setScorecardRoundId(round.round_id)}
-                    className={cls(
-                      "rounded-xl border px-2 py-2 text-xs font-bold",
-                      String(archiveRound?.round_id) === String(round.round_id)
-                        ? "border-amber-400/60 bg-amber-600 text-amber-50"
-                        : "border-amber-700/35 bg-black/25 text-amber-100"
-                    )}
-                  >
-                    {round.round_name || round.round_id}
-                  </button>
-                ))}
-              </div>
-
-              <div className="mt-3 grid grid-cols-2 gap-1.5 text-[10px] text-amber-100/70 sm:grid-cols-4">
-                <div className="rounded-lg bg-emerald-700/50 px-2 py-1 text-emerald-50">Birdie oder besser</div>
-                <div className="rounded-lg bg-amber-500/20 px-2 py-1 text-amber-100">Par</div>
-                <div className="rounded-lg bg-orange-800/55 px-2 py-1 text-orange-100">Bogey</div>
-                <div className="rounded-lg bg-red-900/60 px-2 py-1 text-red-100">Doppelbogey+ / X</div>
-              </div>
-            </CardContent>
+            <CardContent className="p-3"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Scorekarten</p><div className="mt-0.5 text-sm font-semibold text-amber-300/85">Chroniken der Runde</div><h2 className="font-serif text-lg text-amber-200">{archiveRound?.round_name || "Aktive Runde"}</h2><p className="mt-1 text-sm text-amber-100/70">{archiveCourse?.course_name || "Kurs"} · klassische Scorekarte je Spieler</p><div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">{availableRounds.map((round) => <button key={round.round_id} type="button" onClick={() => setScorecardRoundId(round.round_id)} className={cls("rounded-xl border px-2 py-2 text-xs font-bold", String(archiveRound?.round_id) === String(round.round_id) ? "border-amber-400/60 bg-amber-600 text-amber-50" : "border-amber-700/35 bg-black/25 text-amber-100")}>{round.round_name || round.round_id}</button>)}</div><div className="mt-3 grid grid-cols-2 gap-1.5 text-[10px] text-amber-100/70 sm:grid-cols-4"><div className="rounded-lg bg-emerald-700/50 px-2 py-1 text-emerald-50">Birdie oder besser</div><div className="rounded-lg bg-amber-500/20 px-2 py-1 text-amber-100">Par</div><div className="rounded-lg bg-orange-800/55 px-2 py-1 text-orange-100">Bogey</div><div className="rounded-lg bg-red-900/60 px-2 py-1 text-red-100">Doppelbogey+ / X</div></div></CardContent>
           </Card>
-
           {scorecardPlayers.map((player) => {
             const playerScores = scorecardHoles.map((hole) => {
-              const score = scorecardScores.find(
-                (item) =>
-                  String(item.player_id || "") === String(player.id) &&
-                  Number(item.hole_number) === Number(hole.hole_number)
-              );
+              const score = scorecardScores.find((item) => String(item.player_id || "") === String(player.id) && Number(item.hole_number) === Number(hole.hole_number));
               const shots = getShotsOnHole(player.course_hcp, hole.hcp);
               const grossStableford = score ? getScoreStablefordPoints(score, hole.par, 0) : 0;
               const netStableford = score ? getScoreStablefordPoints(score, hole.par, shots) : 0;
@@ -1957,7 +1692,6 @@ function LordOfTheHolesApp() {
               const hcpAdjustedToPar = hcpAdjustedStrokes != null ? hcpAdjustedStrokes - Number(hole.par || 0) : null;
               return { hole, score, shots, grossStableford, netStableford, hcpAdjustedStrokes, hcpAdjustedToPar };
             });
-
             const playedRows = playerScores.filter((row) => row.score && row.score.strokes !== "" && row.score.strokes != null);
             const totalStrokes = playedRows.reduce((sum, row) => sum + Number(row.score?.strokes || 0), 0);
             const totalGrossStableford = playedRows.reduce((sum, row) => sum + Number(row.grossStableford || 0), 0);
@@ -1965,90 +1699,21 @@ function LordOfTheHolesApp() {
             const totalHcpAdjustedStrokes = playedRows.reduce((sum, row) => sum + Number(row.hcpAdjustedStrokes || 0), 0);
             const totalParPlayed = playedRows.reduce((sum, row) => sum + Number(row.hole?.par || 0), 0);
             const totalHcpAdjustedToPar = playedRows.length ? totalHcpAdjustedStrokes - totalParPlayed : null;
-
             return (
               <Card key={player.id} className="mb-3 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm">
                 <CardContent className="p-3">
-                  <div className="mb-3 flex items-start justify-between gap-2">
-                    <div>
-                      <div className="font-serif text-lg font-bold text-amber-200">{getPlayerLabel(player)}</div>
-                      <div className="text-xs text-amber-100/65">SpV {Number(player.course_hcp || 0)} · {playedRows.length}/18 Löcher</div>
-                    </div>
-                    <div className="rounded-2xl border border-amber-700/30 bg-black/25 px-3 py-2 text-right text-xs text-amber-100/80">
-                      <div>Strokes HCP adjusted</div>
-                      <b className="font-serif text-lg text-amber-300">{playedRows.length ? totalHcpAdjustedStrokes : "–"}</b>
-                    </div>
-                  </div>
-
+                  <div className="mb-3 flex items-start justify-between gap-2"><div><div className="font-serif text-lg font-bold text-amber-200">{getPlayerLabel(player)}</div><div className="text-xs text-amber-100/65">SpV {Number(player.course_hcp || 0)} · {playedRows.length}/18 Löcher</div></div><div className="rounded-2xl border border-amber-700/30 bg-black/25 px-3 py-2 text-right text-xs text-amber-100/80"><div>Strokes HCP adjusted</div><b className="font-serif text-lg text-amber-300">{playedRows.length ? totalHcpAdjustedStrokes : "–"}</b></div></div>
                   <div className="overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/25 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     <table className="w-full min-w-[760px] border-collapse text-xs text-amber-50 landscape:min-w-0 landscape:text-[11px]">
-                      <thead>
-                        <tr className="text-left uppercase tracking-wider text-amber-100/80">
-                          <th className="px-2 py-1.5">Loch</th>
-                          {scorecardHoles.map((hole) => <th key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hole.hole_number}</th>)}
-                          <th className="px-2 py-1.5 text-center">Σ</th>
-                        </tr>
-                      </thead>
+                      <thead><tr className="text-left uppercase tracking-wider text-amber-100/80"><th className="px-2 py-1.5">Loch</th>{scorecardHoles.map((hole) => <th key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hole.hole_number}</th>)}<th className="px-2 py-1.5 text-center">Σ</th></tr></thead>
                       <tbody>
-                        <tr className="border-t border-amber-700/20">
-                          <td className="px-2 py-1.5 font-semibold text-amber-100">Par</td>
-                          {scorecardHoles.map((hole) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hole.par}</td>)}
-                          <td className="px-2 py-1.5 text-center font-bold text-amber-200">{scorecardHoles.reduce((sum, hole) => sum + Number(hole.par || 0), 0)}</td>
-                        </tr>
-                        <tr className="border-t border-amber-700/20">
-                          <td className="px-2 py-1.5 font-semibold text-amber-100">Vorgabe</td>
-                          {playerScores.map(({ hole, shots }) => (
-                            <td key={hole.hole_number} className="px-1.5 py-1.5 text-center font-bold tracking-[0.18em] text-amber-300">
-                              {Number(shots || 0) > 0 ? "|".repeat(Number(shots || 0)) : ""}
-                            </td>
-                          ))}
-                          <td className="px-2 py-1.5 text-center font-bold text-amber-300">
-                            {playedRows.length ? playedRows.reduce((sum, row) => sum + Number(row.shots || 0), 0) : ""}
-                          </td>
-                        </tr>
-                        <tr className="border-t border-amber-700/20">
-                          <td className="px-2 py-1.5 font-semibold text-amber-100">Strokes</td>
-                          {playerScores.map(({ hole, score }) => (
-                            <td key={hole.hole_number} className="px-1 py-1.5 text-center">
-                              <span className={cls("inline-flex min-w-[26px] justify-center rounded-lg px-1.5 py-0.5 font-bold", getStrokesCellClass(score, hole))}>
-                                {score ? normalizeBoolean(score.picked_up) ? "X" : score.strokes || "–" : "–"}
-                              </span>
-                            </td>
-                          ))}
-                          <td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? totalStrokes : "–"}</td>
-                        </tr>
-                        <tr className="border-t border-amber-700/20">
-                          <td className="px-2 py-1.5 font-semibold text-amber-100">Strokes HCP adjusted</td>
-                          {playerScores.map(({ hole, hcpAdjustedStrokes }) => (
-                            <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hcpAdjustedStrokes ?? "–"}</td>
-                          ))}
-                          <td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? totalHcpAdjustedStrokes : "–"}</td>
-                        </tr>
-                        <tr className="border-t border-amber-700/20">
-                          <td className="px-2 py-1.5 font-semibold text-amber-100">+/− HCP adjusted</td>
-                          {playerScores.map(({ hole, hcpAdjustedToPar }) => (
-                            <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">
-                              {hcpAdjustedToPar == null ? "–" : formatToPar(hcpAdjustedToPar, true)}
-                            </td>
-                          ))}
-                          <td className="px-2 py-1.5 text-center font-bold text-amber-300">
-                            {totalHcpAdjustedToPar == null ? "–" : formatToPar(totalHcpAdjustedToPar, true)}
-                          </td>
-                        </tr>
-                        <tr className="border-t border-amber-700/20">
-                          <td className="px-2 py-1.5 font-semibold text-amber-100">Netto Stblf.</td>
-                          {playerScores.map(({ hole, score, netStableford }) => (
-                            <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{score ? netStableford : "–"}</td>
-                          ))}
-                          <td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? totalNetStableford : "–"}</td>
-                        </tr>
-                        <tr className="border-t border-amber-700/20">
-                          <td className="px-2 py-1.5 font-semibold text-amber-100">Brutto</td>
-                          {playerScores.map(({ hole, score, grossStableford }) => (
-                            <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{score ? grossStableford : "–"}</td>
-                          ))}
-                          <td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? totalGrossStableford : "–"}</td>
-                        </tr>
+                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Par</td>{scorecardHoles.map((hole) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hole.par}</td>)}<td className="px-2 py-1.5 text-center font-bold text-amber-200">{scorecardHoles.reduce((sum, hole) => sum + Number(hole.par || 0), 0)}</td></tr>
+                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Vorgabe</td>{playerScores.map(({ hole, shots }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center font-bold tracking-[0.18em] text-amber-300">{Number(shots || 0) > 0 ? "|".repeat(Number(shots || 0)) : ""}</td>)}<td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? playedRows.reduce((sum, row) => sum + Number(row.shots || 0), 0) : ""}</td></tr>
+                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Strokes</td>{playerScores.map(({ hole, score }) => <td key={hole.hole_number} className="px-1 py-1.5 text-center"><span className={cls("inline-flex min-w-[26px] justify-center rounded-lg px-1.5 py-0.5 font-bold", getStrokesCellClass(score, hole))}>{score ? normalizeBoolean(score.picked_up) ? "X" : score.strokes || "–" : "–"}</span></td>)}<td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? totalStrokes : "–"}</td></tr>
+                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Strokes HCP adjusted</td>{playerScores.map(({ hole, hcpAdjustedStrokes }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hcpAdjustedStrokes ?? "–"}</td>)}<td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? totalHcpAdjustedStrokes : "–"}</td></tr>
+                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">+/− HCP adjusted</td>{playerScores.map(({ hole, hcpAdjustedToPar }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hcpAdjustedToPar == null ? "–" : formatToPar(hcpAdjustedToPar, true)}</td>)}<td className="px-2 py-1.5 text-center font-bold text-amber-300">{totalHcpAdjustedToPar == null ? "–" : formatToPar(totalHcpAdjustedToPar, true)}</td></tr>
+                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Netto Stblf.</td>{playerScores.map(({ hole, score, netStableford }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{score ? netStableford : "–"}</td>)}<td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? totalNetStableford : "–"}</td></tr>
+                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Brutto</td>{playerScores.map(({ hole, score, grossStableford }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{score ? grossStableford : "–"}</td>)}<td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? totalGrossStableford : "–"}</td></tr>
                       </tbody>
                     </table>
                   </div>
@@ -2077,31 +1742,7 @@ function LordOfTheHolesApp() {
       <div className="fixed inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/lord-bg.webp')" }} />
       <div className="fixed inset-0 bg-black/45" />
       <div className="fixed inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.06),rgba(0,0,0,0.58)_38%,rgba(0,0,0,0.86)_100%)]" />
-      {((showSplash || appLocked) && !lockAdminBypass) ? <div className="fixed inset-0 z-[100] bg-black"><div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/lord-bg.webp')" }} /><div className="absolute inset-0 bg-black/25" />{!appLocked ? <div className="absolute inset-x-0 bottom-8 flex justify-center px-6 pb-[env(safe-area-inset-bottom)]"><button type="button" disabled={splashEntering} onClick={enterRoundFromSplash} className="w-full max-w-xs rounded-2xl border border-amber-300/55 bg-black/55 px-5 py-2.5 font-serif text-lg font-black tracking-wide text-amber-200 shadow-2xl shadow-black/70 backdrop-blur-sm active:scale-[0.98] disabled:opacity-60">{splashEntering ? "Datenbank wird geladen ..." : "Runde betreten"}</button></div> : <div className="absolute inset-x-4 bottom-10 mx-auto max-w-sm rounded-3xl border border-amber-500/35 bg-black/55 p-4 text-center text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm"><div className="font-serif text-xl font-black text-amber-200">Der Rat ist noch nicht einberufen.</div><div className="mt-2 text-sm text-amber-100/80">Im Weimarer Land werden Stimmen gesenkt, alte Karten entrollt und verdächtig ernste Blicke ausgetauscht. Die Gefährten werden bald gerufen.</div><div className="mt-4 grid grid-cols-4 gap-1.5 rounded-2xl border border-amber-500/25 bg-black/35 p-2 text-center">
-                  <div><div className="font-serif text-xl font-black text-amber-200">{lockCountdown.days}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Tage</div></div>
-                  <div><div className="font-serif text-xl font-black text-amber-200">{String(lockCountdown.hours).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Std</div></div>
-                  <div><div className="font-serif text-xl font-black text-amber-200">{String(lockCountdown.minutes).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Min</div></div>
-                  <div><div className="font-serif text-xl font-black text-amber-200">{String(lockCountdown.seconds).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Sek</div></div>
-                </div><div className="mt-3 text-xs uppercase tracking-[0.18em] text-amber-300/70">Bitte noch einen Augenblick an der Pforte warten</div></div>}{appLocked ? <button type="button" onClick={() => setLockUnlockOpen(true)} className="absolute bottom-3 left-3 h-8 w-8 rounded-full text-[10px] text-amber-100/10" aria-label="Admin-Zugang">•</button> : null}{appLocked && lockUnlockOpen ? <div className="absolute inset-x-4 bottom-8 mx-auto max-w-xs rounded-2xl border border-amber-700/35 bg-black/70 p-3 text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm"><div className="mb-2 text-xs uppercase tracking-[0.18em] text-amber-300/70">Admin</div><input type="password" value={lockPasswordInput} onChange={(e) => setLockPasswordInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") enterLockedAppAsAdmin(); }} placeholder="Passwort" className="mb-2 w-full rounded-xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" autoFocus /><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => { setLockUnlockOpen(false); setLockPasswordInput(""); }} className="rounded-xl bg-stone-800 py-2 text-sm font-bold text-amber-100">Abbrechen</button><button type="button" disabled={splashEntering} onClick={enterLockedAppAsAdmin} className="rounded-xl bg-amber-600 py-2 text-sm font-bold text-amber-50 disabled:opacity-60">{splashEntering ? "Lade ..." : "Admin rein"}</button></div></div> : null}</div> : null}
-      {showPlayerSelectPopup ? (
-        <div className="fixed inset-0 z-[99] flex items-center justify-center bg-black/72 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-400/55 bg-stone-950 text-amber-50 shadow-2xl shadow-black/80">
-            <div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.22),transparent_45%),linear-gradient(180deg,rgba(41,37,36,0.94),rgba(12,10,9,1))] p-4 text-center">
-              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full border border-amber-300/45 bg-black/25 text-3xl">🧙</div>
-              <div className="text-[10px] uppercase tracking-[0.26em] text-amber-100/70">Dieses Handy gehört zu</div>
-              <div className="mt-2 font-serif text-xl font-black text-amber-200">Wer bist du?</div>
-              <p className="mt-2 text-sm text-amber-100/70">Wähle zuerst deinen Spieler. Erst dann kann die App offiziellen Score und deinen Kontrollscore sauber trennen.</p>
-              <div className="mt-4 rounded-2xl border border-amber-700/35 bg-black/25 p-2 text-left">
-                <label className="mb-1 block text-sm text-amber-100/80">Wer bin ich auf diesem Handy?</label>
-                <select value={myPlayerId} onChange={(e) => setMyPlayerId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50">
-                  <option value="">Spieler auswählen</option>
-                  {allPlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {((showSplash || appLocked) && !lockAdminBypass) ? <div className="fixed inset-0 z-[100] bg-black"><div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/lord-bg.webp')" }} /><div className="absolute inset-0 bg-black/25" />{!appLocked ? <div className="absolute inset-x-0 bottom-8 flex justify-center px-6 pb-[env(safe-area-inset-bottom)]"><button type="button" disabled={splashEntering} onClick={enterRoundFromSplash} className="w-full max-w-xs rounded-2xl border border-amber-300/55 bg-black/55 px-5 py-2.5 font-serif text-lg font-black tracking-wide text-amber-200 shadow-2xl shadow-black/70 backdrop-blur-sm active:scale-[0.98] disabled:opacity-60">{splashEntering ? "Datenbank wird geladen ..." : "Runde betreten"}</button></div> : <div className="absolute inset-x-4 bottom-10 mx-auto max-w-sm rounded-3xl border border-amber-500/35 bg-black/55 p-4 text-center text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm"><div className="font-serif text-xl font-black text-amber-200">Der Rat ist noch nicht einberufen.</div><div className="mt-2 text-sm text-amber-100/80">Im Weimarer Land werden Stimmen gesenkt, alte Karten entrollt und verdächtig ernste Blicke ausgetauscht. Die Gefährten werden bald gerufen.</div><div className="mt-4 grid grid-cols-4 gap-1.5 rounded-2xl border border-amber-500/25 bg-black/35 p-2 text-center"><div><div className="font-serif text-xl font-black text-amber-200">{lockCountdown.days}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Tage</div></div><div><div className="font-serif text-xl font-black text-amber-200">{String(lockCountdown.hours).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Std</div></div><div><div className="font-serif text-xl font-black text-amber-200">{String(lockCountdown.minutes).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Min</div></div><div><div className="font-serif text-xl font-black text-amber-200">{String(lockCountdown.seconds).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Sek</div></div></div><div className="mt-3 text-xs uppercase tracking-[0.18em] text-amber-300/70">Bitte noch einen Augenblick an der Pforte warten</div></div>}{appLocked ? <button type="button" onClick={() => setLockUnlockOpen(true)} className="absolute bottom-3 left-3 h-8 w-8 rounded-full text-[10px] text-amber-100/10" aria-label="Admin-Zugang">•</button> : null}{appLocked && lockUnlockOpen ? <div className="absolute inset-x-4 bottom-8 mx-auto max-w-xs rounded-2xl border border-amber-700/35 bg-black/70 p-3 text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm"><div className="mb-2 text-xs uppercase tracking-[0.18em] text-amber-300/70">Admin</div><input type="password" value={lockPasswordInput} onChange={(e) => setLockPasswordInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") enterLockedAppAsAdmin(); }} placeholder="Passwort" className="mb-2 w-full rounded-xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" autoFocus /><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => { setLockUnlockOpen(false); setLockPasswordInput(""); }} className="rounded-xl bg-stone-800 py-2 text-sm font-bold text-amber-100">Abbrechen</button><button type="button" disabled={splashEntering} onClick={enterLockedAppAsAdmin} className="rounded-xl bg-amber-600 py-2 text-sm font-bold text-amber-50 disabled:opacity-60">{splashEntering ? "Lade ..." : "Admin rein"}</button></div></div> : null}</div> : null}
       <main className="relative z-10 mx-auto max-w-md px-2 py-1.5">
         {renderHeader()}
         {renderStatusMessages()}
@@ -2112,90 +1753,14 @@ function LordOfTheHolesApp() {
       {setupSavedMessage ? <div className="fixed inset-x-3 top-4 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/50 bg-emerald-950/95 p-3 text-emerald-50 shadow-2xl shadow-black/60 backdrop-blur"><div className="flex items-start justify-between gap-2"><div><div className="font-serif text-lg text-emerald-100">Gespeichert</div><div className="mt-0.5 text-sm text-emerald-100/85">{setupSavedMessage}</div></div><button type="button" onClick={() => setSetupSavedMessage("")} className="rounded-xl border border-emerald-400/40 bg-black/25 px-3 py-1 text-sm font-bold text-emerald-50">×</button></div></div> : null}
       {backupSavedMessage ? <div className="fixed inset-x-3 top-4 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/50 bg-emerald-950/95 p-3 text-emerald-50 shadow-2xl shadow-black/60 backdrop-blur"><div className="flex items-start justify-between gap-2"><div><div className="font-serif text-lg text-emerald-100">Backup erstellt</div><div className="mt-0.5 text-sm text-emerald-100/85">{backupSavedMessage}</div></div><button type="button" onClick={() => setBackupSavedMessage("")} className="rounded-xl border border-emerald-400/40 bg-black/25 px-3 py-1 text-sm font-bold text-emerald-50">×</button></div></div> : null}
       {renderPopupStandingsTable()}
-      {needsMyPlayerSelection ? (
-        <div className="fixed inset-0 z-[94] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-500/45 bg-stone-950 text-amber-50 shadow-2xl shadow-black/80">
-            <div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.20),transparent_45%),linear-gradient(180deg,rgba(41,37,36,0.94),rgba(12,10,9,1))] p-4 text-center">
-              <div className="text-[10px] uppercase tracking-[0.24em] text-amber-300/75">Dieses Handy</div>
-              <div className="mt-1 font-serif text-2xl font-black text-amber-200">Wer bist du?</div>
-              <div className="mt-1 text-sm text-amber-100/70">Wähle deinen eigenen Spieler. Diese Auswahl bleibt auf diesem Handy gespeichert.</div>
-              <div className="mt-4 grid gap-2">
-                {visiblePlayers.map((player) => (
-                  <button
-                    key={player.id}
-                    type="button"
-                    onClick={() => {
-                      setMyPlayerId(player.id);
-                      setScoreEntryMode("player");
-                    }}
-                    className="rounded-2xl border border-amber-700/35 bg-stone-900 px-3 py-3 font-serif text-base font-bold text-amber-100 transition active:scale-[0.98]"
-                  >
-                    {getPlayerLabel(player)}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
-      {roundSummaryPopup ? (
-        <div className="fixed inset-0 z-[94] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-400/60 bg-stone-950 text-center text-amber-50 shadow-2xl shadow-black/80">
-            <div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.25),transparent_45%),linear-gradient(180deg,rgba(41,37,36,0.92),rgba(12,10,9,1))] p-5">
-              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full border border-amber-300/50 bg-black/25 text-3xl shadow-xl shadow-amber-950/40">📜</div>
-              <div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/70">{roundSummaryPopup.subtitle}</div>
-              <div className="mt-2 font-serif text-2xl font-black text-amber-200">{roundSummaryPopup.title}</div>
-              <div className="mt-1 text-sm font-semibold text-amber-100/80">{roundSummaryPopup.playerName}</div>
-
-              <div className="mt-4 grid grid-cols-2 gap-2 text-left text-sm">
-                <div className="rounded-2xl border border-amber-500/30 bg-black/25 p-3">
-                  <div className="text-xs uppercase tracking-[0.18em] text-amber-300/70">Strokes</div>
-                  <div className="font-serif text-2xl font-black text-amber-200">{roundSummaryPopup.strokes}</div>
-                  <div className="text-xs text-amber-100/65">{formatToPar(roundSummaryPopup.toPar, true)} zu Par</div>
-                </div>
-                <div className="rounded-2xl border border-amber-500/30 bg-black/25 p-3">
-                  <div className="text-xs uppercase tracking-[0.18em] text-amber-300/70">HCP adjusted</div>
-                  <div className="font-serif text-2xl font-black text-amber-200">{roundSummaryPopup.hcpAdjustedStrokes}</div>
-                  <div className="text-xs text-amber-100/65">Strokes HCP</div>
-                </div>
-                <div className="rounded-2xl border border-amber-500/30 bg-black/25 p-3">
-                  <div className="text-xs uppercase tracking-[0.18em] text-amber-300/70">Netto Stblf.</div>
-                  <div className="font-serif text-2xl font-black text-amber-200">{roundSummaryPopup.netStableford}</div>
-                  <div className="text-xs text-amber-100/65">Punkte</div>
-                </div>
-                <div className="rounded-2xl border border-amber-500/30 bg-black/25 p-3">
-                  <div className="text-xs uppercase tracking-[0.18em] text-amber-300/70">Brutto</div>
-                  <div className="font-serif text-2xl font-black text-amber-200">{roundSummaryPopup.grossStableford}</div>
-                  <div className="text-xs text-amber-100/65">Punkte</div>
-                </div>
-              </div>
-
-              <div className="mt-3 grid grid-cols-4 gap-1.5 text-xs text-amber-100/80">
-                <div className="rounded-xl bg-amber-500/10 p-2"><b className="block text-amber-200">{roundSummaryPopup.putts}</b>Putts</div>
-                <div className="rounded-xl bg-emerald-500/10 p-2"><b className="block text-emerald-200">{roundSummaryPopup.girCount}</b>GIR</div>
-                <div className="rounded-xl bg-amber-500/10 p-2"><b className="block text-amber-200">{roundSummaryPopup.birdiesOrBetter}</b>Birdie+</div>
-                <div className="rounded-xl bg-red-500/10 p-2"><b className="block text-red-100">{roundSummaryPopup.pickedUp}</b>X</div>
-              </div>
-            </div>
-            <div className="p-3">
-              <button
-                type="button"
-                onClick={() => setRoundSummaryDismissedKeys((current) => Array.from(new Set([...(current || []), roundSummaryPopup.key])))}
-                className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-2.5 text-sm font-bold text-amber-50"
-              >
-                Chronik schließen ×
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
-      {displayedRoundHonorCelebration && !showFinalWinnerPopup && !roundSummaryPopup ? <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm"><div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-400/60 bg-stone-950 text-center text-amber-50 shadow-2xl shadow-black/80"><div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.28),transparent_45%),linear-gradient(180deg,rgba(120,53,15,0.55),rgba(12,10,9,1))] p-5"><div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-amber-300/50 bg-black/25 text-3xl shadow-xl shadow-amber-950/40">⚜</div><div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/70">{displayedRoundHonorCelebration.roundName} beendet</div><div className="mt-2 font-serif text-lg font-black text-amber-200">Gondors Erlass</div><div className="mt-1 text-sm text-amber-100/70">Die Runde ist gespielt. Den Herren von Gondor werden ihre Schildträger zur Seite gestellt — der Hofstaat wird neu geordnet.</div><div className="mt-2 rounded-2xl border border-amber-300/40 bg-amber-500/10 p-3 text-sm font-semibold text-amber-50">{roundHonorPersonalMessage}</div><div className="mt-2 rounded-2xl border border-amber-500/35 bg-black/25 p-3 text-left"><div className="text-xs uppercase tracking-[0.22em] text-amber-300/75">{displayedRoundHonorCelebration.lords.length === 1 ? "Herr von Gondor" : "Herren von Gondor"}</div><div className="mt-2 space-y-1">{displayedRoundHonorCelebration.lords.map((player, index) => <div key={player.id} className="flex items-center justify-between gap-2 rounded-xl bg-amber-500/10 px-2 py-1.5"><span className="font-serif text-lg font-black text-amber-200">{index + 1}. {getPlayerLabel(player)}</span><span className="text-xs text-amber-100/70">{player.hcpAdjustedStrokes}</span></div>)}</div></div>{displayedRoundHonorCelebration.lordPlayoff?.length ? <div className="mt-2 rounded-2xl border border-amber-400/45 bg-amber-500/10 p-3 text-left"><div className="text-xs uppercase tracking-[0.22em] text-amber-300/80">Entscheidungsputten um {displayedRoundHonorCelebration.lordPlayoffSlots} Herr{displayedRoundHonorCelebration.lordPlayoffSlots === 1 ? "enplatz" : "enplätze"}</div><div className="mt-2 space-y-1">{displayedRoundHonorCelebration.lordPlayoff.map((player) => <div key={player.id} className="flex items-center justify-between gap-2 rounded-xl bg-amber-500/10 px-2 py-1.5"><span className="font-serif text-lg font-black text-amber-200">{getPlayerLabel(player)}</span><span className="text-xs text-amber-100/70">{player.hcpAdjustedStrokes}</span></div>)}</div><div className="mt-2 text-xs text-amber-100/75">Diese Spieler müssen ins Entscheidungsputten, bis die offenen Herrenplätze geklärt sind.</div></div> : null}<div className="mt-2 rounded-2xl border border-red-500/35 bg-black/25 p-3 text-left"><div className="text-xs uppercase tracking-[0.22em] text-red-200/80">Schildträger im Dienst der Herren</div><div className="mt-2 space-y-1">{displayedRoundHonorCelebration.butlers.map((player) => <div key={player.id} className="flex items-center justify-between gap-2 rounded-xl bg-red-500/10 px-2 py-1.5"><span className="font-serif text-lg font-black text-red-100">{getPlayerLabel(player)}</span><span className="text-xs text-red-100/70">{player.hcpAdjustedStrokes}</span></div>)}</div></div>{displayedRoundHonorCelebration.butlerPlayoff?.length ? <div className="mt-2 rounded-2xl border border-red-400/45 bg-red-500/10 p-3 text-left"><div className="text-xs uppercase tracking-[0.22em] text-red-200/80">Entscheidungsputten um {displayedRoundHonorCelebration.butlerPlayoffSlots} Schildträgerplatz{displayedRoundHonorCelebration.butlerPlayoffSlots === 1 ? "" : "plätze"}</div><div className="mt-2 space-y-1">{displayedRoundHonorCelebration.butlerPlayoff.map((player) => <div key={player.id} className="flex items-center justify-between gap-2 rounded-xl bg-red-500/10 px-2 py-1.5"><span className="font-serif text-lg font-black text-red-100">{getPlayerLabel(player)}</span><span className="text-xs text-red-100/70">{player.hcpAdjustedStrokes}</span></div>)}</div><div className="mt-2 text-xs text-red-100/75">Nur diese punktgleichen Spieler müssen ins Entscheidungsputten um den offenen Schildträgerdienst. Bereits eindeutig feststehende Schildträger müssen nicht antreten.</div></div> : null}<div className="mt-2 rounded-2xl border border-amber-500/25 bg-black/25 p-2 text-sm text-amber-100/75">{displayedRoundHonorCelebration.hasPlayoff ? "Gondor wartet auf das Entscheidungsputten. Erst danach ist geklärt, wer Krone trägt und wer Schild hält." : displayedRoundHonorCelebration.roundOrder === 1 ? "Der Herr von Gondor steht fest. Sein Schildträger ebenso. Der Dienst ist ehrenvoll — und vermutlich leicht erniedrigend." : "Die Herren von Gondor und ihre Schildträger stehen fest. Der Hofstaat ist informiert, die Eide sind gesprochen, die Knie zittern."}</div></div><div className="p-3"><button type="button" onClick={() => setRoundHonorDismissedKeys((current) => Array.from(new Set([...(current || []), displayedRoundHonorCelebration.key])))} className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-2.5 text-sm font-bold text-amber-50">{roundHonorCloseLabel}</button></div></div></div> : null}
+      {needsMyPlayerSelection ? <div className="fixed inset-0 z-[94] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm"><div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-500/45 bg-stone-950 text-amber-50 shadow-2xl shadow-black/80"><div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.20),transparent_45%),linear-gradient(180deg,rgba(41,37,36,0.94),rgba(12,10,9,1))] p-4 text-center"><div className="text-[10px] uppercase tracking-[0.24em] text-amber-300/75">Dieses Handy</div><div className="mt-1 font-serif text-2xl font-black text-amber-200">Wer bist du?</div><div className="mt-1 text-sm text-amber-100/70">Wähle deinen eigenen Spieler. Diese Auswahl bleibt auf diesem Handy gespeichert.</div><div className="mt-4 grid gap-2">{visiblePlayers.map((player) => <button key={player.id} type="button" onClick={() => { setMyPlayerId(player.id); setScoreEntryMode("player"); }} className="rounded-2xl border border-amber-700/35 bg-stone-900 px-3 py-3 font-serif text-base font-bold text-amber-100 transition active:scale-[0.98]">{getPlayerLabel(player)}</button>)}</div></div></div></div> : null}
+      {roundSummaryPopup ? <div className="fixed inset-0 z-[94] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm"><div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-400/60 bg-stone-950 text-center text-amber-50 shadow-2xl shadow-black/80"><div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.25),transparent_45%),linear-gradient(180deg,rgba(41,37,36,0.92),rgba(12,10,9,1))] p-5"><div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full border border-amber-300/50 bg-black/25 text-3xl shadow-xl shadow-amber-950/40">📜</div><div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/70">{roundSummaryPopup.subtitle}</div><div className="mt-2 font-serif text-2xl font-black text-amber-200">{roundSummaryPopup.title}</div><div className="mt-1 text-sm font-semibold text-amber-100/80">{roundSummaryPopup.playerName}</div><div className="mt-4 grid grid-cols-2 gap-2 text-left text-sm"><div className="rounded-2xl border border-amber-500/30 bg-black/25 p-3"><div className="text-xs uppercase tracking-[0.18em] text-amber-300/70">Strokes</div><div className="font-serif text-2xl font-black text-amber-200">{roundSummaryPopup.strokes}</div><div className="text-xs text-amber-100/65">{formatToPar(roundSummaryPopup.toPar, true)} zu Par</div></div><div className="rounded-2xl border border-amber-500/30 bg-black/25 p-3"><div className="text-xs uppercase tracking-[0.18em] text-amber-300/70">HCP adjusted</div><div className="font-serif text-2xl font-black text-amber-200">{roundSummaryPopup.hcpAdjustedStrokes}</div><div className="text-xs text-amber-100/65">Strokes HCP</div></div><div className="rounded-2xl border border-amber-500/30 bg-black/25 p-3"><div className="text-xs uppercase tracking-[0.18em] text-amber-300/70">Netto Stblf.</div><div className="font-serif text-2xl font-black text-amber-200">{roundSummaryPopup.netStableford}</div><div className="text-xs text-amber-100/65">Punkte</div></div><div className="rounded-2xl border border-amber-500/30 bg-black/25 p-3"><div className="text-xs uppercase tracking-[0.18em] text-amber-300/70">Brutto</div><div className="font-serif text-2xl font-black text-amber-200">{roundSummaryPopup.grossStableford}</div><div className="text-xs text-amber-100/65">Punkte</div></div></div><div className="mt-3 grid grid-cols-4 gap-1.5 text-xs text-amber-100/80"><div className="rounded-xl bg-amber-500/10 p-2"><b className="block text-amber-200">{roundSummaryPopup.putts}</b>Putts</div><div className="rounded-xl bg-emerald-500/10 p-2"><b className="block text-emerald-200">{roundSummaryPopup.girCount}</b>GIR</div><div className="rounded-xl bg-amber-500/10 p-2"><b className="block text-amber-200">{roundSummaryPopup.birdiesOrBetter}</b>Birdie+</div><div className="rounded-xl bg-red-500/10 p-2"><b className="block text-red-100">{roundSummaryPopup.pickedUp}</b>X</div></div></div><div className="p-3"><button type="button" onClick={() => setRoundSummaryDismissedKeys((current) => Array.from(new Set([...(current || []), roundSummaryPopup.key])))} className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-2.5 text-sm font-bold text-amber-50">Chronik schließen ×</button></div></div></div> : null}
+      {displayedRoundHonorCelebration && !showFinalWinnerPopup && !roundSummaryPopup ? <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm"><div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-400/60 bg-stone-950 text-center text-amber-50 shadow-2xl shadow-black/80"><div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.28),transparent_45%),linear-gradient(180deg,rgba(120,53,15,0.55),rgba(12,10,9,1))] p-5"><div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-amber-300/50 bg-black/25 text-3xl shadow-xl shadow-amber-950/40">⚜</div><div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/70">{displayedRoundHonorCelebration.roundName} beendet</div><div className="mt-2 font-serif text-lg font-black text-amber-200">Gondors Erlass</div><div className="mt-1 text-sm text-amber-100/70">Die Runde ist gespielt. Den Herren von Gondor werden ihre Schildträger zur Seite gestellt — der Hofstaat wird neu geordnet.</div><div className="mt-2 rounded-2xl border border-amber-300/40 bg-amber-500/10 p-3 text-sm font-semibold text-amber-50">{roundHonorPersonalMessage}</div><div className="mt-2 rounded-2xl border border-amber-500/35 bg-black/25 p-3 text-left"><div className="text-xs uppercase tracking-[0.22em] text-amber-300/75">{displayedRoundHonorCelebration.lords.length === 1 ? "Herr von Gondor" : "Herren von Gondor"}</div><div className="mt-2 space-y-1">{displayedRoundHonorCelebration.lords.map((player, index) => <div key={player.id} className="flex items-center justify-between gap-2 rounded-xl bg-amber-500/10 px-2 py-1.5"><span className="font-serif text-lg font-black text-amber-200">{index + 1}. {getPlayerLabel(player)}</span><span className="text-xs text-amber-100/70">{player.hcpAdjustedStrokes}</span></div>)}</div></div><div className="mt-2 rounded-2xl border border-red-500/35 bg-black/25 p-3 text-left"><div className="text-xs uppercase tracking-[0.22em] text-red-200/80">Schildträger im Dienst der Herren</div><div className="mt-2 space-y-1">{displayedRoundHonorCelebration.butlers.map((player) => <div key={player.id} className="flex items-center justify-between gap-2 rounded-xl bg-red-500/10 px-2 py-1.5"><span className="font-serif text-lg font-black text-red-100">{getPlayerLabel(player)}</span><span className="text-xs text-red-100/70">{player.hcpAdjustedStrokes}</span></div>)}</div></div></div><div className="p-3"><button type="button" onClick={() => setRoundHonorDismissedKeys((current) => Array.from(new Set([...(current || []), displayedRoundHonorCelebration.key])))} className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-2.5 text-sm font-bold text-amber-50">{roundHonorCloseLabel}</button></div></div></div> : null}
       {showFinalWinnerPopup && !roundSummaryPopup ? <div className="fixed inset-0 z-[96] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm"><div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-400/60 bg-stone-950 text-center text-amber-50 shadow-2xl shadow-black/80"><div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.28),transparent_45%),linear-gradient(180deg,rgba(120,53,15,0.55),rgba(12,10,9,1))] p-5"><div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-amber-300/50 bg-black/25 text-3xl shadow-xl shadow-amber-950/40">♛</div><div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/70">Finale beendet</div><div className="mt-2 font-serif text-lg font-black text-amber-200">Lord of the Holes 2026 ist</div><div className="mt-2 font-serif text-4xl font-black text-amber-300 drop-shadow">{finalWinnerCelebration?.winnerName}</div><div className="mt-2 text-sm text-amber-100/70">{finalWinnerCelebration?.winnerLabel}</div><div className="mt-2 rounded-2xl border border-amber-500/35 bg-black/25 p-2 text-sm text-amber-100">Final Strokes HCP: <b className="text-amber-200">{finalWinnerCelebration?.finalHcpAdjustedStrokes ?? "–"}</b></div></div><div className="p-3"><button type="button" onClick={() => setWinnerPopupDismissedKey(finalWinnerPopupKey)} className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-2.5 text-sm font-bold text-amber-50">Krone anerkennen ×</button></div></div></div> : null}
       {clearScoresConfirmOpen ? <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"><div className="w-full max-w-md rounded-3xl border border-red-500/60 bg-stone-950 p-4 text-red-50 shadow-2xl shadow-black/70"><div className="font-serif text-lg text-red-100">Alle Scores löschen?</div><p className="mt-2 text-sm text-red-100/80">Dadurch werden alle Einträge im Tab Scores gelöscht. Vorher wird automatisch ein Backup erstellt. Backup-Tabs bleiben erhalten.</p>{clearScoresError ? <div className="mt-2 rounded-2xl border border-red-400/50 bg-red-950/50 p-2 text-xs text-red-100">Fehler: {clearScoresError}</div> : null}<div className="mt-2 grid grid-cols-2 gap-2"><button type="button" disabled={clearScoresSaving} onClick={() => setClearScoresConfirmOpen(false)} className="rounded-2xl border border-amber-700/40 bg-stone-900 px-3 py-2.5 text-sm font-bold text-amber-100 disabled:opacity-50">Abbrechen</button><button type="button" disabled={clearScoresSaving} onClick={clearAllScores} className="rounded-2xl border border-red-400/60 bg-red-700 px-3 py-2.5 text-sm font-bold text-red-50 disabled:opacity-50">{clearScoresSaving ? "Lösche ..." : "Ja, Scores löschen"}</button></div></div></div> : null}
     </div>
   );
 }
-
 
 export default function LordOfTheHolesPWA() {
   return (
