@@ -1430,6 +1430,16 @@ function LordOfTheHolesApp() {
                     <button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl border px-2 py-1.5 text-xs font-bold transition-colors", isScorerEntryMode ? "border-[rgb(var(--score-accent)/0.45)] bg-sky-900/65 text-sky-50" : "border-amber-700/25 bg-stone-800 text-amber-100", hasOwnScoreMismatch && "ring-1 ring-red-400/70")}><span className="block truncate font-serif text-sm leading-none">Mein Score{hasOwnScoreMismatch ? " ⚠" : ""}</span></button>
                   </div>
                 ) : null}
+                {visibleScoreMismatchMessages.length ? (
+                  <div className="mb-2 rounded-2xl border border-red-500/50 bg-red-950/45 p-2 text-xs text-red-100 shadow-[0_10px_24px_rgba(0,0,0,0.32)]">
+                    <div className="font-serif text-sm font-bold text-red-100">Palantír meldet Abweichung</div>
+                    <div className="mt-1 space-y-1 text-red-100/90">
+                      {visibleScoreMismatchMessages.map((message) => (
+                        <div key={message} className="rounded-xl bg-black/25 px-2 py-1">{message}</div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
                 <div className="mb-1.5 grid grid-cols-[auto_1fr] items-center gap-2 rounded-2xl border border-[rgb(var(--score-accent)/0.30)] bg-black/25 px-3 py-2 text-[10px] text-amber-100/70"><div className="font-serif text-xl font-black leading-none text-amber-200">Loch {activeHole}</div><div className="flex items-center justify-end gap-2.5 text-right text-[11px]"><span>Par <b className="text-amber-200">{activeHoleData.par}</b></span><span>HCP <b className="text-amber-200">{activeHoleData.hcp}</b></span><span>{activeHoleData.meters} m</span><span>Vorgabe <b className="text-amber-200 tracking-[0.18em]">{formatShotMarks(entryPlayerShotsOnActiveHole)}</b></span></div></div>
                 <div className="mb-3"><ScoreStepper value={normalizeBoolean(currentScore.picked_up) ? 0 : currentScore.strokes ?? ""} par={activeHoleData?.par || 4} pickedUpStrokes={pickedUpStrokes} disabled={!canEnterScores} onChange={(scoreValue) => Number(scoreValue) === 0 || Number(scoreValue) >= Number(pickedUpStrokes || 0) ? saveScore({ strokes: pickedUpStrokes, picked_up: true }) : saveScore({ strokes: scoreValue, picked_up: false })} /></div>
                 <div className="mb-3"><PuttStepper value={currentScore.putts_count} disabled={!canEnterScores || currentEffectiveStrokes <= 1} max={maxPuttsForCurrentScore} onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })} /></div>
