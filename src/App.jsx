@@ -668,13 +668,13 @@ function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", sta
         <div className="text-sm font-semibold text-amber-100">{label}</div>
         {status ? <div className="rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold text-amber-100/75">{status}</div> : null}
       </div>
-      <div className="grid grid-cols-[78px_1fr_78px] items-center gap-2.5">
-        <button type="button" onClick={() => setValue(baseValue - 1)} disabled={baseValue <= min} className="h-[78px] rounded-2xl border border-amber-500/45 bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.16),rgba(12,10,9,0.96)_58%)] text-4xl font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.16),0_8px_22px_rgba(0,0,0,0.38)] transition active:scale-[0.97] disabled:opacity-35">−</button>
-        <button type="button" onClick={() => setValue(baseValue)} className="h-[78px] rounded-2xl border border-amber-400/35 bg-[radial-gradient(circle_at_50%_0%,rgba(251,191,36,0.22),rgba(28,25,23,0.86)_48%,rgba(12,10,9,0.96)_100%)] text-center shadow-[inset_0_0_28px_rgba(251,191,36,0.08),0_10px_26px_rgba(0,0,0,0.42)] ring-1 ring-amber-300/10 transition active:scale-[0.985]">
-          <div className="font-serif text-[3.65rem] font-black leading-none text-amber-200 drop-shadow-[0_0_14px_rgba(251,191,36,0.18)]">{shownValue}</div>
+      <div className="grid grid-cols-[82px_1fr_82px] items-center gap-2.5">
+        <button type="button" onClick={() => setValue(baseValue - 1)} disabled={baseValue <= min} className="h-[84px] rounded-2xl border border-amber-500/45 bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.16),rgba(12,10,9,0.96)_58%)] text-4xl font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.16),0_8px_22px_rgba(0,0,0,0.38)] transition active:scale-[0.97] disabled:opacity-35">−</button>
+        <button type="button" onClick={() => setValue(baseValue)} className="h-[84px] rounded-2xl border border-amber-400/35 bg-[radial-gradient(circle_at_50%_0%,rgba(251,191,36,0.22),rgba(28,25,23,0.86)_48%,rgba(12,10,9,0.96)_100%)] text-center shadow-[inset_0_0_28px_rgba(251,191,36,0.08),0_10px_26px_rgba(0,0,0,0.42)] ring-1 ring-amber-300/10 transition active:scale-[0.985]">
+          <div className="font-serif text-[3.95rem] font-black leading-none text-amber-200 drop-shadow-[0_0_14px_rgba(251,191,36,0.18)]">{shownValue}</div>
           <div className="text-[9px] uppercase tracking-[0.16em] text-amber-100/50">{!hasValue && defaultValue != null ? "tippen" : label}</div>
         </button>
-        <button type="button" onClick={() => setValue(baseValue + 1)} disabled={baseValue >= max} className="h-[78px] rounded-2xl border border-amber-500/45 bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.16),rgba(12,10,9,0.96)_58%)] text-4xl font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.16),0_8px_22px_rgba(0,0,0,0.38)] transition active:scale-[0.97] disabled:opacity-35">+</button>
+        <button type="button" onClick={() => setValue(baseValue + 1)} disabled={baseValue >= max} className="h-[84px] rounded-2xl border border-amber-500/45 bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.16),rgba(12,10,9,0.96)_58%)] text-4xl font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.16),0_8px_22px_rgba(0,0,0,0.38)] transition active:scale-[0.97] disabled:opacity-35">+</button>
       </div>
     </div>
   );
@@ -1405,7 +1405,7 @@ function LordOfTheHolesApp() {
             <div className={cls("rounded-3xl bg-[linear-gradient(180deg,rgba(48,35,22,0.46),rgba(12,10,9,0.44))] p-2.5 shadow-[inset_0_1px_0_rgba(251,191,36,0.08),0_14px_34px_rgba(0,0,0,0.26)] backdrop-blur-[2px]", hasScoreMismatch ? "ring-1 ring-red-500/45" : "")}>
               {myCurrentPlayer ? (
                 <div className="mb-2 grid grid-cols-2 gap-2 rounded-2xl border border-amber-700/30 bg-black/25 p-1.5">
-                  <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-2xl px-2 py-3 text-base font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/60")}>
+                  <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-2xl px-2 py-2.5 text-sm font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/60")}>
                     {getPlayerLabel(scoredPlayer) || "Spieler"} {hasSelectedPlayerScoreMismatch ? "⚠" : ""}
                   </button>
                   <button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl px-2 py-1.5 text-xs font-bold", isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasOwnScoreMismatch && "ring-1 ring-red-400/60")}>
