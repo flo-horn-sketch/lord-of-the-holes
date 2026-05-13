@@ -826,6 +826,7 @@ function LordOfTheHolesApp() {
   const [allScores, setAllScores] = useState(cachedState?.allScores?.length ? cachedState.allScores.map(normalizeScoreRecord) : []);
   const [pendingScores, setPendingScores] = useState(() => readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord));
   const pendingScoresRef = useRef(readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord));
+  const lastRoundForScorerPromptRef = useRef("");
   const lastAutoHoleTargetRef = useRef("");
   const [localHandicaps, setLocalHandicaps] = useState({});
   const [scoredPlayerId, setScoredPlayerId] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerId", ""));
@@ -1025,14 +1026,30 @@ function LordOfTheHolesApp() {
   useEffect(() => {
     const roundId = String(displayedActiveRound?.round_id || "");
     if (!roundId || !myPlayerId || !scoreablePlayers.length || showSplash || (appLocked && !lockAdminBypass)) return;
+
     const storedPlayerId = scoredPlayerByRound?.[roundId] || "";
-    if (storedPlayerId && scoreablePlayers.some((player) => String(player.id) === String(storedPlayerId))) {
+    const storedPlayerIsValid = storedPlayerId && scoreablePlayers.some((player) => String(player.id) === String(storedPlayerId));
+    const roundChanged = lastRoundForScorerPromptRef.current !== roundId;
+
+    if (roundChanged) {
+      lastRoundForScorerPromptRef.current = roundId;
+      if (storedPlayerIsValid) {
+        setScoredPlayerId(storedPlayerId);
+        setRoundScorerPromptOpen(false);
+      } else {
+        setScoredPlayerId("");
+        setRoundScorerPromptOpen(true);
+      }
+      return;
+    }
+
+    if (storedPlayerIsValid) {
       if (String(scoredPlayerId) !== String(storedPlayerId)) setScoredPlayerId(storedPlayerId);
       setRoundScorerPromptOpen(false);
       return;
     }
-    setScoredPlayerId("");
-    setRoundScorerPromptOpen(true);
+
+    if (!scoredPlayerId) setRoundScorerPromptOpen(true);
   }, [displayedActiveRound?.round_id, myPlayerId, scoreablePlayers, scoredPlayerByRound, scoredPlayerId, showSplash, appLocked, lockAdminBypass]);
 
   useEffect(() => { writeLocalJson("lordOfTheHoles.myPlayerId", myPlayerId); }, [myPlayerId]);
