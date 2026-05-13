@@ -1753,3 +1753,10 @@ function LordOfTheHolesApp() {
   );
 }
 
+export default function LordOfTheHolesPWA() {
+  return (
+    <AppErrorBoundary>
+      <LordOfTheHolesApp />
+    </AppErrorBoundary>
+  );
+}
