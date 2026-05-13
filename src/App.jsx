@@ -1037,7 +1037,7 @@ function LordOfTheHolesApp() {
   );
   const identityFlowActive = !showSplash && (!appLocked || lockAdminBypass);
   const needsMyPlayerSelection = Boolean(identityFlowActive && !myPlayerId);
-  const needsScoredPlayerSelection = Boolean(identityFlowActive && myPlayerId && identityRoundId && !currentAssignedScoredPlayerIsValid);
+  const needsScoredPlayerSelection = false;
   const activePopupSoundKey = showSplash || showPlayerSelectPopup ? "" : roundSummaryPopup ? `roundSummary:${roundSummaryPopup.key}` : showFinalWinnerPopup ? `finalWinner:${finalWinnerPopupKey}` : displayedRoundHonorCelebration ? `roundHonor:${displayedRoundHonorCelebration.key}` : clearScoresConfirmOpen ? "clearScoresConfirm" : backupSavedMessage ? "backupSaved" : setupSavedMessage ? "setupSaved" : clearScoresError ? "clearScoresError" : error ? "error" : "";
 
   useEffect(() => {
@@ -1156,7 +1156,9 @@ function LordOfTheHolesApp() {
       const nextActiveRoundId = String(nextActiveRound?.round_id || "");
       const lastSeenActiveRoundId = String(readLocalJson("lordOfTheHoles.lastSeenActiveRoundId", "") || "");
       if (nextActiveRoundId && lastSeenActiveRoundId && nextActiveRoundId !== lastSeenActiveRoundId) {
-        setShowSplash(true);
+        setScoredPlayerId("");
+        setScoreEntryMode("player");
+        lastLoadedRoundRef.current = "";
       }
       if (nextActiveRoundId) writeLocalJson("lordOfTheHoles.lastSeenActiveRoundId", nextActiveRoundId);
       const nextActivePlayers = data.activePlayers?.length ? data.activePlayers.map(withFallbackAlias) : getRoundPlayers(nextActiveRound?.round_id, nextAllPlayers, data.roundPlayers || []);
@@ -1641,6 +1643,31 @@ function LordOfTheHolesApp() {
               <div className="mb-2 rounded-xl border border-amber-700/30 bg-black/25 p-1.5 text-[10px] text-amber-100/75">Unter Einstellungen kannst du festlegen, wer du bist.</div>
             )}
 
+            {myPlayerId && !currentAssignedScoredPlayerIsValid ? (
+              <div className="mb-2 rounded-2xl border border-amber-500/45 bg-stone-950/75 p-2 shadow-xl shadow-black/30 backdrop-blur-sm">
+                <div className="mb-2 text-center">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300/75">Neue Zähl-Zuordnung</div>
+                  <div className="font-serif text-lg font-black text-amber-200">Wen zählst du?</div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {scoreablePlayers.map((player) => (
+                    <button
+                      key={player.id}
+                      type="button"
+                      onClick={() => {
+                        setScoredPlayerId(player.id);
+                        saveScorerAssignmentForRound(displayedActiveRound?.round_id || "", player.id);
+                        setRoundScorerPromptOpen(false);
+                      }}
+                      className="rounded-2xl bg-stone-800 px-2 py-3 font-serif text-sm font-bold text-amber-100 active:scale-[0.98]"
+                    >
+                      {getPlayerLabel(player)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             <div className={cls("rounded-3xl", hasScoreMismatch ? "ring-1 ring-red-500/45" : "")}>
               {myCurrentPlayer ? (
                 <div className="mb-2 grid grid-cols-2 gap-2">
@@ -2001,55 +2028,28 @@ function LordOfTheHolesApp() {
       {setupSavedMessage ? <div className="fixed inset-x-3 top-4 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/50 bg-emerald-950/95 p-3 text-emerald-50 shadow-2xl shadow-black/60 backdrop-blur"><div className="flex items-start justify-between gap-2"><div><div className="font-serif text-lg text-emerald-100">Gespeichert</div><div className="mt-0.5 text-sm text-emerald-100/85">{setupSavedMessage}</div></div><button type="button" onClick={() => setSetupSavedMessage("")} className="rounded-xl border border-emerald-400/40 bg-black/25 px-3 py-1 text-sm font-bold text-emerald-50">×</button></div></div> : null}
       {backupSavedMessage ? <div className="fixed inset-x-3 top-4 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/50 bg-emerald-950/95 p-3 text-emerald-50 shadow-2xl shadow-black/60 backdrop-blur"><div className="flex items-start justify-between gap-2"><div><div className="font-serif text-lg text-emerald-100">Backup erstellt</div><div className="mt-0.5 text-sm text-emerald-100/85">{backupSavedMessage}</div></div><button type="button" onClick={() => setBackupSavedMessage("")} className="rounded-xl border border-emerald-400/40 bg-black/25 px-3 py-1 text-sm font-bold text-emerald-50">×</button></div></div> : null}
       {renderPopupStandingsTable()}
-      {(needsMyPlayerSelection || needsScoredPlayerSelection) ? (
+      {needsMyPlayerSelection ? (
         <div className="fixed inset-0 z-[94] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
           <div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-500/45 bg-stone-950 text-amber-50 shadow-2xl shadow-black/80">
             <div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.20),transparent_45%),linear-gradient(180deg,rgba(41,37,36,0.94),rgba(12,10,9,1))] p-4 text-center">
-              <div className="text-[10px] uppercase tracking-[0.24em] text-amber-300/75">Start der Runde</div>
-              <div className="mt-1 font-serif text-2xl font-black text-amber-200">{needsMyPlayerSelection ? "Wer bist du?" : "Wen zählst du?"}</div>
-              <div className="mt-1 text-sm text-amber-100/70">
-                {needsMyPlayerSelection
-                  ? "Wähle zuerst deinen eigenen Spieler. Danach wählst du direkt, wen du in dieser Runde zählst."
-                  : `${displayedActiveRound?.round_name || "Diese Runde"} beginnt. Wähle deinen Gefährten für die Scorekarte.`}
+              <div className="text-[10px] uppercase tracking-[0.24em] text-amber-300/75">Dieses Handy</div>
+              <div className="mt-1 font-serif text-2xl font-black text-amber-200">Wer bist du?</div>
+              <div className="mt-1 text-sm text-amber-100/70">Wähle deinen eigenen Spieler. Diese Auswahl bleibt auf diesem Handy gespeichert.</div>
+              <div className="mt-4 grid gap-2">
+                {visiblePlayers.map((player) => (
+                  <button
+                    key={player.id}
+                    type="button"
+                    onClick={() => {
+                      setMyPlayerId(player.id);
+                      setScoreEntryMode("player");
+                    }}
+                    className="rounded-2xl border border-amber-700/35 bg-stone-900 px-3 py-3 font-serif text-base font-bold text-amber-100 transition active:scale-[0.98]"
+                  >
+                    {getPlayerLabel(player)}
+                  </button>
+                ))}
               </div>
-              {needsMyPlayerSelection ? (
-                <div className="mt-4 grid gap-2">
-                  {visiblePlayers.map((player) => (
-                    <button
-                      key={player.id}
-                      type="button"
-                      onClick={() => {
-                        setMyPlayerId(player.id);
-                        setScoredPlayerId("");
-                        setScoreEntryMode("player");
-                        setRoundScorerPromptOpen(true);
-                      }}
-                      className="rounded-2xl border border-amber-700/35 bg-stone-900 px-3 py-3 font-serif text-base font-bold text-amber-100 transition active:scale-[0.98]"
-                    >
-                      {getPlayerLabel(player)}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="mt-4 grid gap-2">
-                  {scoreablePlayers.map((player) => (
-                    <button
-                      key={player.id}
-                      type="button"
-                      onClick={() => {
-                        setScoredPlayerId(player.id);
-                        saveScorerAssignmentForRound(displayedActiveRound?.round_id || "", player.id);
-                        setRoundScorerPromptOpen(false);
-                        setScoreEntryMode("player");
-                        setActiveHole(getFirstUnscoredHole(scores, displayedActiveRound?.round_id || "", player.id, 1, myPlayerId));
-                      }}
-                      className="rounded-2xl border border-amber-700/35 bg-stone-900 px-3 py-3 font-serif text-base font-bold text-amber-100 transition active:scale-[0.98]"
-                    >
-                      {getPlayerLabel(player)}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         </div>
