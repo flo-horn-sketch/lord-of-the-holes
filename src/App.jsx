@@ -1024,7 +1024,7 @@ function LordOfTheHolesApp() {
 
   useEffect(() => {
     const roundId = String(displayedActiveRound?.round_id || "");
-    if (!roundId || !myPlayerId || !scoreablePlayers.length || showSplash || appLocked) return;
+    if (!roundId || !myPlayerId || !scoreablePlayers.length || showSplash || (appLocked && !lockAdminBypass)) return;
     const storedPlayerId = scoredPlayerByRound?.[roundId] || "";
     if (storedPlayerId && scoreablePlayers.some((player) => String(player.id) === String(storedPlayerId))) {
       if (String(scoredPlayerId) !== String(storedPlayerId)) setScoredPlayerId(storedPlayerId);
@@ -1033,7 +1033,7 @@ function LordOfTheHolesApp() {
     }
     setScoredPlayerId("");
     setRoundScorerPromptOpen(true);
-  }, [displayedActiveRound?.round_id, myPlayerId, scoreablePlayers, scoredPlayerByRound, scoredPlayerId, showSplash, appLocked]);
+  }, [displayedActiveRound?.round_id, myPlayerId, scoreablePlayers, scoredPlayerByRound, scoredPlayerId, showSplash, appLocked, lockAdminBypass]);
 
   useEffect(() => { writeLocalJson("lordOfTheHoles.myPlayerId", myPlayerId); }, [myPlayerId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.appLocked", appLocked); }, [appLocked]);
@@ -1908,7 +1908,7 @@ function LordOfTheHolesApp() {
       {setupSavedMessage ? <div className="fixed inset-x-3 top-4 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/50 bg-emerald-950/95 p-3 text-emerald-50 shadow-2xl shadow-black/60 backdrop-blur"><div className="flex items-start justify-between gap-2"><div><div className="font-serif text-lg text-emerald-100">Gespeichert</div><div className="mt-0.5 text-sm text-emerald-100/85">{setupSavedMessage}</div></div><button type="button" onClick={() => setSetupSavedMessage("")} className="rounded-xl border border-emerald-400/40 bg-black/25 px-3 py-1 text-sm font-bold text-emerald-50">×</button></div></div> : null}
       {backupSavedMessage ? <div className="fixed inset-x-3 top-4 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/50 bg-emerald-950/95 p-3 text-emerald-50 shadow-2xl shadow-black/60 backdrop-blur"><div className="flex items-start justify-between gap-2"><div><div className="font-serif text-lg text-emerald-100">Backup erstellt</div><div className="mt-0.5 text-sm text-emerald-100/85">{backupSavedMessage}</div></div><button type="button" onClick={() => setBackupSavedMessage("")} className="rounded-xl border border-emerald-400/40 bg-black/25 px-3 py-1 text-sm font-bold text-emerald-50">×</button></div></div> : null}
       {renderPopupStandingsTable()}
-      {((!myPlayerId || roundScorerPromptOpen) && !showSplash && !appLocked) ? (
+      {((!myPlayerId || roundScorerPromptOpen) && !showSplash && (!appLocked || lockAdminBypass)) ? (
         <div className="fixed inset-0 z-[94] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
           <div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-500/45 bg-stone-950 text-amber-50 shadow-2xl shadow-black/80">
             <div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.20),transparent_45%),linear-gradient(180deg,rgba(41,37,36,0.94),rgba(12,10,9,1))] p-4 text-center">
