@@ -898,7 +898,7 @@ function LordOfTheHolesApp() {
     if (isScorerEntryMode) return String(s.player_id) === String(entryPlayerId) && isScorerControlScore(s);
     return String(s.player_id) === String(entryPlayerId) && !isScorerControlScore(s);
   }) || { strokes: "", picked_up: false, over_two_putts: false, putts_count: "", lady: false }, [scores, entryPlayerId, activeHole, displayedActiveRound?.round_id, isScorerEntryMode]);
-  const canEnterScores = Boolean(myPlayerId && entryPlayerId && entryPlayer);
+  const canEnterScores = Boolean(displayedActiveRound?.round_id && entryPlayerId && entryPlayer && Number(activeHole) > 0);
   const hasCurrentScore = currentScore.strokes !== "" && currentScore.strokes != null;
   const hasCurrentPutts = currentScore.putts_count !== "" && currentScore.putts_count != null;
   const officialScoreForActiveHole = useMemo(() => findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", scoredPlayerId, activeHole, false), [scores, displayedActiveRound?.round_id, scoredPlayerId, activeHole]);
@@ -1170,7 +1170,13 @@ function LordOfTheHolesApp() {
   }
 
   function optimisticUpdate(patch) {
-    const next = normalizeScoreRecord({ round_id: displayedActiveRound?.round_id || "r1", player_id: entryPlayerId, hole_number: activeHole, strokes: currentScore.strokes ?? "", picked_up: normalizeBoolean(currentScore.picked_up), over_two_putts: normalizeBoolean(currentScore.over_two_putts), putts_count: currentScore.putts_count ?? "", lady: normalizeBoolean(currentScore.lady), scorer_player_id: isScorerEntryMode ? entryPlayerId : myPlayerId || "", updated_at: new Date().toISOString(), ...patch });
+    const safeRoundId = String(displayedActiveRound?.round_id || "").trim();
+    const safePlayerId = String(entryPlayerId || "").trim();
+    const safeHoleNumber = Number(activeHole || 0);
+    if (!safeRoundId || !safePlayerId || !safeHoleNumber) {
+      throw new Error("Score kann noch nicht gespeichert werden: Runde, Spieler oder Loch fehlt.");
+    }
+    const next = normalizeScoreRecord({ round_id: safeRoundId, player_id: safePlayerId, hole_number: safeHoleNumber, strokes: currentScore.strokes ?? "", picked_up: normalizeBoolean(currentScore.picked_up), over_two_putts: normalizeBoolean(currentScore.over_two_putts), putts_count: currentScore.putts_count ?? "", lady: normalizeBoolean(currentScore.lady), scorer_player_id: isScorerEntryMode ? entryPlayerId : myPlayerId || "", updated_at: new Date().toISOString(), ...patch });
     const sameScore = (score) => String(score.round_id) === String(next.round_id) && String(score.player_id) === String(next.player_id) && Number(score.hole_number) === Number(next.hole_number) && isScorerControlScore(score) === isScorerControlScore(next);
     const updateList = (current) => current.some(sameScore) ? current.map((s) => sameScore(s) ? next : s) : [...current, next];
     setScores(updateList);
@@ -1217,11 +1223,17 @@ function LordOfTheHolesApp() {
 
   async function saveScore(patch) {
     if (!canEnterScores) {
-      setScoreHintMessage("Erst Spieler und Zähler auswählen.");
+      setScoreHintMessage("Erst Runde, Spieler und Zähler auswählen.");
       window.setTimeout(() => setScoreHintMessage(""), 1800);
       return;
     }
-    const next = optimisticUpdate(patch);
+    let next;
+    try {
+      next = optimisticUpdate(patch);
+    } catch (err) {
+      setError(err.message || "Score kann noch nicht gespeichert werden.");
+      return;
+    }
     addPendingScore(next);
     setSaving(true);
     try { await callSheetApi({ action: "upsertScore", score: next }); removePendingScore(next); setConnectionStatus("online"); setError(""); }
