@@ -1401,7 +1401,7 @@ function LordOfTheHolesApp() {
               <div className="mb-2 rounded-xl border border-amber-700/30 bg-black/20 p-1.5 text-[10px] text-amber-100/75">Unter Einstellungen kannst du festlegen, wer du bist.</div>
             )}
 
-            <div className={cls("rounded-3xl border bg-[linear-gradient(180deg,rgba(48,35,22,0.72),rgba(12,10,9,0.7))] p-3 shadow-[inset_0_1px_0_rgba(251,191,36,0.10),0_18px_44px_rgba(0,0,0,0.34)]", hasScoreMismatch ? "border-red-500/70 ring-1 ring-red-500/40" : "border-amber-700/40")}>
+            <div className={cls("rounded-3xl bg-[linear-gradient(180deg,rgba(48,35,22,0.46),rgba(12,10,9,0.44))] p-2.5 shadow-[inset_0_1px_0_rgba(251,191,36,0.08),0_14px_34px_rgba(0,0,0,0.26)] backdrop-blur-[2px]", hasScoreMismatch ? "ring-1 ring-red-500/45" : "")}>
               {myCurrentPlayer ? (
                 <div className="mb-3 grid grid-cols-2 gap-2 rounded-2xl border border-amber-700/30 bg-black/25 p-1.5">
                   <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/60")}>
