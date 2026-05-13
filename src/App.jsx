@@ -1406,10 +1406,10 @@ function LordOfTheHolesApp() {
               {myCurrentPlayer ? (
                 <div className="mb-2 grid grid-cols-2 gap-2">
                   <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-2xl px-2 py-3 text-base font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "bg-stone-800 text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/60")}>
-                    {getPlayerLabel(scoredPlayer) || "Spieler"} {hasSelectedPlayerScoreMismatch ? "⚠" : ""}
+                    <span className="font-serif">{getPlayerLabel(scoredPlayer) || "Spieler"}</span> {hasSelectedPlayerScoreMismatch ? "⚠" : ""}
                   </button>
                   <button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl px-2 py-1.5 text-xs font-bold", isScorerEntryMode ? "bg-amber-600 text-amber-50" : "bg-stone-800 text-amber-100", hasOwnScoreMismatch && "ring-1 ring-red-400/60")}>
-                    Mein Score {hasOwnScoreMismatch ? "⚠" : ""}
+                    <span className="font-serif">Mein Score</span> {hasOwnScoreMismatch ? "⚠" : ""}
                   </button>
                 </div>
               ) : null}
