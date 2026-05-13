@@ -1040,6 +1040,14 @@ function LordOfTheHolesApp() {
   const currentAssignedScoredPlayerIsValid = Boolean(
     currentAssignedScoredPlayerId && scoreablePlayers.some((player) => String(player.id) === String(currentAssignedScoredPlayerId))
   );
+
+  useEffect(() => {
+    if (!identityRoundId || !myPlayerId || showSplash || (appLocked && !lockAdminBypass)) return;
+    if (currentAssignedScoredPlayerIsValid && String(scoredPlayerId || "") !== String(currentAssignedScoredPlayerId)) {
+      setScoredPlayerId(currentAssignedScoredPlayerId);
+      setRoundScorerPromptOpen(false);
+    }
+  }, [identityRoundId, myPlayerId, currentAssignedScoredPlayerId, currentAssignedScoredPlayerIsValid, scoredPlayerId, showSplash, appLocked, lockAdminBypass]);
   const identityFlowActive = !showSplash && (!appLocked || lockAdminBypass);
   const needsMyPlayerSelection = Boolean(identityFlowActive && !myPlayerId);
   const needsScoredPlayerSelection = false;
@@ -1573,12 +1581,21 @@ function LordOfTheHolesApp() {
             <p className="mt-1 text-sm text-amber-100/65">Diese Einstellung wird nur lokal auf diesem Handy gespeichert.</p>
 
             <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
-              <label className="mb-1 block text-sm text-amber-100/80">Wer bin ich auf diesem Handy?</label>
+              <label className="mb-1 block text-sm text-amber-100/80">Zähler auf diesem Gerät</label>
               <select
                 value={myPlayerId}
                 onChange={(e) => {
-                  setMyPlayerId(e.target.value);
+                  const nextMyPlayerId = e.target.value;
+                  setMyPlayerId(nextMyPlayerId);
                   setScoreEntryMode("player");
+                  if (displayedActiveRound?.round_id && nextMyPlayerId && String(scoredPlayerId) === String(nextMyPlayerId)) {
+                    setScoredPlayerId("");
+                    setScoredPlayerByRound((current) => {
+                      const next = { ...(current || {}) };
+                      delete next[displayedActiveRound.round_id];
+                      return next;
+                    });
+                  }
                 }}
                 className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50"
               >
@@ -1587,17 +1604,27 @@ function LordOfTheHolesApp() {
                   <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>
                 ))}
               </select>
-              <p className="mt-2 text-xs text-amber-100/60">Dieser Spieler wird auf diesem Handy beim Score-Zählen ausgeblendet, damit man sich nicht selbst zählt.</p>
+              <p className="mt-2 text-xs text-amber-100/60">Diese Auswahl gilt grundsätzlich nur für dieses Gerät und bleibt auch bei Rundenwechseln gespeichert.</p>
             </div>
 
             <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
-              <label className="mb-1 block text-sm text-amber-100/80">Wen zähle ich?</label>
+              <label className="mb-1 block text-sm text-amber-100/80">Spieler für die aktive Runde</label>
               <select
                 value={scoredPlayerId}
                 onChange={(e) => {
                   const nextPlayerId = e.target.value;
                   setScoredPlayerId(nextPlayerId);
-                  if (displayedActiveRound?.round_id && nextPlayerId) saveLocalScoredPlayerForRound(displayedActiveRound.round_id, nextPlayerId);
+                  if (displayedActiveRound?.round_id) {
+                    if (nextPlayerId) {
+                      saveLocalScoredPlayerForRound(displayedActiveRound.round_id, nextPlayerId);
+                    } else {
+                      setScoredPlayerByRound((current) => {
+                        const next = { ...(current || {}) };
+                        delete next[displayedActiveRound.round_id];
+                        return next;
+                      });
+                    }
+                  }
                 }}
                 className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50"
               >
@@ -1606,7 +1633,7 @@ function LordOfTheHolesApp() {
                   <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>
                 ))}
               </select>
-              <p className="mt-2 text-xs text-amber-100/60">Dieser Spieler ist im Score-Bereich vorausgewählt und wird pro Runde lokal gespeichert.</p>
+              <p className="mt-2 text-xs text-amber-100/60">Diese Auswahl gilt nur für die aktive Runde ({displayedActiveRound?.round_name || "aktuelle Runde"}) und wird lokal auf diesem Gerät gespeichert.</p>
             </div>
           </CardContent>
         </Card>
