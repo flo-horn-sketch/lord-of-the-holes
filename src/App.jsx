@@ -174,14 +174,13 @@ function getPlayerLabel(player) {
 
 function getCourseSettings(id, list = fallbackCourses) {
   const cid = String(id || "goethe").toLowerCase().trim();
-  const fallbackCourse = cid === "feininger" ? fallbackCourses[1] : fallbackCourses[0];
+  const officialCourse = cid === "feininger"
+    ? { course_id: "feininger", course_name: "Feininger Kurs", course_rating: 70.4, slope_rating: 122, par: 71 }
+    : { course_id: "goethe", course_name: "Goethe Kurs", course_rating: 72.0, slope_rating: 131, par: 72 };
   const sheetCourse = (list || []).find((item) => String(item?.course_id || "").toLowerCase().trim() === cid);
   return {
-    ...fallbackCourse,
     ...sheetCourse,
-    course_rating: Number(sheetCourse?.course_rating || sheetCourse?.rating || sheetCourse?.cr || fallbackCourse.course_rating),
-    slope_rating: Number(sheetCourse?.slope_rating || sheetCourse?.slope || sheetCourse?.sr || fallbackCourse.slope_rating),
-    par: Number(sheetCourse?.par || fallbackCourse.par),
+    ...officialCourse,
   };
 }
 
