@@ -48,7 +48,7 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
-const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbxZl-ZH5c4rYeDaOyoIw1RdqVdeE0fEfmERIEGwlJVs4GNT5cLh-BiIo_KmAvpPUWZ6/exec";
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbySHbh5V_FZTo4rCzEewajlM7Nvcg2_TG14RhIcR3GJWOqW4-eo6nEnYFHW31xyKQ0K/exec";
 const ADMIN_PASSWORD = "weimar";
 const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T11:00:00+02:00");
 
@@ -1363,7 +1363,7 @@ function LordOfTheHolesApp() {
     setSetupSavedMessage("");
     setError("");
     try {
-      const result = await callSheetApi({ action: "fullReset" });
+      const result = await callSheetApi({ action: "clearResetMarkersAndFullReset" });
       const resetAt = String(result?.full_reset_at || result?.fullResetAt || new Date().toISOString());
       const emptyScores = [];
       setScores(emptyScores);
@@ -1584,7 +1584,7 @@ function LordOfTheHolesApp() {
             <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={() => { setClearScoresError(""); setClearScoresConfirmOpen(true); }} className="mt-2 w-full rounded-2xl border border-red-500/50 bg-red-950/60 py-2 text-red-100 disabled:opacity-50">Scores löschen</Button>
             <Button disabled={!isAdminUnlocked || connectionStatus !== "online"} onClick={resetDeviceAssignmentsForAll} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">Spieler-/Zähler-Zuordnungen zurücksetzen</Button>
             <Button disabled={!isAdminUnlocked} onClick={clearLocalCache} className="mt-2 w-full rounded-2xl border border-sky-500/40 bg-sky-950/60 py-2 text-sky-100 disabled:opacity-50">Lokalen Cache dieses Geräts löschen</Button>
-            <Button disabled={!isAdminUnlocked || connectionStatus !== "online"} onClick={fullResetForAllDevices} className="mt-2 w-full rounded-2xl border border-red-400/60 bg-red-950/80 py-2 text-red-100 disabled:opacity-50">Komplett-Reset für alle Geräte</Button>
+            <Button disabled={!isAdminUnlocked || connectionStatus !== "online"} onClick={fullResetForAllDevices} className="mt-2 w-full rounded-2xl border border-red-400/60 bg-red-950/80 py-2 text-red-100 disabled:opacity-50">Script-Cache löschen + Komplett-Reset für alle</Button>
           </CardContent>
         </Card>
       </motion.section>
