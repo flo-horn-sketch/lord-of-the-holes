@@ -1281,32 +1281,7 @@ function LordOfTheHolesApp() {
 
   async function clearScoresAndDeviceAssignments() {
     await clearAllScores();
-    let resetAt = new Date().toISOString();
-    try {
-      const result = await callSheetApi({ action: "resetDeviceAssignments" });
-      resetAt = String(result?.device_assignments_reset_at || result?.deviceAssignmentsResetAt || resetAt);
-      setConnectionStatus("online");
-    } catch (err) {
-      setConnectionStatus("offline");
-      setError(err.message || "Scores gelöscht, aber Geräte-Zuordnung konnte nicht global zurückgesetzt werden.");
-    }
-    setDeviceAssignmentsResetAt(resetAt);
-    setMyPlayerId("");
-    setScoredPlayerId("");
-    setScoredPlayerByRound({});
-    setScoreEntryMode("player");
-    setRoundScorerPromptOpen(false);
-    setRoundSummaryDismissedKeys([]);
-    setWinnerPopupDismissedKey("");
-    setRoundHonorDismissedKeys([]);
-    writeLocalJson("lordOfTheHoles.myPlayerId", "");
-    writeLocalJson("lordOfTheHoles.scoredPlayerId", "");
-    writeLocalJson("lordOfTheHoles.scoredPlayerByRound", {});
-    writeLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", resetAt);
-    writeLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", []);
-    writeLocalJson("lordOfTheHoles.winnerPopupDismissedKey", "");
-    writeLocalJson("lordOfTheHoles.roundHonorDismissedKeys", []);
-    setSetupSavedMessage("Scores wurden gelöscht. Wer bin ich / Wen zähle ich wurde für alle Geräte zurückgesetzt.");
+    setSetupSavedMessage("Scores wurden gelöscht. Backups bleiben erhalten.");
   }
 
   async function resetDeviceAssignmentsForAll() {
@@ -1437,8 +1412,8 @@ function LordOfTheHolesApp() {
     if (!data) return;
     setLockAdminBypass(true);
     setIsAdminUnlocked(true);
-    setMainMenu("admin");
-    setView("admin");
+    setMainMenu("current");
+    setView("score");
     setShowSplash(false);
     setLockUnlockOpen(false);
     setLockPasswordInput("");
@@ -1530,7 +1505,8 @@ function LordOfTheHolesApp() {
             <Button disabled={!isAdminUnlocked || backupSaving} onClick={createRoundBackup} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-700/80 py-2 text-emerald-50 disabled:opacity-50">{backupSaving ? "Erstelle Backup ..." : "Backup für aktive Runde erstellen"}</Button>
             {appLocked ? <Button disabled={!isAdminUnlocked} onClick={() => { setGlobalAppLock(false); setLockAdminBypass(false); }} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-800/70 py-2 text-emerald-50 disabled:opacity-50">App für alle freigeben</Button> : <Button disabled={!isAdminUnlocked} onClick={() => { setMenuOpen(false); setLockAdminBypass(false); setGlobalAppLock(true); }} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">App für alle sperren</Button>}
             <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={() => { setClearScoresError(""); setClearScoresConfirmOpen(true); }} className="mt-2 w-full rounded-2xl border border-red-500/50 bg-red-950/60 py-2 text-red-100 disabled:opacity-50">Scores löschen</Button>
-            <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={clearScoresAndDeviceAssignments} className="mt-2 w-full rounded-2xl border border-red-400/50 bg-red-950/80 py-2 text-red-100 disabled:opacity-50">Scores + alle Spieler-/Zähler-Zuordnungen zurücksetzen</Button>
+            <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={() => { setClearScoresError(""); setClearScoresConfirmOpen(true); }} className="mt-2 w-full rounded-2xl border border-red-500/50 bg-red-950/60 py-2 text-red-100 disabled:opacity-50">Scores löschen</Button>
+            <Button disabled={!isAdminUnlocked || connectionStatus !== "online"} onClick={resetDeviceAssignmentsForAll} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">Spieler-/Zähler-Zuordnungen zurücksetzen</Button>
           </CardContent>
         </Card>
       </motion.section>
