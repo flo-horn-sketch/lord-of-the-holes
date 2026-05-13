@@ -654,12 +654,13 @@ function triggerSoftVibration() {
   } catch {}
 }
 
-function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", status = "", defaultValue = null, onChange, formatValue }) {
+function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", status = "", defaultValue = null, disabled = false, onChange, formatValue }) {
   const hasValue = value !== "" && value != null;
   const fallbackValue = defaultValue == null ? min : Number(defaultValue);
   const baseValue = Math.max(min, Math.min(max, Number(hasValue ? value : fallbackValue)));
   const shownValue = hasValue || defaultValue != null ? (formatValue ? formatValue(baseValue) : baseValue) : emptyLabel;
   const setValue = (nextValue) => {
+    if (disabled) return;
     triggerSoftVibration();
     onChange(Math.max(min, Math.min(max, Number(nextValue || 0))));
   };
@@ -670,29 +671,29 @@ function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", sta
         {status ? <div className="rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold text-amber-100/75">{status}</div> : null}
       </div>
       <div className="grid grid-cols-[82px_1fr_82px] items-center gap-2.5">
-        <button type="button" onClick={() => setValue(baseValue - 1)} disabled={baseValue <= min} className="h-[84px] rounded-2xl border border-amber-500/45 bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.16),rgba(12,10,9,0.96)_58%)] text-4xl font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.16),0_8px_22px_rgba(0,0,0,0.38)] transition active:scale-[0.97] disabled:opacity-35">−</button>
-        <button type="button" onClick={() => setValue(baseValue)} className="h-[84px] rounded-2xl border border-amber-400/35 bg-[radial-gradient(circle_at_50%_0%,rgba(251,191,36,0.22),rgba(28,25,23,0.86)_48%,rgba(12,10,9,0.96)_100%)] text-center shadow-[inset_0_0_28px_rgba(251,191,36,0.08),0_10px_26px_rgba(0,0,0,0.42)] ring-1 ring-amber-300/10 transition active:scale-[0.985]">
+        <button type="button" onClick={() => setValue(baseValue - 1)} disabled={disabled || baseValue <= min} className="h-[84px] rounded-2xl border border-amber-500/45 bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.16),rgba(12,10,9,0.96)_58%)] text-4xl font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.16),0_8px_22px_rgba(0,0,0,0.38)] transition active:scale-[0.97] disabled:opacity-35">−</button>
+        <button type="button" disabled={disabled} onClick={() => setValue(baseValue)} className="h-[84px] rounded-2xl border border-amber-400/35 bg-[radial-gradient(circle_at_50%_0%,rgba(251,191,36,0.22),rgba(28,25,23,0.86)_48%,rgba(12,10,9,0.96)_100%)] text-center shadow-[inset_0_0_28px_rgba(251,191,36,0.08),0_10px_26px_rgba(0,0,0,0.42)] ring-1 ring-amber-300/10 transition active:scale-[0.985]">
           <div className="font-serif text-[3.95rem] font-black leading-none text-amber-200 drop-shadow-[0_0_14px_rgba(251,191,36,0.18)]">{shownValue}</div>
           <div className="text-[9px] uppercase tracking-[0.16em] text-amber-100/50">{!hasValue && defaultValue != null ? "tippen" : label}</div>
         </button>
-        <button type="button" onClick={() => setValue(baseValue + 1)} disabled={baseValue >= max} className="h-[84px] rounded-2xl border border-amber-500/45 bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.16),rgba(12,10,9,0.96)_58%)] text-4xl font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.16),0_8px_22px_rgba(0,0,0,0.38)] transition active:scale-[0.97] disabled:opacity-35">+</button>
+        <button type="button" onClick={() => setValue(baseValue + 1)} disabled={disabled || baseValue >= max} className="h-[84px] rounded-2xl border border-amber-500/45 bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.16),rgba(12,10,9,0.96)_58%)] text-4xl font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.16),0_8px_22px_rgba(0,0,0,0.38)] transition active:scale-[0.97] disabled:opacity-35">+</button>
       </div>
     </div>
   );
 }
 
-function PuttStepper({ value, onChange }) {
+function PuttStepper({ value, disabled = false, onChange }) {
   const hasValue = value !== "" && value != null;
   const selected = hasValue ? Number(value || 0) : 2;
   const snakeLabel = selected >= 4 ? "4+ · 4 €" : selected === 3 ? "3 · 2 €" : "keine Snake";
-  return <TouchStepper label="Putts" value={value === 0 ? 0 : value || ""} min={0} max={6} emptyLabel="2" defaultValue={2} status={snakeLabel} onChange={onChange} />;
+  return <TouchStepper label="Putts" value={value === 0 ? 0 : value || ""} min={0} max={6} emptyLabel="2" defaultValue={2} status={snakeLabel} disabled={disabled} onChange={onChange} />;
 }
 
-function ScoreStepper({ value, par, pickedUpStrokes, onChange }) {
+function ScoreStepper({ value, par, pickedUpStrokes, disabled = false, onChange }) {
   const displayScore = value === "" || value == null ? Number(par || 4) : value;
   const isPickedValue = Number(displayScore) === 0 || Number(displayScore) >= Number(pickedUpStrokes || 0);
   const effectiveStatus = value === "" || value == null ? "" : isPickedValue ? `X · gewertet ${pickedUpStrokes}` : getScoreRelationLabel(displayScore, par);
-  return <TouchStepper label="Score" value={value} min={0} max={30} emptyLabel={String(par || 4)} defaultValue={Number(par || 4)} status={effectiveStatus} formatValue={(nextValue) => (Number(nextValue) === 0 ? "X" : nextValue)} onChange={onChange} />;
+  return <TouchStepper label="Score" value={value} min={0} max={30} emptyLabel={String(par || 4)} defaultValue={Number(par || 4)} status={effectiveStatus} disabled={disabled} formatValue={(nextValue) => (Number(nextValue) === 0 ? "X" : nextValue)} onChange={onChange} />;
 }
 
 function LeaderboardTable({ title, players, columns }) {
@@ -897,6 +898,7 @@ function LordOfTheHolesApp() {
     if (isScorerEntryMode) return String(s.player_id) === String(entryPlayerId) && isScorerControlScore(s);
     return String(s.player_id) === String(entryPlayerId) && !isScorerControlScore(s);
   }) || { strokes: "", picked_up: false, over_two_putts: false, putts_count: "", lady: false }, [scores, entryPlayerId, activeHole, displayedActiveRound?.round_id, isScorerEntryMode]);
+  const canEnterScores = Boolean(myPlayerId && entryPlayerId && entryPlayer);
   const hasCurrentScore = currentScore.strokes !== "" && currentScore.strokes != null;
   const hasCurrentPutts = currentScore.putts_count !== "" && currentScore.putts_count != null;
   const officialScoreForActiveHole = useMemo(() => findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", scoredPlayerId, activeHole, false), [scores, displayedActiveRound?.round_id, scoredPlayerId, activeHole]);
@@ -1120,7 +1122,8 @@ function LordOfTheHolesApp() {
         if (nextAppLocked && !lockAdminBypass) setShowSplash(true);
       }
       const nextDeviceAssignmentsResetAt = String(data.device_assignments_reset_at || data.deviceAssignmentsResetAt || "");
-      if (nextDeviceAssignmentsResetAt && nextDeviceAssignmentsResetAt !== deviceAssignmentsResetAt) {
+      const localDeviceAssignmentsResetAt = String(readLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", "") || "");
+      if (nextDeviceAssignmentsResetAt && nextDeviceAssignmentsResetAt !== localDeviceAssignmentsResetAt) {
         setMyPlayerId("");
         setScoredPlayerId("");
         setScoredPlayerByRound({});
@@ -1129,6 +1132,9 @@ function LordOfTheHolesApp() {
         writeLocalJson("lordOfTheHoles.myPlayerId", "");
         writeLocalJson("lordOfTheHoles.scoredPlayerId", "");
         writeLocalJson("lordOfTheHoles.scoredPlayerByRound", {});
+        writeLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", nextDeviceAssignmentsResetAt);
+        setDeviceAssignmentsResetAt(nextDeviceAssignmentsResetAt);
+      } else if (nextDeviceAssignmentsResetAt && nextDeviceAssignmentsResetAt !== deviceAssignmentsResetAt) {
         setDeviceAssignmentsResetAt(nextDeviceAssignmentsResetAt);
       }
       const nextAllPlayers = (data.players?.length ? data.players : fallbackPlayers).map(withFallbackAlias);
@@ -1210,6 +1216,11 @@ function LordOfTheHolesApp() {
   }
 
   async function saveScore(patch) {
+    if (!canEnterScores) {
+      setScoreHintMessage("Erst Spieler und Zähler auswählen.");
+      window.setTimeout(() => setScoreHintMessage(""), 1800);
+      return;
+    }
     const next = optimisticUpdate(patch);
     addPendingScore(next);
     setSaving(true);
@@ -1606,6 +1617,7 @@ function LordOfTheHolesApp() {
                   value={normalizeBoolean(currentScore.picked_up) ? 0 : currentScore.strokes ?? ""}
                   par={activeHoleData?.par || 4}
                   pickedUpStrokes={pickedUpStrokes}
+                  disabled={!canEnterScores}
                   onChange={(scoreValue) =>
                     Number(scoreValue) === 0 || Number(scoreValue) >= Number(pickedUpStrokes || 0)
                       ? saveScore({ strokes: pickedUpStrokes, picked_up: true })
@@ -1615,7 +1627,7 @@ function LordOfTheHolesApp() {
               </div>
 
               <div className="mb-3">
-                <PuttStepper value={currentScore.putts_count} onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })} />
+                <PuttStepper value={currentScore.putts_count} disabled={!canEnterScores} onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })} />
               </div>
 
               <div className="mb-3 rounded-2xl border border-amber-700/40 bg-black/25 p-2">
@@ -1624,7 +1636,7 @@ function LordOfTheHolesApp() {
                     <div className="text-xs font-semibold text-amber-100">Lady</div>
                     <div className="text-[10px] text-amber-100/65">Markiert eine Lady.</div>
                   </div>
-                  <input type="checkbox" checked={normalizeBoolean(currentScore.lady)} onChange={(e) => saveScore({ lady: e.target.checked })} className="h-6 w-6 accent-amber-500" />
+                  <input type="checkbox" disabled={!canEnterScores} checked={normalizeBoolean(currentScore.lady)} onChange={(e) => saveScore({ lady: e.target.checked })} className="h-6 w-6 accent-amber-500 disabled:opacity-40" />
                 </div>
               </div>
 
@@ -1632,7 +1644,7 @@ function LordOfTheHolesApp() {
 
               <div className="grid grid-cols-2 gap-2">
                 <Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 py-3 text-base font-bold text-amber-100">Zurück</Button>
-                <Button disabled={activeHole === 18} onClick={goToNextHole} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>Loch {Math.min(18, Number(activeHole || 1) + 1)}</Button>
+                <Button disabled={activeHole === 18 || !canEnterScores} onClick={goToNextHole} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>Loch {Math.min(18, Number(activeHole || 1) + 1)}</Button>
               </div>
             </div>
           </CardContent>
