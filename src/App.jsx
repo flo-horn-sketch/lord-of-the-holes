@@ -1158,14 +1158,14 @@ function LordOfTheHolesApp() {
       setRounds(nextRounds);
       setRoundPlayers(data.roundPlayers || []);
       setActiveRound(nextActiveRound);
-      if (!adminEditing) {
-        const previousRoundId = selectedActiveRoundId;
-        const nextRoundId = nextActiveRound?.round_id || fallbackRounds[0].round_id;
-        setSelectedCourseId(nextActiveRound?.course_id || "");
-        setSelectedActiveRoundId(nextRoundId);
-        if (String(previousRoundId || "") !== String(nextRoundId || "")) {
-          window.setTimeout(() => prepareScorerPromptForRound(nextRoundId), 0);
-        }
+      const previousRoundId = selectedActiveRoundId;
+      const nextRoundId = nextActiveRound?.round_id || fallbackRounds[0].round_id;
+      setSelectedCourseId(nextActiveRound?.course_id || "");
+      setSelectedActiveRoundId(nextRoundId);
+      if (String(previousRoundId || "") !== String(nextRoundId || "")) {
+        setScoredPlayerId("");
+        setScoreEntryMode("player");
+        window.setTimeout(() => prepareScorerPromptForRound(nextRoundId), 0);
       }
       applyPlayers(nextActivePlayers, nextAllPlayers, nextCourses);
       setHoles(normalizeHoles(data.activeHoles?.length ? data.activeHoles : data.holes).filter((hole) => !nextActiveRound?.course_id || String(hole.course_id) === String(nextActiveRound.course_id)));
