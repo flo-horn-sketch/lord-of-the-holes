@@ -48,7 +48,7 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
-const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbx-u4AbUuNBQcgRN0auYkNx41-Gudhu5T0_odRw83JJtZOT_QbrGFW2ynoU-lLe7e8/exec";
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbyamITQ2Nj7h9woLyZ2inRlRpBbZYxL6ZVOPn5HEQ1LdPLREqEu2jNzAnYphCsHsS7N/exec";
 const ADMIN_PASSWORD = "weimar";
 const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T11:00:00+02:00");
 
@@ -829,6 +829,7 @@ function LordOfTheHolesApp() {
   const [courses, setCourses] = useState(cachedState?.courses?.length ? cachedState.courses : fallbackCourses);
   const [rounds, setRounds] = useState(cachedState?.rounds?.length ? cachedState.rounds : fallbackRounds);
   const [roundPlayers, setRoundPlayers] = useState(cachedState?.roundPlayers || []);
+  const [scorerAssignments, setScorerAssignments] = useState(cachedState?.scorerAssignments || []);
   const [activeRound, setActiveRound] = useState(cachedState?.activeRound || null);
   const [holes, setHoles] = useState(cachedState?.holes?.length ? cachedState.holes : fallbackHoles.filter((h) => h.course_id === "goethe"));
   const [allHoles, setAllHoles] = useState(cachedState?.allHoles?.length ? cachedState.allHoles : fallbackHoles);
@@ -1039,7 +1040,8 @@ function LordOfTheHolesApp() {
     const roundId = String(displayedActiveRound?.round_id || "");
     if (!roundId || !myPlayerId || !scoreablePlayers.length || showSplash || (appLocked && !lockAdminBypass)) return;
 
-    const storedPlayerId = scoredPlayerByRound?.[roundId] || "";
+    const assignment = getScorerAssignmentForRound(roundId, myPlayerId);
+    const storedPlayerId = String(assignment?.scored_player_id || assignment?.scoredPlayerId || "");
     const storedPlayerIsValid = storedPlayerId && scoreablePlayers.some((player) => String(player.id) === String(storedPlayerId));
     const roundChanged = lastRoundForScorerPromptRef.current !== roundId;
 
@@ -1048,27 +1050,29 @@ function LordOfTheHolesApp() {
       setScoreEntryMode("player");
       if (storedPlayerIsValid) {
         setScoredPlayerId(storedPlayerId);
+        setForcedScorerPromptRoundId("");
         setRoundScorerPromptOpen(false);
       } else {
         setScoredPlayerId("");
+        setForcedScorerPromptRoundId(roundId);
         setRoundScorerPromptOpen(true);
       }
       return;
     }
 
-    if (storedPlayerIsValid) {
+    if (storedPlayerIsValid && !forcedScorerPromptRoundId) {
       if (String(scoredPlayerId) !== String(storedPlayerId)) setScoredPlayerId(storedPlayerId);
       setRoundScorerPromptOpen(false);
       return;
     }
 
-    if (!scoredPlayerId) {
+    if (!scoredPlayerId || forcedScorerPromptRoundId) {
       setRoundScorerPromptOpen(true);
       return;
     }
 
     setRoundScorerPromptOpen(false);
-  }, [displayedActiveRound?.round_id, myPlayerId, scoreablePlayers, scoredPlayerByRound, scoredPlayerId, showSplash, appLocked, lockAdminBypass]);
+  }, [displayedActiveRound?.round_id, myPlayerId, scoreablePlayers, scorerAssignments, scoredPlayerId, showSplash, appLocked, lockAdminBypass, forcedScorerPromptRoundId]);
 
   useEffect(() => { writeLocalJson("lordOfTheHoles.myPlayerId", myPlayerId); }, [myPlayerId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.appLocked", appLocked); }, [appLocked]);
@@ -1088,8 +1092,8 @@ function LordOfTheHolesApp() {
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", roundSummaryDismissedKeys); }, [roundSummaryDismissedKeys]);
   useEffect(() => { pendingScoresRef.current = pendingScores; writeLocalJson("lordOfTheHoles.pendingScores", pendingScores); }, [pendingScores]);
   useEffect(() => {
-    writeLocalJson("lordOfTheHoles.cachedState", { players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId, cachedAt: new Date().toISOString() });
-  }, [players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId]);
+    writeLocalJson("lordOfTheHoles.cachedState", { players, allPlayers, courses, rounds, roundPlayers, scorerAssignments, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId, cachedAt: new Date().toISOString() });
+  }, [players, allPlayers, courses, rounds, roundPlayers, scorerAssignments, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId]);
   useEffect(() => { introAudioRef.current = new Audio("/intro-sound.mp3"); introAudioRef.current.preload = "auto"; introAudioRef.current.loop = false; }, []);
   useEffect(() => { if (!autoSync) return undefined; loadData({ silent: true }); const timer = setInterval(() => loadData({ silent: true }), 30000); return () => clearInterval(timer); }, [autoSync]);
   useEffect(() => { if (!autoSync || !pendingScores.length) return undefined; const timer = setInterval(() => flushPendingScores(), 10000); return () => clearInterval(timer); }, [autoSync, pendingScores]);
@@ -1158,6 +1162,7 @@ function LordOfTheHolesApp() {
       setCourses(nextCourses);
       setRounds(nextRounds);
       setRoundPlayers(data.roundPlayers || []);
+      setScorerAssignments(data.scorerAssignments || data.scorer_assignments || []);
       setActiveRound(nextActiveRound);
       const previousRoundId = selectedActiveRoundId;
       const nextRoundId = nextActiveRound?.round_id || fallbackRounds[0].round_id;
@@ -1451,12 +1456,20 @@ function LordOfTheHolesApp() {
     setError("");
   }
 
+  function getScorerAssignmentForRound(roundId, scorerPlayerId) {
+    return (scorerAssignments || []).find((assignment) =>
+      String(assignment.round_id || "") === String(roundId || "") &&
+      String(assignment.scorer_player_id || assignment.scorerPlayerId || "") === String(scorerPlayerId || "")
+    ) || null;
+  }
+
   function prepareScorerPromptForRound(nextRoundId, forcePrompt = false) {
     const roundId = String(nextRoundId || "");
     if (!roundId) return;
     lastRoundForScorerPromptRef.current = roundId;
     setScoreEntryMode("player");
-    const storedPlayerId = scoredPlayerByRound?.[roundId] || "";
+    const assignment = getScorerAssignmentForRound(roundId, myPlayerId);
+    const storedPlayerId = String(assignment?.scored_player_id || assignment?.scoredPlayerId || "");
     const playersForRound = getRoundPlayers(roundId, allPlayers, roundPlayers);
     const availableForRound = myPlayerId ? playersForRound.filter((player) => String(player.id) !== String(myPlayerId)) : playersForRound;
     const validPlayers = availableForRound.length ? availableForRound : playersForRound;
@@ -1469,6 +1482,30 @@ function LordOfTheHolesApp() {
       setScoredPlayerId("");
       setForcedScorerPromptRoundId(roundId);
       if (myPlayerId && !showSplash && (!appLocked || lockAdminBypass)) setRoundScorerPromptOpen(true);
+    }
+  }
+
+  async function saveScorerAssignmentForRound(roundId, scoredPlayerIdValue) {
+    if (!roundId || !myPlayerId || !scoredPlayerIdValue) return false;
+    const nextAssignment = {
+      round_id: roundId,
+      scorer_player_id: myPlayerId,
+      scored_player_id: scoredPlayerIdValue,
+      updated_at: new Date().toISOString(),
+    };
+    setScorerAssignments((current) => [
+      ...(current || []).filter((assignment) => !(String(assignment.round_id || "") === String(roundId) && String(assignment.scorer_player_id || assignment.scorerPlayerId || "") === String(myPlayerId))),
+      nextAssignment,
+    ]);
+    try {
+      await callSheetApi({ action: "saveScorerAssignment", assignment: nextAssignment });
+      setConnectionStatus("online");
+      setError("");
+      return true;
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Zähler-Zuordnung konnte nicht gespeichert werden.");
+      return false;
     }
   }
 
@@ -2023,7 +2060,7 @@ function LordOfTheHolesApp() {
                       type="button"
                       onClick={() => {
                         setScoredPlayerId(player.id);
-                        setScoredPlayerByRound((current) => ({ ...(current || {}), [displayedActiveRound?.round_id || ""]: player.id }));
+                        saveScorerAssignmentForRound(displayedActiveRound?.round_id || "", player.id);
                         setForcedScorerPromptRoundId("");
                         setRoundScorerPromptOpen(false);
                         setScoreEntryMode("player");
