@@ -312,6 +312,15 @@ function getScoreTimestamp(score) {
   return Number.isNaN(time) ? 0 : time;
 }
 
+function isValidScorePayload(score) {
+  return Boolean(
+    score &&
+    String(score.round_id || "").trim() &&
+    String(score.player_id || "").trim() &&
+    Number(score.hole_number) > 0
+  );
+}
+
 function isNewerOrEqualScore(candidate, existing) {
   return getScoreTimestamp(candidate) >= getScoreTimestamp(existing);
 }
@@ -825,8 +834,8 @@ function LordOfTheHolesApp() {
   const [allHoles, setAllHoles] = useState(cachedState?.allHoles?.length ? cachedState.allHoles : fallbackHoles);
   const [scores, setScores] = useState(cachedState?.scores?.length ? cachedState.scores.map(normalizeScoreRecord) : []);
   const [allScores, setAllScores] = useState(cachedState?.allScores?.length ? cachedState.allScores.map(normalizeScoreRecord) : []);
-  const [pendingScores, setPendingScores] = useState(() => readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord));
-  const pendingScoresRef = useRef(readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord));
+  const [pendingScores, setPendingScores] = useState(() => readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord).filter(isValidScorePayload));
+  const pendingScoresRef = useRef(readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord).filter(isValidScorePayload));
   const lastRoundForScorerPromptRef = useRef("");
   const lastAutoHoleTargetRef = useRef("");
   const [localHandicaps, setLocalHandicaps] = useState({});
@@ -1129,9 +1138,12 @@ function LordOfTheHolesApp() {
         setScoredPlayerByRound({});
         setScoreEntryMode("player");
         setRoundScorerPromptOpen(false);
+        setPendingScores([]);
+        pendingScoresRef.current = [];
         writeLocalJson("lordOfTheHoles.myPlayerId", "");
         writeLocalJson("lordOfTheHoles.scoredPlayerId", "");
         writeLocalJson("lordOfTheHoles.scoredPlayerByRound", {});
+        writeLocalJson("lordOfTheHoles.pendingScores", []);
         writeLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", nextDeviceAssignmentsResetAt);
         setDeviceAssignmentsResetAt(nextDeviceAssignmentsResetAt);
       } else if (nextDeviceAssignmentsResetAt && nextDeviceAssignmentsResetAt !== deviceAssignmentsResetAt) {
@@ -1185,6 +1197,7 @@ function LordOfTheHolesApp() {
   }
 
   function addPendingScore(score) {
+    if (!isValidScorePayload(score)) return;
     setPendingScores((current) => {
       const key = getScoreIdentityKey(score);
       const nextPendingScores = [...current.filter((item) => getScoreIdentityKey(item) !== key), normalizeScoreRecord(score)];
@@ -1206,12 +1219,18 @@ function LordOfTheHolesApp() {
   }
 
   async function savePendingScore(score) {
+    if (!isValidScorePayload(score)) { removePendingScore(score); return true; }
     try { await callSheetApi({ action: "upsertScore", score }); removePendingScore(score); setConnectionStatus("online"); setError(""); return true; }
     catch (err) { setConnectionStatus("offline"); setError(err.message || "Score ist lokal gesichert und wird später synchronisiert."); return false; }
   }
 
   async function flushPendingScores() {
-    const livePendingScores = [...pendingScoresRef.current];
+    const livePendingScores = [...pendingScoresRef.current].filter(isValidScorePayload);
+    if (livePendingScores.length !== pendingScoresRef.current.length) {
+      pendingScoresRef.current = livePendingScores;
+      setPendingScores(livePendingScores);
+      writeLocalJson("lordOfTheHoles.pendingScores", livePendingScores);
+    }
     if (!livePendingScores.length) return true;
     let allSaved = true;
     for (const pendingScore of livePendingScores) {
@@ -1295,13 +1314,16 @@ function LordOfTheHolesApp() {
       setScoredPlayerByRound({});
       setScoreEntryMode("player");
       setRoundScorerPromptOpen(false);
+      setPendingScores([]);
+      pendingScoresRef.current = [];
       writeLocalJson("lordOfTheHoles.myPlayerId", "");
       writeLocalJson("lordOfTheHoles.scoredPlayerId", "");
       writeLocalJson("lordOfTheHoles.scoredPlayerByRound", {});
+      writeLocalJson("lordOfTheHoles.pendingScores", []);
       writeLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", resetAt);
       setConnectionStatus("online");
       setError("");
-      setSetupSavedMessage("Wer bin ich / Wen zähle ich wurde für alle Geräte zurückgesetzt.");
+      setSetupSavedMessage("Wer bin ich / Wen zähle ich und lokale offene Scores wurden für dieses Gerät zurückgesetzt. Andere Geräte übernehmen den Reset beim nächsten Laden.");
     } catch (err) {
       setConnectionStatus("offline");
       setError(err.message || "Geräte-Zuordnung konnte nicht für alle zurückgesetzt werden.");
