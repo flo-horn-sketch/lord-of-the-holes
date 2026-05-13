@@ -853,6 +853,8 @@ function LordOfTheHolesApp() {
   const [backupSavedMessage, setBackupSavedMessage] = useState("");
   const [scoreHintMessage, setScoreHintMessage] = useState("");
   const [showSplash, setShowSplash] = useState(true);
+  const [splashEntering, setSplashEntering] = useState(false);
+  const [splashEntering, setSplashEntering] = useState(false);
   const [appLocked, setAppLocked] = useState(() => readLocalJson("lordOfTheHoles.appLocked", false));
   const [lockUnlockOpen, setLockUnlockOpen] = useState(false);
   const [lockPasswordInput, setLockPasswordInput] = useState("");
@@ -1116,15 +1118,7 @@ function LordOfTheHolesApp() {
       setRounds(nextRounds);
       setRoundPlayers(data.roundPlayers || []);
       setActiveRound(nextActiveRound);
-      if (!adminEditing) {
-        const storedRoundId = readLocalJson("lordOfTheHoles.selectedActiveRoundId", cachedState?.selectedActiveRoundId || "");
-        const validStoredRound = storedRoundId && nextRounds.some((round) => String(round.round_id) === String(storedRoundId));
-        const nextDisplayRound = validStoredRound
-          ? nextRounds.find((round) => String(round.round_id) === String(storedRoundId))
-          : nextActiveRound;
-        setSelectedCourseId(nextDisplayRound?.course_id || nextActiveRound?.course_id || "");
-        setSelectedActiveRoundId(nextDisplayRound?.round_id || nextActiveRound?.round_id || fallbackRounds[0].round_id);
-      }
+      if (!adminEditing) { setSelectedCourseId(nextActiveRound?.course_id || ""); setSelectedActiveRoundId(nextActiveRound?.round_id || fallbackRounds[0].round_id); }
       applyPlayers(nextActivePlayers, nextAllPlayers, nextCourses);
       setHoles(normalizeHoles(data.activeHoles?.length ? data.activeHoles : data.holes).filter((hole) => !nextActiveRound?.course_id || String(hole.course_id) === String(nextActiveRound.course_id)));
       setAllHoles(normalizeHoles(data.holes));
@@ -1137,9 +1131,11 @@ function LordOfTheHolesApp() {
       setScores(nextActiveScores);
       setConnectionStatus("online");
       setError("");
+      return data;
     } catch (err) {
       setConnectionStatus("offline");
       setError(err.message || "Datenbank konnte nicht geladen werden.");
+      return null;
     } finally {
       if (!silent) setLoading(false);
     }
@@ -1357,7 +1353,12 @@ function LordOfTheHolesApp() {
   }
 
   async function enterRoundFromSplash() {
-    if (appLocked) return;
+    if (appLocked || splashEntering) return;
+    setSplashEntering(true);
+    const data = await loadData({ silent: true });
+    setSplashEntering(false);
+    const nextAppLocked = normalizeBoolean(data?.app_locked ?? data?.appLocked);
+    if (!data || nextAppLocked) return;
     await playPopupSound();
     setShowSplash(false);
   }
@@ -1873,7 +1874,7 @@ function LordOfTheHolesApp() {
       <div className="fixed inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/lord-bg.webp')" }} />
       <div className="fixed inset-0 bg-black/45" />
       <div className="fixed inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.06),rgba(0,0,0,0.58)_38%,rgba(0,0,0,0.86)_100%)]" />
-      {((showSplash || appLocked) && !lockAdminBypass) ? <div className="fixed inset-0 z-[100] bg-black"><div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/lord-bg.webp')" }} /><div className="absolute inset-0 bg-black/25" />{!appLocked ? <div className="absolute inset-x-0 bottom-8 flex justify-center px-6 pb-[env(safe-area-inset-bottom)]"><button type="button" onClick={enterRoundFromSplash} className="w-full max-w-xs rounded-2xl border border-amber-300/55 bg-black/55 px-5 py-2.5 font-serif text-lg font-black tracking-wide text-amber-200 shadow-2xl shadow-black/70 backdrop-blur-sm active:scale-[0.98]">Runde betreten</button></div> : <div className="absolute inset-x-4 bottom-10 mx-auto max-w-sm rounded-3xl border border-amber-500/35 bg-black/55 p-4 text-center text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm"><div className="font-serif text-xl font-black text-amber-200">Der Rat ist noch nicht einberufen.</div><div className="mt-2 text-sm text-amber-100/80">Im Weimarer Land werden Stimmen gesenkt, alte Karten entrollt und verdächtig ernste Blicke ausgetauscht. Die Gefährten werden bald gerufen.</div><div className="mt-4 grid grid-cols-4 gap-1.5 rounded-2xl border border-amber-500/25 bg-black/35 p-2 text-center">
+      {((showSplash || appLocked) && !lockAdminBypass) ? <div className="fixed inset-0 z-[100] bg-black"><div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/lord-bg.webp')" }} /><div className="absolute inset-0 bg-black/25" />{!appLocked ? <div className="absolute inset-x-0 bottom-8 flex justify-center px-6 pb-[env(safe-area-inset-bottom)]"><button type="button" disabled={splashEntering} onClick={enterRoundFromSplash} className="w-full max-w-xs rounded-2xl border border-amber-300/55 bg-black/55 px-5 py-2.5 font-serif text-lg font-black tracking-wide text-amber-200 shadow-2xl shadow-black/70 backdrop-blur-sm active:scale-[0.98] disabled:opacity-60">{splashEntering ? "Datenbank wird geladen ..." : "Runde betreten"}</button></div> : <div className="absolute inset-x-4 bottom-10 mx-auto max-w-sm rounded-3xl border border-amber-500/35 bg-black/55 p-4 text-center text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm"><div className="font-serif text-xl font-black text-amber-200">Der Rat ist noch nicht einberufen.</div><div className="mt-2 text-sm text-amber-100/80">Im Weimarer Land werden Stimmen gesenkt, alte Karten entrollt und verdächtig ernste Blicke ausgetauscht. Die Gefährten werden bald gerufen.</div><div className="mt-4 grid grid-cols-4 gap-1.5 rounded-2xl border border-amber-500/25 bg-black/35 p-2 text-center">
                   <div><div className="font-serif text-xl font-black text-amber-200">{lockCountdown.days}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Tage</div></div>
                   <div><div className="font-serif text-xl font-black text-amber-200">{String(lockCountdown.hours).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Std</div></div>
                   <div><div className="font-serif text-xl font-black text-amber-200">{String(lockCountdown.minutes).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Min</div></div>
