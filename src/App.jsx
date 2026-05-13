@@ -1253,12 +1253,12 @@ function LordOfTheHolesApp() {
     const subtitle = mainMenu === "current" ? activeRoundChapterLabel : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? activeRoundIsFinal ? "Turnier · Am Schicksalsberg" : "Turnier · Kapitel der Gefährten" : mainMenu === "archive" ? "Scorekarten · Chroniken der Runde" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "admin" ? "Admin" : "Einstellungen";
     return (
       <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-1 pt-1">
-        <div className="relative flex items-center justify-between gap-2">
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-700/40 bg-black/35 px-2 py-0.5 text-[10px] text-amber-100/75">
+        <div className="relative flex h-8 items-center justify-center">
+          <div className="pointer-events-none absolute left-1/2 top-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 rounded-full border border-amber-700/40 bg-black/35 px-2 py-0.5 text-[10px] text-amber-100/75">
             <Icon size={14} className={connectionStatus === "online" ? "text-emerald-300" : "text-red-300"}>{connectionStatus === "online" ? "●" : "○"}</Icon>
             <span>{pendingScores.length ? `${pendingScores.length} offen` : connectionStatus === "online" ? "Datenbank verbunden" : "Datenbank offline"}</span>
           </div>
-          <button type="button" onClick={() => setMenuOpen((value) => !value)} className="rounded-xl border border-amber-700/40 bg-black/45 px-2.5 py-1 text-base leading-none text-amber-100 shadow-lg shadow-black/40 backdrop-blur-sm" aria-label="Menü öffnen">☰</button>
+          <button type="button" onClick={() => setMenuOpen((value) => !value)} className="ml-auto rounded-xl border border-amber-700/40 bg-black/45 px-2.5 py-1 text-base leading-none text-amber-100 shadow-lg shadow-black/40 backdrop-blur-sm" aria-label="Menü öffnen">☰</button>
           {menuOpen ? <div className="absolute right-0 top-[34px] z-30 w-64 overflow-hidden rounded-2xl border border-amber-700/40 bg-stone-950/95 text-left shadow-2xl shadow-black/70 backdrop-blur">{[["current", "Scoring"], ["roundTables", "Tabellen Runde"], ["tournament", "Turnier"], ["archive", "Scorekarten"], ["fun", "Mittelerde"], ["settings", "Einstellungen"], ["admin", "Admin"]].map(([value, label]) => (
             <button
               key={value}
