@@ -1405,11 +1405,11 @@ function LordOfTheHolesApp() {
             <div className={cls("rounded-3xl", hasScoreMismatch ? "ring-1 ring-red-500/45" : "")}>
               {myCurrentPlayer ? (
                 <div className="mb-2 grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-2xl px-2 py-3 text-base font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "bg-stone-800 text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/60")}>
-                    <span className="font-serif">{getPlayerLabel(scoredPlayer) || "Spieler"}</span> {hasSelectedPlayerScoreMismatch ? "⚠" : ""}
+                  <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-2xl px-2 py-3 text-sm font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "bg-stone-800 text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/60")}>
+                    <span className="block truncate font-serif text-sm leading-none">{getPlayerLabel(scoredPlayer) || "Spieler"}</span>{hasSelectedPlayerScoreMismatch ? <span className="ml-1">⚠</span> : null}
                   </button>
                   <button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl px-2 py-1.5 text-xs font-bold", isScorerEntryMode ? "bg-amber-600 text-amber-50" : "bg-stone-800 text-amber-100", hasOwnScoreMismatch && "ring-1 ring-red-400/60")}>
-                    <span className="font-serif">Mein Score</span> {hasOwnScoreMismatch ? "⚠" : ""}
+                    <span className="block truncate font-serif text-sm leading-none">Mein Score</span>{hasOwnScoreMismatch ? <span className="ml-1">⚠</span> : null}
                   </button>
                 </div>
               ) : null}
