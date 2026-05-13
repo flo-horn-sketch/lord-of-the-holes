@@ -682,11 +682,11 @@ function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", sta
   );
 }
 
-function PuttStepper({ value, disabled = false, onChange }) {
+function PuttStepper({ value, disabled = false, max = 6, onChange }) {
   const hasValue = value !== "" && value != null;
-  const selected = hasValue ? Number(value || 0) : 2;
+  const selected = hasValue ? Number(value || 0) : Math.min(2, Number(max || 0));
   const snakeLabel = selected >= 4 ? "4+ · 4 €" : selected === 3 ? "3 · 2 €" : "keine Snake";
-  return <TouchStepper label="Putts" value={value === 0 ? 0 : value || ""} min={0} max={6} emptyLabel="2" defaultValue={2} status={snakeLabel} disabled={disabled} onChange={onChange} />;
+  return <TouchStepper label="Putts" value={value === 0 ? 0 : value || ""} min={0} max={Math.max(0, Number(max || 0))} emptyLabel={String(Math.min(2, Math.max(0, Number(max || 0))))} defaultValue={Math.min(2, Math.max(0, Number(max || 0)))} status={snakeLabel} disabled={disabled} onChange={onChange} />;
 }
 
 function ScoreStepper({ value, par, pickedUpStrokes, disabled = false, onChange }) {
@@ -891,6 +891,8 @@ function LordOfTheHolesApp() {
     return String(s.player_id) === String(entryPlayerId) && !isScorerControlScore(s);
   }) || { strokes: "", picked_up: false, over_two_putts: false, putts_count: "", lady: false }, [scores, entryPlayerId, activeHole, displayedActiveRound?.round_id, isScorerEntryMode]);
   const canEnterScores = Boolean(displayedActiveRound?.round_id && myPlayerId && scoredPlayerId && entryPlayerId && entryPlayer && Number(activeHole) > 0);
+  const currentEffectiveStrokes = normalizeBoolean(currentScore.picked_up) ? Number(pickedUpStrokes || 0) : Number(currentScore.strokes || 0);
+  const maxPuttsForCurrentScore = currentEffectiveStrokes > 1 ? currentEffectiveStrokes - 1 : 0;
   const officialScoreForActiveHole = useMemo(() => findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", scoredPlayerId, activeHole, false), [scores, displayedActiveRound?.round_id, scoredPlayerId, activeHole]);
   const controlScoreForActiveHole = useMemo(() => (myPlayerId ? findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", myPlayerId, activeHole, true) : null), [scores, displayedActiveRound?.round_id, myPlayerId, activeHole]);
   const hasOfficialScoreForNext = officialScoreForActiveHole && officialScoreForActiveHole.strokes !== "" && officialScoreForActiveHole.strokes != null;
@@ -1201,13 +1203,24 @@ function LordOfTheHolesApp() {
   }
 
   async function saveScore(patch) {
+    const nextPatch = { ...patch };
+    const nextStrokes = nextPatch.strokes !== undefined ? Number(nextPatch.strokes || 0) : currentEffectiveStrokes;
+    if (nextPatch.putts_count !== undefined && nextStrokes > 0 && Number(nextPatch.putts_count || 0) > Math.max(0, nextStrokes - 1)) {
+      setScoreHintMessage("Putts dürfen maximal Schläge minus 1 sein.");
+      window.setTimeout(() => setScoreHintMessage(""), 1800);
+      return;
+    }
+    if (nextPatch.strokes !== undefined && currentScore.putts_count !== "" && currentScore.putts_count != null && Number(currentScore.putts_count || 0) > Math.max(0, Number(nextPatch.strokes || 0) - 1)) {
+      nextPatch.putts_count = Math.max(0, Number(nextPatch.strokes || 0) - 1);
+      nextPatch.over_two_putts = Number(nextPatch.putts_count || 0) >= 3;
+    }
     if (!canEnterScores) {
       setScoreHintMessage("Erst Runde, Spieler und Zähler auswählen.");
       window.setTimeout(() => setScoreHintMessage(""), 1800);
       return;
     }
     let next;
-    try { next = optimisticUpdate(patch); }
+    try { next = optimisticUpdate(nextPatch); }
     catch (err) { setError(err.message || "Score kann noch nicht gespeichert werden."); return; }
     addPendingScore(next);
     setSaving(true);
@@ -1619,7 +1632,7 @@ function LordOfTheHolesApp() {
               {visibleScoreMismatchMessages.length ? <div className="mb-2 rounded-xl border border-red-500/50 bg-red-950/40 p-1.5 text-xs text-red-100"><span className="underline underline-offset-4">Palantír meldet Abweichung</span><div className="mt-1 space-y-0.5">{visibleScoreMismatchMessages.map((message) => <div key={message}>{message}</div>)}</div></div> : null}
               <div className="mb-1.5 grid grid-cols-[auto_1fr] items-center gap-2 rounded-2xl border border-amber-700/35 bg-black/25 px-3 py-2 text-[10px] text-amber-100/70"><div className="font-serif text-xl font-black leading-none text-amber-200">Loch {activeHole}</div><div className="flex items-center justify-end gap-2.5 text-right text-[11px]"><span>Par <b className="text-amber-200">{activeHoleData.par}</b></span><span>HCP <b className="text-amber-200">{activeHoleData.hcp}</b></span><span>{activeHoleData.meters} m</span><span>Vorgabe <b className="text-amber-200 tracking-[0.18em]">{formatShotMarks(entryPlayerShotsOnActiveHole)}</b></span></div></div>
               <div className="mb-3"><ScoreStepper value={normalizeBoolean(currentScore.picked_up) ? 0 : currentScore.strokes ?? ""} par={activeHoleData?.par || 4} pickedUpStrokes={pickedUpStrokes} disabled={!canEnterScores} onChange={(scoreValue) => Number(scoreValue) === 0 || Number(scoreValue) >= Number(pickedUpStrokes || 0) ? saveScore({ strokes: pickedUpStrokes, picked_up: true }) : saveScore({ strokes: scoreValue, picked_up: false })} /></div>
-              <div className="mb-3"><PuttStepper value={currentScore.putts_count} disabled={!canEnterScores} onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })} /></div>
+              <div className="mb-3"><PuttStepper value={currentScore.putts_count} disabled={!canEnterScores || currentEffectiveStrokes <= 1} max={maxPuttsForCurrentScore} onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })} /></div>
               <div className="mb-3 rounded-2xl border border-amber-700/40 bg-black/25 p-2"><div className="flex items-center justify-between gap-2"><div><div className="text-xs font-semibold text-amber-100">Lady</div><div className="text-[10px] text-amber-100/65">Markiert eine Lady.</div></div><input type="checkbox" disabled={!canEnterScores} checked={normalizeBoolean(currentScore.lady)} onChange={(e) => saveScore({ lady: e.target.checked })} className="h-6 w-6 accent-amber-500 disabled:opacity-40" /></div></div>
               {scoreHintMessage ? <div className="mb-2 rounded-xl border border-amber-500/40 bg-amber-950/50 p-1.5 text-center text-xs font-semibold text-amber-100">{scoreHintMessage}</div> : null}
               <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 py-3 text-base font-bold text-amber-100">Zurück</Button><Button disabled={activeHole === 18 || !canEnterScores} onClick={goToNextHole} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>Loch {Math.min(18, Number(activeHole || 1) + 1)}</Button></div>
