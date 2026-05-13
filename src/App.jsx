@@ -1400,13 +1400,13 @@ function LordOfTheHolesApp() {
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
         <Card className="mb-2 rounded-2xl bg-transparent shadow-none">
           <CardContent className="p-2">
-            <div className={cls("mb-2 rounded-2xl border bg-[linear-gradient(180deg,rgba(48,35,22,0.70),rgba(12,10,9,0.62))] p-1.5 shadow-[inset_0_1px_0_rgba(251,191,36,0.10),0_10px_28px_rgba(0,0,0,0.30)]", hasScoreMismatch ? "border-red-500/60" : "border-amber-500/30")}>
+            <div className={cls("mb-2 rounded-2xl border bg-[linear-gradient(180deg,rgba(48,35,22,0.70),rgba(12,10,9,0.62))] px-3 py-2.5 shadow-[inset_0_1px_0_rgba(251,191,36,0.10),0_10px_28px_rgba(0,0,0,0.30)]", hasScoreMismatch ? "border-red-500/60" : "border-amber-500/30")}>
               <div className="grid grid-cols-[1fr_auto] items-center gap-2">
                 <div className="grid grid-cols-[auto_1fr] items-center gap-3">
-                  <div className="font-serif text-2xl font-black leading-none text-amber-200">{displayedActiveRound?.round_name || "Runde 1"}</div>
-                  <div className="text-right leading-tight">
-                    <div className="text-[11px] font-semibold text-amber-100/80">{getRoundChapterLabel(displayedActiveRound).replace(`${displayedActiveRound?.round_name || ""} · `, "")}</div>
-                    <div className="text-[10px] text-amber-100/60">{activeCourse?.course_name || "Kein Kurs ausgewählt"}</div>
+                  <div className="font-serif text-[1.7rem] font-black leading-none text-amber-200">{displayedActiveRound?.round_name || "Runde 1"}</div>
+                  <div className="text-right leading-snug">
+                    <div className="text-xs font-semibold text-amber-100/85">{getRoundChapterLabel(displayedActiveRound).replace(`${displayedActiveRound?.round_name || ""} · `, "")}</div>
+                    <div className="text-[11px] text-amber-100/65">{activeCourse?.course_name || "Kein Kurs ausgewählt"}</div>
                   </div>
                 </div>
                 <div className="text-right">
@@ -1462,9 +1462,9 @@ function LordOfTheHolesApp() {
                 </div>
               ) : null}
 
-              <div className="mb-1.5 grid grid-cols-[auto_1fr] items-center gap-2 rounded-2xl border border-amber-700/35 bg-black/25 px-2 py-1 text-[10px] text-amber-100/70">
-                <div className="font-serif text-lg font-black leading-none text-amber-200">Loch {activeHole}</div>
-                <div className="flex items-center justify-end gap-2 text-right">
+              <div className="mb-1.5 grid grid-cols-[auto_1fr] items-center gap-2 rounded-2xl border border-amber-700/35 bg-black/25 px-3 py-2 text-[10px] text-amber-100/70">
+                <div className="font-serif text-xl font-black leading-none text-amber-200">Loch {activeHole}</div>
+                <div className="flex items-center justify-end gap-2.5 text-right text-[11px]">
                   <span>Par <b className="text-amber-200">{activeHoleData.par}</b></span>
                   <span>HCP <b className="text-amber-200">{activeHoleData.hcp}</b></span>
                   <span>{activeHoleData.meters} m</span>
