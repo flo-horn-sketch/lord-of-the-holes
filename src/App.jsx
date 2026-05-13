@@ -1318,6 +1318,30 @@ function LordOfTheHolesApp() {
     }
   }
 
+  function clearLocalCache() {
+    try {
+      Object.keys(window.localStorage || {}).forEach((key) => {
+        if (String(key).startsWith("lordOfTheHoles.")) window.localStorage.removeItem(key);
+      });
+    } catch {}
+    setMyPlayerId("");
+    setScoredPlayerId("");
+    setScoredPlayerByRound({});
+    setPendingScores([]);
+    pendingScoresRef.current = [];
+    setWinnerPopupDismissedKey("");
+    setRoundHonorDismissedKeys([]);
+    setRoundSummaryDismissedKeys([]);
+    setScorecardRoundId("");
+    setRoundTableRoundId("");
+    setSelectedActiveRoundId(displayedActiveRound?.round_id || activeRound?.round_id || "r1");
+    setDeviceAssignmentsResetAt("");
+    setScoresResetAt("");
+    setScoreEntryMode("player");
+    setActiveHole(1);
+    setSetupSavedMessage("Lokaler Cache auf diesem Gerät wurde gelöscht.");
+  }
+
   async function saveFullSetup() {
     setBackupSavedMessage("");
     setSetupSavedMessage("");
@@ -1523,6 +1547,7 @@ function LordOfTheHolesApp() {
             {appLocked ? <Button disabled={!isAdminUnlocked} onClick={() => { setGlobalAppLock(false); setLockAdminBypass(false); }} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-800/70 py-2 text-emerald-50 disabled:opacity-50">App für alle freigeben</Button> : <Button disabled={!isAdminUnlocked} onClick={() => { setMenuOpen(false); setLockAdminBypass(false); setGlobalAppLock(true); }} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">App für alle sperren</Button>}
             <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={() => { setClearScoresError(""); setClearScoresConfirmOpen(true); }} className="mt-2 w-full rounded-2xl border border-red-500/50 bg-red-950/60 py-2 text-red-100 disabled:opacity-50">Scores löschen</Button>
             <Button disabled={!isAdminUnlocked || connectionStatus !== "online"} onClick={resetDeviceAssignmentsForAll} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">Spieler-/Zähler-Zuordnungen zurücksetzen</Button>
+            <Button disabled={!isAdminUnlocked} onClick={clearLocalCache} className="mt-2 w-full rounded-2xl border border-sky-500/40 bg-sky-950/60 py-2 text-sky-100 disabled:opacity-50">Lokalen Cache dieses Geräts löschen</Button>
           </CardContent>
         </Card>
       </motion.section>
