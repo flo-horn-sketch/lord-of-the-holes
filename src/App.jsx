@@ -48,7 +48,7 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
-const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbyaupv2xGGWJ9cAP4VwEkmPvdEtvUGpK0ePFoJyAQjgqhVgSIauybzoDbELOQ1HUiwa/exec";
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbxZl-ZH5c4rYeDaOyoIw1RdqVdeE0fEfmERIEGwlJVs4GNT5cLh-BiIo_KmAvpPUWZ6/exec";
 const ADMIN_PASSWORD = "weimar";
 const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T11:00:00+02:00");
 
@@ -853,6 +853,7 @@ function LordOfTheHolesApp() {
   const [lockCountdownNow, setLockCountdownNow] = useState(() => new Date());
   const [deviceAssignmentsResetAt, setDeviceAssignmentsResetAt] = useState(() => readLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", ""));
   const [scoresResetAt, setScoresResetAt] = useState(() => readLocalJson("lordOfTheHoles.scoresResetAt", ""));
+  const [fullResetAt, setFullResetAt] = useState(() => readLocalJson("lordOfTheHoles.fullResetAt", ""));
   const introAudioRef = useRef(null);
   const lastPopupSoundKeyRef = useRef("");
   const [clearScoresConfirmOpen, setClearScoresConfirmOpen] = useState(false);
@@ -1022,6 +1023,7 @@ function LordOfTheHolesApp() {
   useEffect(() => { writeLocalJson("lordOfTheHoles.appLocked", appLocked); }, [appLocked]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", deviceAssignmentsResetAt); }, [deviceAssignmentsResetAt]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoresResetAt", scoresResetAt); }, [scoresResetAt]);
+  useEffect(() => { writeLocalJson("lordOfTheHoles.fullResetAt", fullResetAt); }, [fullResetAt]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerId", scoredPlayerId); }, [scoredPlayerId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerByRound", scoredPlayerByRound); }, [scoredPlayerByRound]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.winnerPopupDismissedKey", winnerPopupDismissedKey); }, [winnerPopupDismissedKey]);
@@ -1078,6 +1080,11 @@ function LordOfTheHolesApp() {
         const nextAppLocked = normalizeBoolean(data.app_locked ?? data.appLocked);
         setAppLocked(nextAppLocked);
         if (nextAppLocked && !lockAdminBypass) setShowSplash(true);
+      }
+      const nextFullResetAt = String(data.full_reset_at || data.fullResetAt || "");
+      const localFullResetAt = String(readLocalJson("lordOfTheHoles.fullResetAt", "") || "");
+      if (nextFullResetAt && nextFullResetAt !== localFullResetAt) {
+        applyLocalCacheClear(nextFullResetAt, "Kompletter Reset wurde übernommen.");
       }
       const nextScoresResetAt = String(data.scores_reset_at || data.scoresResetAt || "");
       const localScoresResetAt = String(readLocalJson("lordOfTheHoles.scoresResetAt", "") || "");
@@ -1318,7 +1325,7 @@ function LordOfTheHolesApp() {
     }
   }
 
-  function clearLocalCache() {
+  function applyLocalCacheClear(resetAt = "", message = "Lokaler Cache auf diesem Gerät wurde gelöscht.") {
     try {
       Object.keys(window.localStorage || {}).forEach((key) => {
         if (String(key).startsWith("lordOfTheHoles.")) window.localStorage.removeItem(key);
@@ -1339,7 +1346,36 @@ function LordOfTheHolesApp() {
     setScoresResetAt("");
     setScoreEntryMode("player");
     setActiveHole(1);
-    setSetupSavedMessage("Lokaler Cache auf diesem Gerät wurde gelöscht.");
+    if (resetAt) {
+      setFullResetAt(resetAt);
+      writeLocalJson("lordOfTheHoles.fullResetAt", resetAt);
+    } else {
+      setFullResetAt("");
+    }
+    setSetupSavedMessage(message);
+  }
+
+  function clearLocalCache() {
+    applyLocalCacheClear("", "Lokaler Cache auf diesem Gerät wurde gelöscht.");
+  }
+
+  async function fullResetForAllDevices() {
+    setSetupSavedMessage("");
+    setError("");
+    try {
+      const result = await callSheetApi({ action: "fullReset" });
+      const resetAt = String(result?.full_reset_at || result?.fullResetAt || new Date().toISOString());
+      const emptyScores = [];
+      setScores(emptyScores);
+      setAllScores(emptyScores);
+      applyLocalCacheClear(resetAt, "Kompletter Reset wurde für alle Geräte ausgelöst.");
+      setConnectionStatus("online");
+      setError("");
+      if (result?.backup_sheet_name) setBackupSavedMessage(`Backup erstellt: ${result.backup_sheet_name}`);
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Kompletter Reset konnte nicht ausgelöst werden.");
+    }
   }
 
   async function saveFullSetup() {
@@ -1548,6 +1584,7 @@ function LordOfTheHolesApp() {
             <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={() => { setClearScoresError(""); setClearScoresConfirmOpen(true); }} className="mt-2 w-full rounded-2xl border border-red-500/50 bg-red-950/60 py-2 text-red-100 disabled:opacity-50">Scores löschen</Button>
             <Button disabled={!isAdminUnlocked || connectionStatus !== "online"} onClick={resetDeviceAssignmentsForAll} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">Spieler-/Zähler-Zuordnungen zurücksetzen</Button>
             <Button disabled={!isAdminUnlocked} onClick={clearLocalCache} className="mt-2 w-full rounded-2xl border border-sky-500/40 bg-sky-950/60 py-2 text-sky-100 disabled:opacity-50">Lokalen Cache dieses Geräts löschen</Button>
+            <Button disabled={!isAdminUnlocked || connectionStatus !== "online"} onClick={fullResetForAllDevices} className="mt-2 w-full rounded-2xl border border-red-400/60 bg-red-950/80 py-2 text-red-100 disabled:opacity-50">Komplett-Reset für alle Geräte</Button>
           </CardContent>
         </Card>
       </motion.section>
