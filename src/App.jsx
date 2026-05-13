@@ -391,18 +391,18 @@ function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", sta
     onChange(Math.max(min, Math.min(max, Number(nextValue || 0))));
   };
   return (
-    <div className="rounded-2xl border border-amber-500/35 bg-[linear-gradient(180deg,rgba(48,35,22,0.72),rgba(12,10,9,0.72))] p-2.5 shadow-[inset_0_1px_0_rgba(251,191,36,0.12),0_12px_32px_rgba(0,0,0,0.35)]">
+    <div className="rounded-2xl border border-[rgb(var(--score-accent)/0.34)] bg-[linear-gradient(180deg,rgba(var(--score-accent),0.10),rgba(12,10,9,0.72))] p-2.5 shadow-[inset_0_1px_0_rgba(251,191,36,0.10),0_12px_32px_rgba(0,0,0,0.35)]">
       <div className="mb-1.5 flex items-center justify-between gap-2">
         <div className="text-sm font-semibold text-amber-100">{label}</div>
-        {status ? <div className="rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold text-amber-100/75">{status}</div> : null}
+        {status ? <div className="rounded-full bg-[rgb(var(--score-accent)/0.14)] px-2.5 py-0.5 text-xs font-bold text-amber-100/75">{status}</div> : null}
       </div>
       <div className="grid grid-cols-[82px_1fr_82px] items-center gap-2.5">
-        <button type="button" onClick={() => setValue(baseValue - 1)} disabled={disabled || baseValue <= min} className="h-[84px] rounded-2xl border border-amber-500/45 bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.16),rgba(12,10,9,0.96)_58%)] text-4xl font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.16),0_8px_22px_rgba(0,0,0,0.38)] transition active:scale-[0.97] disabled:opacity-35">−</button>
-        <button type="button" disabled={disabled} onClick={() => setValue(baseValue)} className="h-[84px] rounded-2xl border border-amber-400/35 bg-[radial-gradient(circle_at_50%_0%,rgba(251,191,36,0.22),rgba(28,25,23,0.86)_48%,rgba(12,10,9,0.96)_100%)] text-center shadow-[inset_0_0_28px_rgba(251,191,36,0.08),0_10px_26px_rgba(0,0,0,0.42)] ring-1 ring-amber-300/10 transition active:scale-[0.985]">
+        <button type="button" onClick={() => setValue(baseValue - 1)} disabled={disabled || baseValue <= min} className="h-[84px] rounded-2xl border border-[rgb(var(--score-accent)/0.42)] bg-[radial-gradient(circle_at_50%_0%,rgba(var(--score-accent),0.13),rgba(12,10,9,0.96)_58%)] text-4xl font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.12),0_8px_22px_rgba(0,0,0,0.38)] transition active:scale-[0.97] disabled:opacity-35">−</button>
+        <button type="button" disabled={disabled} onClick={() => setValue(baseValue)} className="h-[84px] rounded-2xl border border-[rgb(var(--score-accent)/0.34)] bg-[radial-gradient(circle_at_50%_0%,rgba(var(--score-accent),0.16),rgba(28,25,23,0.86)_48%,rgba(12,10,9,0.96)_100%)] text-center shadow-[inset_0_0_28px_rgba(251,191,36,0.06),0_10px_26px_rgba(0,0,0,0.42)] ring-1 ring-[rgb(var(--score-accent)/0.16)] transition active:scale-[0.985]">
           <div className="font-serif text-[3.95rem] font-black leading-none text-amber-200 drop-shadow-[0_0_14px_rgba(251,191,36,0.18)]">{shownValue}</div>
           <div className="text-[9px] uppercase tracking-[0.16em] text-amber-100/50">{!hasValue && defaultValue != null ? "tippen" : label}</div>
         </button>
-        <button type="button" onClick={() => setValue(baseValue + 1)} disabled={disabled || baseValue >= max} className="h-[84px] rounded-2xl border border-amber-500/45 bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.16),rgba(12,10,9,0.96)_58%)] text-4xl font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.16),0_8px_22px_rgba(0,0,0,0.38)] transition active:scale-[0.97] disabled:opacity-35">+</button>
+        <button type="button" onClick={() => setValue(baseValue + 1)} disabled={disabled || baseValue >= max} className="h-[84px] rounded-2xl border border-[rgb(var(--score-accent)/0.42)] bg-[radial-gradient(circle_at_50%_0%,rgba(var(--score-accent),0.13),rgba(12,10,9,0.96)_58%)] text-4xl font-black leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.12),0_8px_22px_rgba(0,0,0,0.38)] transition active:scale-[0.97] disabled:opacity-35">+</button>
       </div>
     </div>
   );
