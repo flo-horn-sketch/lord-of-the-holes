@@ -829,6 +829,8 @@ function LordOfTheHolesApp() {
   const lastAutoHoleTargetRef = useRef("");
   const [localHandicaps, setLocalHandicaps] = useState({});
   const [scoredPlayerId, setScoredPlayerId] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerId", "florian"));
+  const [scoredPlayerByRound, setScoredPlayerByRound] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerByRound", {}));
+  const [roundScorerPromptOpen, setRoundScorerPromptOpen] = useState(false);
   const [scoreEntryMode, setScoreEntryMode] = useState("player");
   const [activeHole, setActiveHole] = useState(() => getFirstUnscoredHole(cachedState?.scores?.length ? cachedState.scores : cachedState?.allScores || [], cachedState?.selectedActiveRoundId || cachedState?.activeRound?.round_id || "", readLocalJson("lordOfTheHoles.scoredPlayerId", ""), 1, readLocalJson("lordOfTheHoles.myPlayerId", "")));
   const [view, setView] = useState("score");
@@ -1018,6 +1020,18 @@ function LordOfTheHolesApp() {
     if (Number(activeHole) < 1 || Number(activeHole) > 18) setActiveHole(1);
   }, [scoreablePlayers, scoredPlayerId, myPlayerId, scoreEntryMode, activeHole]);
 
+  useEffect(() => {
+    const roundId = String(displayedActiveRound?.round_id || "");
+    if (!roundId || !myPlayerId || !scoreablePlayers.length || showSplash || appLocked) return;
+    const storedPlayerId = scoredPlayerByRound?.[roundId] || "";
+    if (storedPlayerId && scoreablePlayers.some((player) => String(player.id) === String(storedPlayerId))) {
+      if (String(scoredPlayerId) !== String(storedPlayerId)) setScoredPlayerId(storedPlayerId);
+      setRoundScorerPromptOpen(false);
+      return;
+    }
+    setRoundScorerPromptOpen(true);
+  }, [displayedActiveRound?.round_id, myPlayerId, scoreablePlayers, scoredPlayerByRound, scoredPlayerId, showSplash, appLocked]);
+
   useEffect(() => { writeLocalJson("lordOfTheHoles.myPlayerId", myPlayerId); }, [myPlayerId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.appLocked", appLocked); }, [appLocked]);
   useEffect(() => {
@@ -1026,6 +1040,7 @@ function LordOfTheHolesApp() {
     return () => window.clearInterval(timer);
   }, [appLocked]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerId", scoredPlayerId); }, [scoredPlayerId]);
+  useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerByRound", scoredPlayerByRound); }, [scoredPlayerByRound]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.winnerPopupDismissedKey", winnerPopupDismissedKey); }, [winnerPopupDismissedKey]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundHonorDismissedKeys", roundHonorDismissedKeys); }, [roundHonorDismissedKeys]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scorecardRoundId", scorecardRoundId); }, [scorecardRoundId]);
@@ -1399,7 +1414,7 @@ function LordOfTheHolesApp() {
   }
 
   function renderSettingsView() {
-    return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}><Card className="mb-2 rounded-2xl border border-amber-500/30 bg-[linear-gradient(180deg,rgba(48,35,22,0.86),rgba(18,13,9,0.82))] shadow-[inset_0_1px_0_rgba(251,191,36,0.10),0_18px_46px_rgba(0,0,0,0.38)] backdrop-blur-sm"><CardContent className="p-3"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Einstellungen</p><h2 className="font-serif text-lg text-amber-200">Mein Handy</h2><p className="mt-1 text-sm text-amber-100/65">Diese Einstellung wird nur lokal auf diesem Handy gespeichert.</p><div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Wer bin ich auf diesem Handy?</label><select value={myPlayerId} onChange={(e) => setMyPlayerId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50"><option value="">Spieler auswählen</option>{allPlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}</select><p className="mt-2 text-xs text-amber-100/60">Dieser Spieler wird auf diesem Handy beim Score-Zählen ausgeblendet, damit man sich nicht selbst zählt.</p></div><div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Wen zähle ich?</label><select value={scoredPlayerId} onChange={(e) => setScoredPlayerId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50"><option value="">Spieler auswählen</option>{scoreablePlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}</select><p className="mt-2 text-xs text-amber-100/60">Dieser Spieler ist links im Score-Bereich vorausgewählt.</p></div></CardContent></Card></motion.section>;
+    return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}><Card className="mb-2 rounded-2xl border border-amber-500/30 bg-[linear-gradient(180deg,rgba(48,35,22,0.86),rgba(18,13,9,0.82))] shadow-[inset_0_1px_0_rgba(251,191,36,0.10),0_18px_46px_rgba(0,0,0,0.38)] backdrop-blur-sm"><CardContent className="p-3"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Einstellungen</p><h2 className="font-serif text-lg text-amber-200">Mein Handy</h2><p className="mt-1 text-sm text-amber-100/65">Diese Einstellung wird nur lokal auf diesem Handy gespeichert.</p><div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Wer bin ich auf diesem Handy?</label><select value={myPlayerId} onChange={(e) => setMyPlayerId(e.target.value)} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50"><option value="">Spieler auswählen</option>{allPlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}</select><p className="mt-2 text-xs text-amber-100/60">Dieser Spieler wird auf diesem Handy beim Score-Zählen ausgeblendet, damit man sich nicht selbst zählt.</p></div><div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Wen zähle ich?</label><select value={scoredPlayerId} onChange={(e) => { const nextPlayerId = e.target.value; setScoredPlayerId(nextPlayerId); if (displayedActiveRound?.round_id) setScoredPlayerByRound((current) => ({ ...(current || {}), [displayedActiveRound.round_id]: nextPlayerId })); }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50"><option value="">Spieler auswählen</option>{scoreablePlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}</select><p className="mt-2 text-xs text-amber-100/60">Dieser Spieler ist links im Score-Bereich vorausgewählt.</p></div></CardContent></Card></motion.section>;
   }
 
   function renderPopupStandingsTable() {
@@ -1818,6 +1833,35 @@ function LordOfTheHolesApp() {
       {setupSavedMessage ? <div className="fixed inset-x-3 top-4 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/50 bg-emerald-950/95 p-3 text-emerald-50 shadow-2xl shadow-black/60 backdrop-blur"><div className="flex items-start justify-between gap-2"><div><div className="font-serif text-lg text-emerald-100">Gespeichert</div><div className="mt-0.5 text-sm text-emerald-100/85">{setupSavedMessage}</div></div><button type="button" onClick={() => setSetupSavedMessage("")} className="rounded-xl border border-emerald-400/40 bg-black/25 px-3 py-1 text-sm font-bold text-emerald-50">×</button></div></div> : null}
       {backupSavedMessage ? <div className="fixed inset-x-3 top-4 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/50 bg-emerald-950/95 p-3 text-emerald-50 shadow-2xl shadow-black/60 backdrop-blur"><div className="flex items-start justify-between gap-2"><div><div className="font-serif text-lg text-emerald-100">Backup erstellt</div><div className="mt-0.5 text-sm text-emerald-100/85">{backupSavedMessage}</div></div><button type="button" onClick={() => setBackupSavedMessage("")} className="rounded-xl border border-emerald-400/40 bg-black/25 px-3 py-1 text-sm font-bold text-emerald-50">×</button></div></div> : null}
       {renderPopupStandingsTable()}
+      {roundScorerPromptOpen && !showSplash && !appLocked ? (
+        <div className="fixed inset-0 z-[93] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-500/45 bg-stone-950 text-amber-50 shadow-2xl shadow-black/80">
+            <div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.20),transparent_45%),linear-gradient(180deg,rgba(41,37,36,0.94),rgba(12,10,9,1))] p-4 text-center">
+              <div className="text-[10px] uppercase tracking-[0.24em] text-amber-300/75">Neue Runde</div>
+              <div className="mt-1 font-serif text-2xl font-black text-amber-200">Wen zählst du?</div>
+              <div className="mt-1 text-sm text-amber-100/70">{displayedActiveRound?.round_name || "Diese Runde"} beginnt. Wähle deinen Gefährten für die Scorekarte.</div>
+              <div className="mt-4 grid gap-2">
+                {scoreablePlayers.map((player) => (
+                  <button
+                    key={player.id}
+                    type="button"
+                    onClick={() => {
+                      setScoredPlayerId(player.id);
+                      setScoredPlayerByRound((current) => ({ ...(current || {}), [displayedActiveRound?.round_id || ""]: player.id }));
+                      setRoundScorerPromptOpen(false);
+                      setScoreEntryMode("player");
+                      setActiveHole(getFirstUnscoredHole(scores, displayedActiveRound?.round_id || "", player.id, 1, myPlayerId));
+                    }}
+                    className="rounded-2xl border border-amber-700/35 bg-stone-900 px-3 py-3 font-serif text-base font-bold text-amber-100 transition active:scale-[0.98]"
+                  >
+                    {getPlayerLabel(player)}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {roundSummaryPopup ? (
         <div className="fixed inset-0 z-[94] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
           <div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-400/60 bg-stone-950 text-center text-amber-50 shadow-2xl shadow-black/80">
