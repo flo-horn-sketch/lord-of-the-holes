@@ -1485,7 +1485,12 @@ function LordOfTheHolesApp() {
     } catch (err) {
       setConnectionStatus("offline");
       setError(err.message || "Zähler-Zuordnung konnte nicht gespeichert werden.");
-      resetRoundScorerPromptOpen(false);nMenu(value);
+      return false;
+    }
+  }
+
+  function setMainMenuAndView(value) {
+    setMainMenu(value);
     setMenuOpen(false);
     if (value === "current") setView("score");
     if (value === "roundTables") setView("leaderboard");
@@ -2036,7 +2041,6 @@ function LordOfTheHolesApp() {
                       onClick={() => {
                         setScoredPlayerId(player.id);
                         saveScorerAssignmentForRound(displayedActiveRound?.round_id || "", player.id);
-                        setForcedScorerPromptRoundId("");
                         setRoundScorerPromptOpen(false);
                         setScoreEntryMode("player");
                         setActiveHole(getFirstUnscoredHole(scores, displayedActiveRound?.round_id || "", player.id, 1, myPlayerId));
@@ -2108,6 +2112,8 @@ function LordOfTheHolesApp() {
       {clearScoresConfirmOpen ? <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"><div className="w-full max-w-md rounded-3xl border border-red-500/60 bg-stone-950 p-4 text-red-50 shadow-2xl shadow-black/70"><div className="font-serif text-lg text-red-100">Alle Scores löschen?</div><p className="mt-2 text-sm text-red-100/80">Dadurch werden alle Einträge im Tab Scores gelöscht. Vorher wird automatisch ein Backup erstellt. Backup-Tabs bleiben erhalten.</p>{clearScoresError ? <div className="mt-2 rounded-2xl border border-red-400/50 bg-red-950/50 p-2 text-xs text-red-100">Fehler: {clearScoresError}</div> : null}<div className="mt-2 grid grid-cols-2 gap-2"><button type="button" disabled={clearScoresSaving} onClick={() => setClearScoresConfirmOpen(false)} className="rounded-2xl border border-amber-700/40 bg-stone-900 px-3 py-2.5 text-sm font-bold text-amber-100 disabled:opacity-50">Abbrechen</button><button type="button" disabled={clearScoresSaving} onClick={clearAllScores} className="rounded-2xl border border-red-400/60 bg-red-700 px-3 py-2.5 text-sm font-bold text-red-50 disabled:opacity-50">{clearScoresSaving ? "Lösche ..." : "Ja, Scores löschen"}</button></div></div></div> : null}
     </div>
   );
+}
+
 }
 
 export default function LordOfTheHolesPWA() {
