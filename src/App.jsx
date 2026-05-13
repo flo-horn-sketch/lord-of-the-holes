@@ -1402,13 +1402,13 @@ function LordOfTheHolesApp() {
               <div className="mb-2 rounded-xl border border-amber-700/30 bg-black/25 p-1.5 text-[10px] text-amber-100/75">Unter Einstellungen kannst du festlegen, wer du bist.</div>
             )}
 
-            <div className={cls("rounded-3xl bg-[linear-gradient(180deg,rgba(48,35,22,0.46),rgba(12,10,9,0.44))] p-2.5 shadow-[inset_0_1px_0_rgba(251,191,36,0.08),0_14px_34px_rgba(0,0,0,0.26)] backdrop-blur-[2px]", hasScoreMismatch ? "ring-1 ring-red-500/45" : "")}>
+            <div className={cls("rounded-3xl", hasScoreMismatch ? "ring-1 ring-red-500/45" : "")}>
               {myCurrentPlayer ? (
-                <div className="mb-2 grid grid-cols-2 gap-2 rounded-2xl border border-amber-700/30 bg-black/25 p-1.5">
-                  <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-2xl px-2 py-2.5 text-sm font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/60")}>
+                <div className="mb-2 grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-2xl px-2 py-3 text-base font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "bg-stone-800 text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/60")}>
                     {getPlayerLabel(scoredPlayer) || "Spieler"} {hasSelectedPlayerScoreMismatch ? "⚠" : ""}
                   </button>
-                  <button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl px-2 py-1.5 text-xs font-bold", isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasOwnScoreMismatch && "ring-1 ring-red-400/60")}>
+                  <button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl px-2 py-1.5 text-xs font-bold", isScorerEntryMode ? "bg-amber-600 text-amber-50" : "bg-stone-800 text-amber-100", hasOwnScoreMismatch && "ring-1 ring-red-400/60")}>
                     Mein Score {hasOwnScoreMismatch ? "⚠" : ""}
                   </button>
                 </div>
