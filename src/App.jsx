@@ -659,13 +659,13 @@ function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", sta
         <div className="text-xs font-semibold text-amber-100">{label}</div>
         {status ? <div className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-100/75">{status}</div> : null}
       </div>
-      <div className="grid grid-cols-[48px_1fr_48px] items-center gap-2">
-        <button type="button" onClick={() => setValue(baseValue - 1)} disabled={baseValue <= min} className="h-9 rounded-xl border border-amber-700/50 bg-stone-950 text-base font-black leading-none text-amber-100 disabled:opacity-35">−</button>
-        <button type="button" onClick={() => setValue(baseValue)} className="h-9 rounded-xl border border-amber-700/30 bg-stone-950/70 text-center shadow-inner shadow-black/60">
-          <div className="font-serif text-2xl font-black leading-none text-amber-200">{shownValue}</div>
+      <div className="grid grid-cols-[56px_1fr_56px] items-center gap-2">
+        <button type="button" onClick={() => setValue(baseValue - 1)} disabled={baseValue <= min} className="h-11 rounded-xl border border-amber-700/50 bg-stone-950 text-xl font-black leading-none text-amber-100 disabled:opacity-35">−</button>
+        <button type="button" onClick={() => setValue(baseValue)} className="h-11 rounded-xl border border-amber-700/30 bg-stone-950/70 text-center shadow-inner shadow-black/60">
+          <div className="font-serif text-3xl font-black leading-none text-amber-200">{shownValue}</div>
           <div className="text-[8px] uppercase tracking-[0.16em] text-amber-100/50">{!hasValue && defaultValue != null ? "tippen" : label}</div>
         </button>
-        <button type="button" onClick={() => setValue(baseValue + 1)} disabled={baseValue >= max} className="h-9 rounded-xl border border-amber-700/50 bg-stone-950 text-base font-black leading-none text-amber-100 disabled:opacity-35">+</button>
+        <button type="button" onClick={() => setValue(baseValue + 1)} disabled={baseValue >= max} className="h-11 rounded-xl border border-amber-700/50 bg-stone-950 text-xl font-black leading-none text-amber-100 disabled:opacity-35">+</button>
       </div>
     </div>
   );
@@ -843,6 +843,7 @@ function LordOfTheHolesApp() {
   const [winnerPopupDismissedKey, setWinnerPopupDismissedKey] = useState(() => readLocalJson("lordOfTheHoles.winnerPopupDismissedKey", ""));
   const [roundHonorDismissedKeys, setRoundHonorDismissedKeys] = useState(() => readLocalJson("lordOfTheHoles.roundHonorDismissedKeys", []));
   const [scorecardRoundId, setScorecardRoundId] = useState(() => readLocalJson("lordOfTheHoles.scorecardRoundId", ""));
+  const [roundTableRoundId, setRoundTableRoundId] = useState(() => readLocalJson("lordOfTheHoles.roundTableRoundId", ""));
   const [roundSummaryDismissedKeys, setRoundSummaryDismissedKeys] = useState(() => readLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", []));
 
   const displayedActiveRound = (selectedActiveRoundId && (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(selectedActiveRoundId))) || activeRound || rounds.find((round) => String(round.status).toLowerCase() === "active") || fallbackRounds[0];
@@ -991,6 +992,7 @@ function LordOfTheHolesApp() {
   useEffect(() => { writeLocalJson("lordOfTheHoles.winnerPopupDismissedKey", winnerPopupDismissedKey); }, [winnerPopupDismissedKey]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundHonorDismissedKeys", roundHonorDismissedKeys); }, [roundHonorDismissedKeys]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scorecardRoundId", scorecardRoundId); }, [scorecardRoundId]);
+  useEffect(() => { writeLocalJson("lordOfTheHoles.roundTableRoundId", roundTableRoundId); }, [roundTableRoundId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.selectedActiveRoundId", selectedActiveRoundId); }, [selectedActiveRoundId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", roundSummaryDismissedKeys); }, [roundSummaryDismissedKeys]);
   useEffect(() => { pendingScoresRef.current = pendingScores; writeLocalJson("lordOfTheHoles.pendingScores", pendingScores); }, [pendingScores]);
@@ -1237,6 +1239,7 @@ function LordOfTheHolesApp() {
     setMainMenu(value);
     setMenuOpen(false);
     if (value === "current") setView("score");
+    if (value === "roundTables") setView("leaderboard");
     if (value === "tournament") setView("tournament");
     if (value === "archive") setView("archive");
     if (value === "fun") setView("fun");
@@ -1247,14 +1250,17 @@ function LordOfTheHolesApp() {
   function renderHeader() {
     const activeRoundIsFinal = String(displayedActiveRound?.stage || "") === "final" || String(displayedActiveRound?.round_id || "") === "r4";
     const activeRoundChapterLabel = getRoundChapterLabel(displayedActiveRound);
-    const subtitle = mainMenu === "current" ? activeRoundChapterLabel : mainMenu === "tournament" ? activeRoundIsFinal ? "Turnier · Am Schicksalsberg" : "Turnier · Kapitel der Gefährten" : mainMenu === "archive" ? "Scorekarten · Chroniken der Runde" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "admin" ? "Admin" : "Einstellungen";
+    const subtitle = mainMenu === "current" ? activeRoundChapterLabel : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? activeRoundIsFinal ? "Turnier · Am Schicksalsberg" : "Turnier · Kapitel der Gefährten" : mainMenu === "archive" ? "Scorekarten · Chroniken der Runde" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "admin" ? "Admin" : "Einstellungen";
     return (
-      <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-1 pt-2">
-        <div className="mb-1 flex items-center justify-end gap-2"><button type="button" onClick={() => setMenuOpen((value) => !value)} className="rounded-xl border border-amber-700/40 bg-black/45 px-2.5 py-1 text-base leading-none text-amber-100 shadow-lg shadow-black/40 backdrop-blur-sm" aria-label="Menü öffnen">☰</button></div>
-        <div className="relative text-center">
-          {menuOpen ? <div className="absolute right-0 top-[42px] z-30 w-64 overflow-hidden rounded-2xl border border-amber-700/40 bg-stone-950/95 text-left shadow-2xl shadow-black/70 backdrop-blur">{[["current", "Aktuelle Runde"], ["tournament", "Turnier"], ["archive", "Scorekarten"], ["fun", "Mittelerde"], ["settings", "Einstellungen"], ["admin", "Admin"]].map(([value, label]) => <button key={value} type="button" onClick={() => setMainMenuAndView(value)} className={cls("block w-full border-b border-amber-700/20 px-4 py-3 text-left text-sm last:border-b-0", mainMenu === value ? "bg-amber-600 text-amber-50" : "bg-transparent text-amber-100")}>{label}</button>)}</div> : null}
+      <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-1 pt-1">
+        <div className="relative flex items-center justify-between gap-2">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-700/40 bg-black/35 px-2 py-0.5 text-[10px] text-amber-100/75">
+            <Icon size={14} className={connectionStatus === "online" ? "text-emerald-300" : "text-red-300"}>{connectionStatus === "online" ? "●" : "○"}</Icon>
+            <span>{pendingScores.length ? `${pendingScores.length} offen` : connectionStatus === "online" ? "Datenbank verbunden" : "Datenbank offline"}</span>
+          </div>
+          <button type="button" onClick={() => setMenuOpen((value) => !value)} className="rounded-xl border border-amber-700/40 bg-black/45 px-2.5 py-1 text-base leading-none text-amber-100 shadow-lg shadow-black/40 backdrop-blur-sm" aria-label="Menü öffnen">☰</button>
+          {menuOpen ? <div className="absolute right-0 top-[34px] z-30 w-64 overflow-hidden rounded-2xl border border-amber-700/40 bg-stone-950/95 text-left shadow-2xl shadow-black/70 backdrop-blur">{[["current", "Aktuelle Runde"], ["roundTables", "Tabellen Runde"], ["tournament", "Turnier"], ["archive", "Scorekarten"], ["fun", "Mittelerde"], ["settings", "Einstellungen"], ["admin", "Admin"]].map(([value, label]) => <button key={value} type="button" onClick={() => setMainMenuAndView(value)} className={cls("block w-full border-b border-amber-700/20 px-4 py-3 text-left text-sm last:border-b-0", mainMenu === value ? "bg-amber-600 text-amber-50" : "bg-transparent text-amber-100")}>{label}</button>)}</div> : null}
         </div>
-        <div className="mt-1 flex justify-center"><div className="inline-flex items-center gap-1.5 rounded-full border border-amber-700/40 bg-black/35 px-2 py-0.5 text-[10px] text-amber-100/75"><Icon size={14} className={connectionStatus === "online" ? "text-emerald-300" : "text-red-300"}>{connectionStatus === "online" ? "●" : "○"}</Icon><span>{pendingScores.length ? `${pendingScores.length} Score${pendingScores.length === 1 ? "" : "s"} offen` : connectionStatus === "online" ? "Datenbank verbunden" : "Datenbank nicht verbunden"}</span></div></div>
       </motion.header>
     );
   }
@@ -1264,8 +1270,7 @@ function LordOfTheHolesApp() {
   }
 
   function renderCurrentTabs() {
-    if (mainMenu !== "current") return null;
-    return <div className="mb-2 grid grid-cols-2 gap-2"><Button onClick={() => setView("score")} className={cls("rounded-xl px-1 py-2.5 text-sm font-bold", view === "score" ? "bg-amber-600 text-amber-50" : "bg-stone-800 text-amber-100")}>Score</Button><Button onClick={() => setView("leaderboard")} className={cls("rounded-xl px-1 py-2.5 text-sm font-bold", view === "leaderboard" ? "bg-amber-600 text-amber-50" : "bg-stone-800 text-amber-100")}>Board</Button></div>;
+    return null;
   }
 
   function renderTournamentView() {
@@ -1310,28 +1315,21 @@ function LordOfTheHolesApp() {
         <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm">
           <CardContent className="p-2">
             <div className={cls("mb-2 rounded-xl border bg-black/25 p-1.5", hasScoreMismatch ? "border-red-500/60" : "border-amber-700/30")}>
-              <div className="flex items-center justify-between gap-2">
+              <div className="grid grid-cols-[1fr_auto] items-center gap-2">
                 <div>
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-amber-300/75">Aktuell gespielt</div>
-                  <div className="font-serif text-base leading-tight text-amber-200">{displayedActiveRound?.round_name || "Runde 1"}</div>
+                  <div className="text-[9px] uppercase tracking-[0.18em] text-amber-300/75">Aktuell gespielt</div>
+                  <div className="font-serif text-base leading-tight text-amber-200">{displayedActiveRound?.round_name || "Runde 1"} · Loch {activeHole}</div>
                   <div className="text-[10px] text-amber-100/70">{getRoundChapterLabel(displayedActiveRound).replace(`${displayedActiveRound?.round_name || ""} · `, "")}</div>
                   <div className="text-[10px] text-amber-100/65">{activeCourse?.course_name || "Kein Kurs ausgewählt"}</div>
                 </div>
-                {hasScoreMismatch ? (
-                  <div className="rounded-full border border-red-400/50 bg-red-950/50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-red-100">Abweichung</div>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="mb-2 grid grid-cols-[1fr_auto] items-center gap-2">
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.18em] text-amber-300/75">Aktives Loch</p>
-                <h2 className="font-serif text-3xl font-black leading-none text-amber-200">{activeHole}</h2>
-              </div>
-              <div className="grid grid-cols-3 gap-1 rounded-xl border border-amber-700/50 bg-black/30 p-1.5 text-center text-[11px] text-amber-50">
-                <div><div className="text-amber-100/70">Par</div><b className="text-amber-200">{activeHoleData.par}</b></div>
-                <div><div className="text-amber-100/70">HCP</div><b className="text-amber-200">{activeHoleData.hcp}</b></div>
-                <div><div className="text-amber-100/70">m</div><b className="text-amber-200">{activeHoleData.meters}</b></div>
+                <div className="text-right">
+                  {hasScoreMismatch ? <div className="mb-1 rounded-full border border-red-400/50 bg-red-950/50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-red-100">Abweichung</div> : null}
+                  <div className="grid grid-cols-3 gap-1 rounded-xl border border-amber-700/50 bg-black/30 p-1.5 text-center text-[10px] text-amber-50">
+                    <div><div className="text-amber-100/70">Par</div><b className="text-amber-200">{activeHoleData.par}</b></div>
+                    <div><div className="text-amber-100/70">HCP</div><b className="text-amber-200">{activeHoleData.hcp}</b></div>
+                    <div><div className="text-amber-100/70">m</div><b className="text-amber-200">{activeHoleData.meters}</b></div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1428,7 +1426,62 @@ function LordOfTheHolesApp() {
   }
 
   function renderLeaderboardView() {
-    return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3"><div className="landscape:mx-auto landscape:max-w-none landscape:pb-6"><Card className="mb-2 rounded-2xl border-amber-700/40 bg-black/35"><CardContent className="p-3 text-sm text-amber-100"><div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Aktuell gespielt</div><div className="mt-1 font-serif text-lg text-amber-200">{displayedActiveRound?.round_name || "Runde 1"}</div><div className="text-amber-100/65">{activeCourse?.course_name || "Kein Kurs ausgewählt"}</div></CardContent></Card><Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm"><CardContent className="p-3"><div className="mb-2"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Leaderboard</p><h2 className="font-serif text-lg text-amber-200">Die Gefährten</h2></div><LeaderboardTable title="Klassisches Zählspiel" players={strokePlayLeaderboard} columns={[{ label: "+/−", render: (p) => formatToPar(p.toPar, p.played), emphasize: true }, { label: "Schläge", render: (p) => p.played ? p.total : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Netto Stableford" players={netStablefordLeaderboard} columns={[{ label: "Punkte", render: (p) => p.netStableford, emphasize: true }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Zählspiel HCP adjusted" players={hcpAdjustedStrokeLeaderboard} columns={[{ label: "+/−", render: (p) => formatToPar(p.hcpAdjustedToPar, p.played), emphasize: true }, { label: "Netto", render: (p) => p.played ? p.hcpAdjustedTotal : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Brutto Punkte" players={grossStablefordLeaderboard} columns={[{ label: "Punkte", render: (p) => p.grossStableford, emphasize: true }, { label: "Schläge", render: (p) => p.played ? p.total : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Putt-Kasse" players={puttPenaltyLeaderboard} columns={[{ label: "3 Putts", render: (p) => `${p.threePutts} × 2 €` }, { label: "4+ Putts", render: (p) => `${p.fourPlusPutts} × 4 €` }, { label: "Gesamt", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} /></CardContent></Card></div></motion.section>;
+    const availableRounds = rounds.length ? rounds : fallbackRounds;
+    const tableRound = availableRounds.find((round) => String(round.round_id) === String(roundTableRoundId)) || displayedActiveRound || availableRounds[0] || fallbackRounds[0];
+    const tableCourseId = tableRound?.course_id || displayCourseId || "goethe";
+    const tableCourse = (courses.length ? courses : fallbackCourses).find((course) => String(course.course_id) === String(tableCourseId));
+    const tableHoles = (allHoles.length ? allHoles : fallbackHoles)
+      .filter((hole) => String(hole.course_id) === String(tableCourseId))
+      .sort((a, b) => Number(a.hole_number) - Number(b.hole_number));
+    const tablePlayers = getPlayersForCourse(getRoundPlayers(tableRound?.round_id, allPlayers, roundPlayers), tableCourseId, courses);
+    const tableScores = officialAllScores.filter((score) => String(score.round_id || "") === String(tableRound?.round_id || ""));
+    const tableStats = buildPlayerStats(tablePlayers, tableHoles, tableScores);
+    const tableStrokePlayLeaderboard = sortStrokePlay(tableStats);
+    const tableNetStablefordLeaderboard = sortStableford(tableStats, "netStableford");
+    const tableGrossStablefordLeaderboard = sortStableford(tableStats, "grossStableford");
+    const tableHcpAdjustedStrokeLeaderboard = sortHcpAdjustedStrokePlay(tableStats);
+    const tablePuttPenaltyLeaderboard = [...tableStats].sort((a, b) => Number(b.puttPenaltyEuro || 0) - Number(a.puttPenaltyEuro || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
+
+    return (
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
+        <div className="landscape:mx-auto landscape:max-w-none landscape:pb-6">
+          <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm">
+            <CardContent className="p-3 text-sm text-amber-100">
+              <div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Tabellen Runde</div>
+              <div className="mt-1 font-serif text-lg text-amber-200">{tableRound?.round_name || "Runde"}</div>
+              <div className="text-amber-100/65">{tableCourse?.course_name || "Kurs"}</div>
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {availableRounds.map((round) => (
+                  <button
+                    key={round.round_id}
+                    type="button"
+                    onClick={() => setRoundTableRoundId(round.round_id)}
+                    className={cls(
+                      "rounded-xl border px-2 py-2 text-xs font-bold",
+                      String(tableRound?.round_id) === String(round.round_id)
+                        ? "border-amber-400/60 bg-amber-600 text-amber-50"
+                        : "border-amber-700/35 bg-black/25 text-amber-100"
+                    )}
+                  >
+                    {round.round_name || round.round_id}
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm">
+            <CardContent className="p-3">
+              <div className="mb-2"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Leaderboard</p><h2 className="font-serif text-lg text-amber-200">Die Gefährten</h2></div>
+              <LeaderboardTable title="Klassisches Zählspiel" players={tableStrokePlayLeaderboard} columns={[{ label: "+/−", render: (p) => formatToPar(p.toPar, p.played), emphasize: true }, { label: "Schläge", render: (p) => p.played ? p.total : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} />
+              <LeaderboardTable title="Netto Stableford" players={tableNetStablefordLeaderboard} columns={[{ label: "Punkte", render: (p) => p.netStableford, emphasize: true }, { label: "Löcher", render: (p) => `${p.played}/18` }]} />
+              <LeaderboardTable title="Zählspiel HCP adjusted" players={tableHcpAdjustedStrokeLeaderboard} columns={[{ label: "+/−", render: (p) => formatToPar(p.hcpAdjustedToPar, p.played), emphasize: true }, { label: "Netto", render: (p) => p.played ? p.hcpAdjustedTotal : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} />
+              <LeaderboardTable title="Brutto Punkte" players={tableGrossStablefordLeaderboard} columns={[{ label: "Punkte", render: (p) => p.grossStableford, emphasize: true }, { label: "Schläge", render: (p) => p.played ? p.total : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} />
+              <LeaderboardTable title="Putt-Kasse" players={tablePuttPenaltyLeaderboard} columns={[{ label: "3 Putts", render: (p) => `${p.threePutts} × 2 €` }, { label: "4+ Putts", render: (p) => `${p.fourPlusPutts} × 4 €` }, { label: "Gesamt", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} />
+            </CardContent>
+          </Card>
+        </div>
+      </motion.section>
+    );
   }
 
   function renderFunView() {
