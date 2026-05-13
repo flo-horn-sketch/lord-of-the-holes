@@ -1361,11 +1361,12 @@ function LordOfTheHolesApp() {
           <CardContent className="p-2">
             <div className={cls("mb-2 rounded-2xl border bg-[linear-gradient(180deg,rgba(48,35,22,0.70),rgba(12,10,9,0.62))] p-1.5 shadow-[inset_0_1px_0_rgba(251,191,36,0.10),0_10px_28px_rgba(0,0,0,0.30)]", hasScoreMismatch ? "border-red-500/60" : "border-amber-500/30")}>
               <div className="grid grid-cols-[1fr_auto] items-center gap-2">
-                <div>
-                  <div className="text-[9px] uppercase tracking-[0.18em] text-amber-300/75">Aktuell gespielt</div>
-                  <div className="font-serif text-base leading-tight text-amber-200">{displayedActiveRound?.round_name || "Runde 1"}</div>
-                  <div className="text-[10px] text-amber-100/70">{getRoundChapterLabel(displayedActiveRound).replace(`${displayedActiveRound?.round_name || ""} · `, "")}</div>
-                  <div className="text-[10px] text-amber-100/65">{activeCourse?.course_name || "Kein Kurs ausgewählt"}</div>
+                <div className="grid grid-cols-[auto_1fr] items-center gap-3">
+                  <div className="font-serif text-2xl font-black leading-none text-amber-200">{displayedActiveRound?.round_name || "Runde 1"}</div>
+                  <div className="text-right leading-tight">
+                    <div className="text-[11px] font-semibold text-amber-100/80">{getRoundChapterLabel(displayedActiveRound).replace(`${displayedActiveRound?.round_name || ""} · `, "")}</div>
+                    <div className="text-[10px] text-amber-100/60">{activeCourse?.course_name || "Kein Kurs ausgewählt"}</div>
+                  </div>
                 </div>
                 <div className="text-right">
                   {hasScoreMismatch ? <div className="rounded-full border border-red-400/50 bg-red-950/50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-red-100">Abweichung</div> : null}
