@@ -828,7 +828,7 @@ function LordOfTheHolesApp() {
   const pendingScoresRef = useRef(readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord));
   const lastAutoHoleTargetRef = useRef("");
   const [localHandicaps, setLocalHandicaps] = useState({});
-  const [scoredPlayerId, setScoredPlayerId] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerId", "florian"));
+  const [scoredPlayerId, setScoredPlayerId] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerId", ""));
   const [scoredPlayerByRound, setScoredPlayerByRound] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerByRound", {}));
   const [roundScorerPromptOpen, setRoundScorerPromptOpen] = useState(false);
   const [scoreEntryMode, setScoreEntryMode] = useState("player");
@@ -1016,7 +1016,7 @@ function LordOfTheHolesApp() {
   const activePopupSoundKey = showSplash || showPlayerSelectPopup ? "" : roundSummaryPopup ? `roundSummary:${roundSummaryPopup.key}` : showFinalWinnerPopup ? `finalWinner:${finalWinnerPopupKey}` : displayedRoundHonorCelebration ? `roundHonor:${displayedRoundHonorCelebration.key}` : clearScoresConfirmOpen ? "clearScoresConfirm" : backupSavedMessage ? "backupSaved" : setupSavedMessage ? "setupSaved" : clearScoresError ? "clearScoresError" : error ? "error" : "";
 
   useEffect(() => {
-    if (!scoreablePlayers.some((p) => String(p.id) === String(scoredPlayerId))) setScoredPlayerId(scoreablePlayers[0]?.id || "");
+    if (scoredPlayerId && !scoreablePlayers.some((p) => String(p.id) === String(scoredPlayerId))) setScoredPlayerId("");
     if (!myPlayerId && scoreEntryMode === "scorer") setScoreEntryMode("player");
     if (Number(activeHole) < 1 || Number(activeHole) > 18) setActiveHole(1);
   }, [scoreablePlayers, scoredPlayerId, myPlayerId, scoreEntryMode, activeHole]);
@@ -1030,6 +1030,7 @@ function LordOfTheHolesApp() {
       setRoundScorerPromptOpen(false);
       return;
     }
+    setScoredPlayerId("");
     setRoundScorerPromptOpen(true);
   }, [displayedActiveRound?.round_id, myPlayerId, scoreablePlayers, scoredPlayerByRound, scoredPlayerId, showSplash, appLocked]);
 
@@ -1239,8 +1240,18 @@ function LordOfTheHolesApp() {
 
   async function clearScoresAndDeviceAssignments() {
     await clearAllScores();
+    let resetAt = new Date().toISOString();
+    try {
+      const result = await callSheetApi({ action: "resetDeviceAssignments" });
+      resetAt = String(result?.device_assignments_reset_at || result?.deviceAssignmentsResetAt || resetAt);
+      setConnectionStatus("online");
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Scores gelöscht, aber Geräte-Zuordnung konnte nicht global zurückgesetzt werden.");
+    }
+    setDeviceAssignmentsResetAt(resetAt);
     setMyPlayerId("");
-    setScoredPlayerId(scoreablePlayers[0]?.id || "");
+    setScoredPlayerId("");
     setScoredPlayerByRound({});
     setScoreEntryMode("player");
     setRoundScorerPromptOpen(false);
@@ -1250,10 +1261,11 @@ function LordOfTheHolesApp() {
     writeLocalJson("lordOfTheHoles.myPlayerId", "");
     writeLocalJson("lordOfTheHoles.scoredPlayerId", "");
     writeLocalJson("lordOfTheHoles.scoredPlayerByRound", {});
+    writeLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", resetAt);
     writeLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", []);
     writeLocalJson("lordOfTheHoles.winnerPopupDismissedKey", "");
     writeLocalJson("lordOfTheHoles.roundHonorDismissedKeys", []);
-    setSetupSavedMessage("Scores wurden gelöscht. Die Geräte-Zuordnung wurde auf diesem Gerät zurückgesetzt.");
+    setSetupSavedMessage("Scores wurden gelöscht. Wer bin ich / Wen zähle ich wurde für alle Geräte zurückgesetzt.");
   }
 
   async function resetDeviceAssignmentsForAll() {
@@ -1464,8 +1476,7 @@ function LordOfTheHolesApp() {
             <Button disabled={!isAdminUnlocked || backupSaving} onClick={createRoundBackup} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-700/80 py-2 text-emerald-50 disabled:opacity-50">{backupSaving ? "Erstelle Backup ..." : "Backup für aktive Runde erstellen"}</Button>
             {appLocked ? <Button disabled={!isAdminUnlocked} onClick={() => { setGlobalAppLock(false); setLockAdminBypass(false); }} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-800/70 py-2 text-emerald-50 disabled:opacity-50">App für alle freigeben</Button> : <Button disabled={!isAdminUnlocked} onClick={() => { setMenuOpen(false); setLockAdminBypass(false); setGlobalAppLock(true); }} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">App für alle sperren</Button>}
             <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={() => { setClearScoresError(""); setClearScoresConfirmOpen(true); }} className="mt-2 w-full rounded-2xl border border-red-500/50 bg-red-950/60 py-2 text-red-100 disabled:opacity-50">Scores löschen</Button>
-            <Button disabled={!isAdminUnlocked || connectionStatus !== "online"} onClick={resetDeviceAssignmentsForAll} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">Wer bin ich / Wen zähle ich bei allen zurücksetzen</Button>
-            <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={clearScoresAndDeviceAssignments} className="mt-2 w-full rounded-2xl border border-red-400/50 bg-red-950/80 py-2 text-red-100 disabled:opacity-50">Scores + Geräte-Zuordnung zurücksetzen</Button>
+            <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={clearScoresAndDeviceAssignments} className="mt-2 w-full rounded-2xl border border-red-400/50 bg-red-950/80 py-2 text-red-100 disabled:opacity-50">Scores + alle Spieler-/Zähler-Zuordnungen zurücksetzen</Button>
           </CardContent>
         </Card>
       </motion.section>
@@ -1907,6 +1918,8 @@ function LordOfTheHolesApp() {
                     onClick={() => {
                       setMyPlayerId(player.id);
                       setScoreEntryMode("player");
+                      setScoredPlayerId("");
+                      setRoundScorerPromptOpen(true);
                     }}
                     className="rounded-2xl border border-amber-700/35 bg-stone-900 px-3 py-3 font-serif text-base font-bold text-amber-100 transition active:scale-[0.98]"
                   >
