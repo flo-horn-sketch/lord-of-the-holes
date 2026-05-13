@@ -998,10 +998,9 @@ function LordOfTheHolesApp() {
   }, [identityRoundId, myPlayerId, currentAssignedScoredPlayerId, currentAssignedScoredPlayerIsValid, scoredPlayerId, showSplash, appLocked, lockAdminBypass]);
 
   useEffect(() => {
-    if (scoredPlayerId && !scoreablePlayers.some((p) => String(p.id) === String(scoredPlayerId))) setScoredPlayerId("");
     if (!myPlayerId && scoreEntryMode === "scorer") setScoreEntryMode("player");
     if (Number(activeHole) < 1 || Number(activeHole) > 18) setActiveHole(1);
-  }, [scoreablePlayers, scoredPlayerId, myPlayerId, scoreEntryMode, activeHole]);
+  }, [myPlayerId, scoreEntryMode, activeHole]);
 
   useEffect(() => {
     const roundId = String(displayedActiveRound?.round_id || "");
@@ -1609,7 +1608,7 @@ function LordOfTheHolesApp() {
                 </div>
               </div>
             ) : <div className="mb-2 rounded-xl border border-amber-700/30 bg-black/25 p-1.5 text-[10px] text-amber-100/75">Wähle zuerst im Start-Popup deinen Spieler aus.</div>}
-            {myPlayerId && (!scoredPlayerId || !currentAssignedScoredPlayerIsValid) ? (
+            {myPlayerId && !scoredPlayerId ? (
               <div className="mb-2 rounded-2xl border border-amber-500/45 bg-stone-950/75 p-2 shadow-xl shadow-black/30 backdrop-blur-sm">
                 <div className="mb-2 text-center"><div className="text-[10px] uppercase tracking-[0.2em] text-amber-300/75">Neue Zähl-Zuordnung</div><div className="font-serif text-lg font-black text-amber-200">Wen zählst du?</div></div>
                 <div className="grid grid-cols-2 gap-2">{scoreablePlayers.map((player) => <button key={player.id} type="button" onClick={() => { setScoredPlayerId(player.id); saveLocalScoredPlayerForRound(displayedActiveRound?.round_id || "", player.id); }} className="rounded-2xl bg-stone-800 px-2 py-3 font-serif text-sm font-bold text-amber-100 active:scale-[0.98]">{getPlayerLabel(player)}</button>)}</div>
