@@ -48,7 +48,7 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
-const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbyamITQ2Nj7h9woLyZ2inRlRpBbZYxL6ZVOPn5HEQ1LdPLREqEu2jNzAnYphCsHsS7N/exec";
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbyaupv2xGGWJ9cAP4VwEkmPvdEtvUGpK0ePFoJyAQjgqhVgSIauybzoDbELOQ1HUiwa/exec";
 const ADMIN_PASSWORD = "weimar";
 const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T11:00:00+02:00");
 
@@ -872,6 +872,7 @@ function LordOfTheHolesApp() {
   const [lockAdminBypass, setLockAdminBypass] = useState(false);
   const [lockCountdownNow, setLockCountdownNow] = useState(() => new Date());
   const [deviceAssignmentsResetAt, setDeviceAssignmentsResetAt] = useState(() => readLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", ""));
+  const [scoresResetAt, setScoresResetAt] = useState(() => readLocalJson("lordOfTheHoles.scoresResetAt", ""));
   const introAudioRef = useRef(null);
   const lastPopupSoundKeyRef = useRef("");
   const [clearScoresConfirmOpen, setClearScoresConfirmOpen] = useState(false);
@@ -1083,6 +1084,7 @@ function LordOfTheHolesApp() {
   useEffect(() => { writeLocalJson("lordOfTheHoles.myPlayerId", myPlayerId); }, [myPlayerId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.appLocked", appLocked); }, [appLocked]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", deviceAssignmentsResetAt); }, [deviceAssignmentsResetAt]);
+  useEffect(() => { writeLocalJson("lordOfTheHoles.scoresResetAt", scoresResetAt); }, [scoresResetAt]);
   useEffect(() => {
     if (!appLocked) return undefined;
     const timer = window.setInterval(() => setLockCountdownNow(new Date()), 1000);
@@ -1141,6 +1143,20 @@ function LordOfTheHolesApp() {
         const nextAppLocked = normalizeBoolean(data.app_locked ?? data.appLocked);
         setAppLocked(nextAppLocked);
         if (nextAppLocked && !lockAdminBypass) setShowSplash(true);
+      }
+      const nextScoresResetAt = String(data.scores_reset_at || data.scoresResetAt || "");
+      const localScoresResetAt = String(readLocalJson("lordOfTheHoles.scoresResetAt", "") || "");
+      if (nextScoresResetAt && nextScoresResetAt !== localScoresResetAt) {
+        const emptyScores = [];
+        setScores(emptyScores);
+        setAllScores(emptyScores);
+        setPendingScores(emptyScores);
+        pendingScoresRef.current = emptyScores;
+        writeLocalJson("lordOfTheHoles.pendingScores", emptyScores);
+        writeLocalJson("lordOfTheHoles.cachedState", null);
+        writeLocalJson("lordOfTheHoles.scoresResetAt", nextScoresResetAt);
+        setScoresResetAt(nextScoresResetAt);
+        setActiveHole(1);
       }
       const nextDeviceAssignmentsResetAt = String(data.device_assignments_reset_at || data.deviceAssignmentsResetAt || "");
       const localDeviceAssignmentsResetAt = String(readLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", "") || "");
@@ -1312,9 +1328,29 @@ function LordOfTheHolesApp() {
     setClearScoresSaving(true);
     setClearScoresError("");
     setError("");
-    try { const result = await callSheetApi({ action: "clearScores" }); setScores([]); setAllScores([]); setPendingScores([]); pendingScoresRef.current = []; writeLocalJson("lordOfTheHoles.pendingScores", []); writeLocalJson("lordOfTheHoles.cachedState", null); setConnectionStatus("online"); setClearScoresConfirmOpen(false); setBackupSavedMessage(result?.backup_sheet_name ? `Backup erstellt: ${result.backup_sheet_name}` : ""); setSetupSavedMessage("Alle Scores wurden gelöscht. Backups bleiben erhalten."); await loadData({ silent: true }); }
-    catch (err) { setConnectionStatus("offline"); const message = err.message || "Scores konnten nicht gelöscht werden."; setClearScoresError(message); setError(message); }
-    finally { setClearScoresSaving(false); }
+    try {
+      const result = await callSheetApi({ action: "clearScores" });
+      const emptyScores = [];
+      setScores(emptyScores);
+      setAllScores(emptyScores);
+      setPendingScores(emptyScores);
+      pendingScoresRef.current = emptyScores;
+      writeLocalJson("lordOfTheHoles.pendingScores", emptyScores);
+      writeLocalJson("lordOfTheHoles.cachedState", null);
+      setActiveHole(1);
+      setConnectionStatus("online");
+      setClearScoresConfirmOpen(false);
+      setBackupSavedMessage(result?.backup_sheet_name ? `Backup erstellt: ${result.backup_sheet_name}` : "");
+      setSetupSavedMessage("Alle Scores wurden gelöscht. Backups bleiben erhalten.");
+      await loadData({ silent: true });
+    } catch (err) {
+      setConnectionStatus("offline");
+      const message = err.message || "Scores konnten nicht gelöscht werden.";
+      setClearScoresError(message);
+      setError(message);
+    } finally {
+      setClearScoresSaving(false);
+    }
   }
 
   async function clearScoresAndDeviceAssignments() {
@@ -1556,7 +1592,6 @@ function LordOfTheHolesApp() {
             <Button disabled={!isAdminUnlocked || setupSaving} onClick={saveFullSetup} className="mt-2 w-full rounded-2xl bg-amber-600 py-2 text-amber-50 disabled:opacity-50">{setupSaving ? "Speichere ..." : "HCP-Werte speichern"}</Button>
             <Button disabled={!isAdminUnlocked || backupSaving} onClick={createRoundBackup} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-700/80 py-2 text-emerald-50 disabled:opacity-50">{backupSaving ? "Erstelle Backup ..." : "Backup für aktive Runde erstellen"}</Button>
             {appLocked ? <Button disabled={!isAdminUnlocked} onClick={() => { setGlobalAppLock(false); setLockAdminBypass(false); }} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-800/70 py-2 text-emerald-50 disabled:opacity-50">App für alle freigeben</Button> : <Button disabled={!isAdminUnlocked} onClick={() => { setMenuOpen(false); setLockAdminBypass(false); setGlobalAppLock(true); }} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">App für alle sperren</Button>}
-            <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={() => { setClearScoresError(""); setClearScoresConfirmOpen(true); }} className="mt-2 w-full rounded-2xl border border-red-500/50 bg-red-950/60 py-2 text-red-100 disabled:opacity-50">Scores löschen</Button>
             <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={() => { setClearScoresError(""); setClearScoresConfirmOpen(true); }} className="mt-2 w-full rounded-2xl border border-red-500/50 bg-red-950/60 py-2 text-red-100 disabled:opacity-50">Scores löschen</Button>
             <Button disabled={!isAdminUnlocked || connectionStatus !== "online"} onClick={resetDeviceAssignmentsForAll} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">Spieler-/Zähler-Zuordnungen zurücksetzen</Button>
           </CardContent>
