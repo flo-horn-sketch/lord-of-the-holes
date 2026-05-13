@@ -893,8 +893,8 @@ function LordOfTheHolesApp() {
   }, [visiblePlayers, myPlayerId]);
   const playersWithCurrentHandicaps = useMemo(() => getPlayersForCourse(visiblePlayers, displayCourseId, courses), [visiblePlayers, displayCourseId, courses]);
   const activeHoleData = holes.find((h) => Number(h.hole_number) === Number(activeHole)) || holes[Number(activeHole) - 1] || fallbackHoles.find((h) => h.course_id === displayCourseId && h.hole_number === Number(activeHole)) || fallbackHoles[0];
-  const scoredPlayerBase = scoreablePlayers.find((p) => p.id === scoredPlayerId) || scoreablePlayers[0];
-  const scoredPlayer = getPlayerForCourse(scoredPlayerBase, displayCourseId, courses);
+  const scoredPlayerBase = scoredPlayerId ? scoreablePlayers.find((p) => String(p.id) === String(scoredPlayerId)) : null;
+  const scoredPlayer = scoredPlayerBase ? getPlayerForCourse(scoredPlayerBase, displayCourseId, courses) : null;
   const myCurrentPlayer = myPlayerId ? getPlayerForCourse(visiblePlayers.find((player) => String(player.id) === String(myPlayerId)), displayCourseId, courses) : null;
   const isScorerEntryMode = scoreEntryMode === "scorer" && Boolean(myCurrentPlayer);
   const entryPlayerId = isScorerEntryMode ? myPlayerId : scoredPlayerId;
@@ -907,7 +907,7 @@ function LordOfTheHolesApp() {
     if (isScorerEntryMode) return String(s.player_id) === String(entryPlayerId) && isScorerControlScore(s);
     return String(s.player_id) === String(entryPlayerId) && !isScorerControlScore(s);
   }) || { strokes: "", picked_up: false, over_two_putts: false, putts_count: "", lady: false }, [scores, entryPlayerId, activeHole, displayedActiveRound?.round_id, isScorerEntryMode]);
-  const canEnterScores = Boolean(displayedActiveRound?.round_id && entryPlayerId && entryPlayer && Number(activeHole) > 0);
+  const canEnterScores = Boolean(displayedActiveRound?.round_id && myPlayerId && scoredPlayerId && entryPlayerId && entryPlayer && Number(activeHole) > 0);
   const hasCurrentScore = currentScore.strokes !== "" && currentScore.strokes != null;
   const hasCurrentPutts = currentScore.putts_count !== "" && currentScore.putts_count != null;
   const officialScoreForActiveHole = useMemo(() => findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", scoredPlayerId, activeHole, false), [scores, displayedActiveRound?.round_id, scoredPlayerId, activeHole]);
@@ -1158,7 +1158,15 @@ function LordOfTheHolesApp() {
       setRounds(nextRounds);
       setRoundPlayers(data.roundPlayers || []);
       setActiveRound(nextActiveRound);
-      if (!adminEditing) { setSelectedCourseId(nextActiveRound?.course_id || ""); setSelectedActiveRoundId(nextActiveRound?.round_id || fallbackRounds[0].round_id); }
+      if (!adminEditing) {
+        const previousRoundId = selectedActiveRoundId;
+        const nextRoundId = nextActiveRound?.round_id || fallbackRounds[0].round_id;
+        setSelectedCourseId(nextActiveRound?.course_id || "");
+        setSelectedActiveRoundId(nextRoundId);
+        if (String(previousRoundId || "") !== String(nextRoundId || "")) {
+          window.setTimeout(() => prepareScorerPromptForRound(nextRoundId), 0);
+        }
+      }
       applyPlayers(nextActivePlayers, nextAllPlayers, nextCourses);
       setHoles(normalizeHoles(data.activeHoles?.length ? data.activeHoles : data.holes).filter((hole) => !nextActiveRound?.course_id || String(hole.course_id) === String(nextActiveRound.course_id)));
       setAllHoles(normalizeHoles(data.holes));
@@ -1442,6 +1450,25 @@ function LordOfTheHolesApp() {
     setError("");
   }
 
+  function prepareScorerPromptForRound(nextRoundId) {
+    const roundId = String(nextRoundId || "");
+    if (!roundId) return;
+    lastRoundForScorerPromptRef.current = roundId;
+    setScoreEntryMode("player");
+    const storedPlayerId = scoredPlayerByRound?.[roundId] || "";
+    const playersForRound = getRoundPlayers(roundId, allPlayers, roundPlayers);
+    const availableForRound = myPlayerId ? playersForRound.filter((player) => String(player.id) !== String(myPlayerId)) : playersForRound;
+    const validPlayers = availableForRound.length ? availableForRound : playersForRound;
+    const storedPlayerIsValid = storedPlayerId && validPlayers.some((player) => String(player.id) === String(storedPlayerId));
+    if (storedPlayerIsValid) {
+      setScoredPlayerId(storedPlayerId);
+      setRoundScorerPromptOpen(false);
+    } else {
+      setScoredPlayerId("");
+      if (myPlayerId && !showSplash && (!appLocked || lockAdminBypass)) setRoundScorerPromptOpen(true);
+    }
+  }
+
   function setMainMenuAndView(value) {
     setMainMenu(value);
     setMenuOpen(false);
@@ -1520,7 +1547,7 @@ function LordOfTheHolesApp() {
           <CardContent className="p-3">
             <div className="mb-2"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Admin</p><h2 className="font-serif text-lg text-amber-200">Turnierverwaltung</h2><p className="mt-1 text-sm text-amber-100/65">Aktive Runde und Spielvorgaben sind sichtbar, aber erst nach Passworteingabe bearbeitbar.</p></div>
             {!isAdminUnlocked ? <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Admin-Passwort</label><input type="password" value={adminPinInput} onChange={(e) => setAdminPinInput(e.target.value)} placeholder="Passwort eingeben" className="mb-3 w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" /><Button onClick={() => { if (adminPinInput === ADMIN_PASSWORD) { setIsAdminUnlocked(true); setError(""); } else { setError("Admin-Passwort ist falsch."); } }} className="w-full rounded-2xl bg-amber-600 py-2 text-amber-50">Admin entsperren</Button></div> : <div className="mb-2 rounded-2xl border border-emerald-700/30 bg-emerald-950/30 p-3 text-sm text-emerald-100">Admin entsperrt. Änderungen können gespeichert werden.</div>}
-            <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Aktive Runde</label><select value={selectedActiveRoundId} onChange={(e) => { const nextRoundId = e.target.value; const nextRound = (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(nextRoundId)); const nextCourseId = nextRound?.course_id || selectedCourseId || ""; setAdminEditing(true); setSelectedActiveRoundId(nextRoundId); setSelectedCourseId(nextCourseId); saveAdminRoundCourse(nextRoundId, nextCourseId); }} disabled={!isAdminUnlocked || setupSaving} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:opacity-60"><option value="">Runde auswählen</option>{(rounds.length ? rounds : fallbackRounds).map((round) => <option key={round.round_id} value={round.round_id}>{round.round_name}</option>)}</select></div>
+            <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Aktive Runde</label><select value={selectedActiveRoundId} onChange={(e) => { const nextRoundId = e.target.value; const nextRound = (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(nextRoundId)); const nextCourseId = nextRound?.course_id || selectedCourseId || ""; setAdminEditing(true); setSelectedActiveRoundId(nextRoundId); setSelectedCourseId(nextCourseId); prepareScorerPromptForRound(nextRoundId); saveAdminRoundCourse(nextRoundId, nextCourseId); }} disabled={!isAdminUnlocked || setupSaving} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:opacity-60"><option value="">Runde auswählen</option>{(rounds.length ? rounds : fallbackRounds).map((round) => <option key={round.round_id} value={round.round_id}>{round.round_name}</option>)}</select></div>
             <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Kurs für aktive Runde</label><select value={selectedCourseId} onChange={(e) => { const nextCourseId = e.target.value; setAdminEditing(true); setSelectedCourseId(nextCourseId); saveAdminRoundCourse(selectedActiveRoundId, nextCourseId); }} disabled={!isAdminUnlocked || setupSaving} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:opacity-60"><option value="">Kurs auswählen</option>{(courses.length ? courses : fallbackCourses).map((course) => <option key={course.course_id} value={course.course_id}>{course.course_name}</option>)}</select></div>
             <div className="space-y-2">{allPlayers.map((p) => { const hcpIndexKey = `hcp_index_${p.id}`; const hcpIndexValue = localHandicaps[hcpIndexKey] ?? String(p.handicap_index ?? p.dgv_hcp ?? p.hcp_index ?? ""); const previewPlayer = { ...p, handicap_index: hcpIndexValue === "" || hcpIndexValue === "-" ? 0 : Number(String(hcpIndexValue).replace(",", ".")) }; const goetheSpv = getCourseHandicap(previewPlayer, "goethe", courses); const feiningerSpv = getCourseHandicap(previewPlayer, "feininger", courses); return <div key={p.id} className="rounded-xl border border-amber-700/30 bg-black/25 p-2"><div className="mb-2 font-semibold text-amber-100">{getPlayerLabel(p)}<div className="text-xs font-normal text-amber-100/70">DGV-HCP eintragen · Spielvorgabe wird automatisch berechnet</div></div><div className="rounded-xl border border-amber-700/20 bg-black/25 p-2"><label className="mb-1 block text-xs font-bold uppercase tracking-[0.16em] text-amber-300/80">DGV HCP / Handicap Index</label><input inputMode="decimal" disabled={!isAdminUnlocked} value={hcpIndexValue} onChange={(e) => { setAdminEditing(true); setLocalHandicaps((current) => ({ ...current, [hcpIndexKey]: cleanHandicapInput(e.target.value) })); }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-center text-amber-50 disabled:opacity-60" /><div className="mt-2 grid grid-cols-2 gap-2 text-center text-xs text-amber-100/75"><div className="rounded-xl bg-amber-50/5 p-2"><div>Goethe SpV</div><b className="text-lg text-amber-200">{goetheSpv}</b></div><div className="rounded-xl bg-amber-50/5 p-2"><div>Feininger SpV</div><b className="text-lg text-amber-200">{feiningerSpv}</b></div></div></div></div>; })}</div>
             <Button disabled={!isAdminUnlocked || setupSaving} onClick={saveFullSetup} className="mt-2 w-full rounded-2xl bg-amber-600 py-2 text-amber-50 disabled:opacity-50">{setupSaving ? "Speichere ..." : "HCP-Werte speichern"}</Button>
