@@ -1167,8 +1167,11 @@ function LordOfTheHolesApp() {
         setScoreEntryMode("player");
         setForcedScorerPromptRoundId(nextActiveRoundId);
         setServerRoundChangePromptId(nextActiveRoundId);
+        setRoundScorerPromptOpen(false);
         lastRoundForScorerPromptRef.current = "";
-        if (!showSplash && (!normalizeBoolean(data.app_locked ?? data.appLocked) || lockAdminBypass)) setRoundScorerPromptOpen(true);
+        if (!normalizeBoolean(data.app_locked ?? data.appLocked) || lockAdminBypass) {
+          setShowSplash(true);
+        }
       }
       if (nextActiveRoundId) writeLocalJson("lordOfTheHoles.lastSeenActiveRoundId", nextActiveRoundId);
       const nextActivePlayers = data.activePlayers?.length ? data.activePlayers.map(withFallbackAlias) : getRoundPlayers(nextActiveRound?.round_id, nextAllPlayers, data.roundPlayers || []);
