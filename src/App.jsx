@@ -1046,6 +1046,8 @@ function LordOfTheHolesApp() {
     if (currentAssignedScoredPlayerIsValid && String(scoredPlayerId || "") !== String(currentAssignedScoredPlayerId)) {
       setScoredPlayerId(currentAssignedScoredPlayerId);
       setRoundScorerPromptOpen(false);
+    } else if (scoredPlayerId) {
+      setRoundScorerPromptOpen(false);
     }
   }, [identityRoundId, myPlayerId, currentAssignedScoredPlayerId, currentAssignedScoredPlayerIsValid, scoredPlayerId, showSplash, appLocked, lockAdminBypass]);
   const identityFlowActive = !showSplash && (!appLocked || lockAdminBypass);
@@ -1071,9 +1073,10 @@ function LordOfTheHolesApp() {
     if (storedPlayerIsValid) {
       if (String(scoredPlayerId || "") !== String(storedPlayerId)) setScoredPlayerId(storedPlayerId);
       setRoundScorerPromptOpen(false);
-    } else {
-      if (scoredPlayerId) setScoredPlayerId("");
+    } else if (!scoredPlayerId) {
       setRoundScorerPromptOpen(true);
+    } else {
+      setRoundScorerPromptOpen(false);
     }
   }, [displayedActiveRound?.round_id, myPlayerId, scoreablePlayers, scoredPlayerByRound, scoredPlayerId, showSplash, appLocked, lockAdminBypass]);
 
@@ -1142,17 +1145,6 @@ function LordOfTheHolesApp() {
       const nextDeviceAssignmentsResetAt = String(data.device_assignments_reset_at || data.deviceAssignmentsResetAt || "");
       const localDeviceAssignmentsResetAt = String(readLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", "") || "");
       if (nextDeviceAssignmentsResetAt && nextDeviceAssignmentsResetAt !== localDeviceAssignmentsResetAt) {
-        setMyPlayerId("");
-        setScoredPlayerId("");
-        setScoredPlayerByRound({});
-        setScoreEntryMode("player");
-        setRoundScorerPromptOpen(false);
-        setPendingScores([]);
-        pendingScoresRef.current = [];
-        writeLocalJson("lordOfTheHoles.myPlayerId", "");
-        writeLocalJson("lordOfTheHoles.scoredPlayerId", "");
-        writeLocalJson("lordOfTheHoles.scoredPlayerByRound", {});
-        writeLocalJson("lordOfTheHoles.pendingScores", []);
         writeLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", nextDeviceAssignmentsResetAt);
         setDeviceAssignmentsResetAt(nextDeviceAssignmentsResetAt);
       } else if (nextDeviceAssignmentsResetAt && nextDeviceAssignmentsResetAt !== deviceAssignmentsResetAt) {
