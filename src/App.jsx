@@ -1070,7 +1070,34 @@ function LordOfTheHolesApp() {
           {menuOpen ? (
             <div className="absolute right-0 top-[34px] z-30 w-64 overflow-hidden rounded-2xl border border-amber-700/40 bg-stone-950/95 text-left shadow-2xl shadow-black/70 backdrop-blur">
               {[["current", "Scoring"], ["roundTables", "Tabellen Runde"], ["tournament", "Turnier"], ["archive", "Scorekarten"], ["fun", "Mittelerde"], ["settings", "Einstellungen"], ["admin", "Admin"]].map(([value, label]) => (
-                <button key={value} type="button" onClick={() => setMainMenuAndView(value)} className={cls("block w-full border-b border-amber-700/20 text-left last:border-b-0", value === "current" ? "px-4 py-4 text-base font-black" : "px-4 py-2.5 text-sm", mainMenu === value ? "bg-amber-700/55 text-amber-50" : "bg-transparent text-amber-100/85")}>{label}</button>
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setMainMenuAndView(value)}
+                  className={cls(
+                    "block w-full border-b border-amber-700/20 text-left last:border-b-0",
+                    value === "current" ? "px-4 py-4 text-base font-black" : "px-4 py-2.5 text-sm",
+                    mainMenu === value
+                      ? value === "current"
+                        ? "bg-[linear-gradient(180deg,rgba(217,119,6,0.98),rgba(146,64,14,0.96))] text-amber-50 shadow-[inset_0_1px_0_rgba(251,191,36,0.28)]"
+                        : "bg-amber-700/55 text-amber-50"
+                      : value === "current"
+                        ? "bg-amber-500/10 text-amber-200"
+                        : "bg-transparent text-amber-100/85"
+                  )}
+                >
+                  {value === "current" ? (
+                    <span className="flex items-center justify-between gap-3">
+                      <span>
+                        <span className="block font-serif text-lg leading-tight">Scoring</span>
+                        <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-100/65">Score eingeben</span>
+                      </span>
+                      <span className="text-xl drop-shadow-[0_0_10px_rgba(251,191,36,0.35)]">➜</span>
+                    </span>
+                  ) : (
+                    <span className="pl-2">{label}</span>
+                  )}
+                </button>
               ))}
             </div>
           ) : null}
@@ -1216,11 +1243,94 @@ function LordOfTheHolesApp() {
     );
   }
 
+  function renderTournamentView() {
+    const qualificationRounds = (rounds.length ? rounds : fallbackRounds).filter((round) => String(round.stage || "qualification") === "qualification").sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0)).slice(0, 3);
+    const standings = (allPlayers || []).map((player) => {
+      const results = qualificationRounds.map((round) => {
+        const roundCourseId = round.course_id || "goethe";
+        const roundHoles = (allHoles.length ? allHoles : fallbackHoles).filter((hole) => String(hole.course_id) === String(roundCourseId));
+        const playerForRound = getPlayerForCourse(player, roundCourseId, courses);
+        const playerScores = officialAllScores.filter((score) => String(score.round_id || "") === String(round.round_id) && String(score.player_id || "") === String(player.id) && score.strokes !== "" && score.strokes != null);
+        const strokes = playerScores.reduce((sum, score) => sum + Number(score.strokes || 0), 0);
+        const hcpShots = playerScores.reduce((sum, score) => sum + getShotsOnHole(playerForRound.course_hcp, roundHoles.find((hole) => Number(hole.hole_number) === Number(score.hole_number))?.hcp), 0);
+        return { roundId: round.round_id, played: playerScores.length, value: playerScores.length ? strokes - hcpShots : null };
+      });
+      const counted = results.filter((result) => result.value != null).sort((a, b) => Number(a.value) - Number(b.value)).slice(0, 2);
+      return { ...withFallbackAlias(player), results, totalBestTwo: counted.length ? counted.reduce((sum, result) => sum + Number(result.value || 0), 0) : null, roundsPlayed: counted.length };
+    }).sort((a, b) => (a.totalBestTwo == null && b.totalBestTwo != null ? 1 : b.totalBestTwo == null && a.totalBestTwo != null ? -1 : Number(a.totalBestTwo || 0) - Number(b.totalBestTwo || 0) || Number(b.roundsPlayed || 0) - Number(a.roundsPlayed || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0)));
+
+    return (
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
+        <Card className="mb-2 rounded-2xl border border-amber-500/30 bg-[linear-gradient(180deg,rgba(48,35,22,0.86),rgba(18,13,9,0.82))] shadow-xl backdrop-blur-sm">
+          <CardContent className="p-3">
+            <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Turnier</p>
+            <h2 className="font-serif text-lg text-amber-200">Gesamtwertung Strokes HCP adjusted</h2>
+            <p className="mt-1 text-sm text-amber-100/65">Es zählen die besten zwei Ergebnisse aus den ersten drei Runden. Niedriger ist besser.</p>
+            <div className="mt-3 overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/25 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <table className="w-full min-w-[620px] border-collapse text-sm text-amber-50">
+                <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100"><th className="px-2 py-2">#</th><th className="px-2 py-2">Spieler</th>{qualificationRounds.map((round) => <th key={round.round_id} className="px-2 py-2 text-right">{round.round_name}</th>)}<th className="px-2 py-2 text-right">Gesamt</th></tr></thead>
+                <tbody>{standings.map((player, index) => <React.Fragment key={player.id}>{index === 3 ? <tr><td colSpan={qualificationRounds.length + 3} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-amber-200">Cut-Linie · Top 3 spielen den Finaltag</td></tr> : null}<tr className="border-t border-amber-700/20"><td className="px-2 py-2 text-amber-200/75">{index + 1}</td><td className="px-2 py-2 font-semibold text-amber-100">{getPlayerLabel(player)}</td>{qualificationRounds.map((round) => { const result = player.results.find((item) => item.roundId === round.round_id); return <td key={round.round_id} className="px-2 py-2 text-right">{result?.value ?? "–"}</td>; })}<td className="px-2 py-2 text-right font-serif text-lg font-bold text-amber-300">{player.totalBestTwo ?? "–"}</td></tr></React.Fragment>)}</tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.section>
+    );
+  }
+
+  function renderArchiveView() {
+    const availableRounds = rounds.length ? rounds : fallbackRounds;
+    const archiveRound = availableRounds.find((round) => String(round.round_id) === String(scorecardRoundId)) || displayedActiveRound || availableRounds[0] || fallbackRounds[0];
+    const archiveCourseId = archiveRound?.course_id || displayCourseId || "goethe";
+    const archiveHoles = (allHoles.length ? allHoles : fallbackHoles).filter((hole) => String(hole.course_id) === String(archiveCourseId)).sort((a, b) => Number(a.hole_number) - Number(b.hole_number));
+    const archivePlayers = getPlayersForCourse(getRoundPlayers(archiveRound?.round_id, allPlayers, roundPlayers), archiveCourseId, courses);
+    const archiveScores = officialAllScores.filter((score) => String(score.round_id || "") === String(archiveRound?.round_id || ""));
+
+    return (
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
+        <Card className="mb-2 rounded-2xl border border-amber-500/30 bg-[linear-gradient(180deg,rgba(48,35,22,0.86),rgba(18,13,9,0.82))] shadow-xl backdrop-blur-sm">
+          <CardContent className="p-3">
+            <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Scorekarten</p>
+            <h2 className="font-serif text-lg text-amber-200">{archiveRound?.round_name || "Runde"}</h2>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">{availableRounds.map((round) => <button key={round.round_id} type="button" onClick={() => setScorecardRoundId(round.round_id)} className={cls("rounded-xl border px-2 py-2 text-xs font-bold", String(archiveRound?.round_id) === String(round.round_id) ? "border-amber-400/60 bg-amber-600 text-amber-50" : "border-amber-700/35 bg-black/25 text-amber-100")}>{round.round_name || round.round_id}</button>)}</div>
+          </CardContent>
+        </Card>
+        {archivePlayers.map((player) => {
+          const playerRows = archiveHoles.map((hole) => ({ hole, score: archiveScores.find((score) => String(score.player_id || "") === String(player.id) && Number(score.hole_number) === Number(hole.hole_number)) }));
+          const total = playerRows.reduce((sum, row) => sum + Number(row.score?.strokes || 0), 0);
+          return <Card key={player.id} className="mb-3 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm"><CardContent className="p-3"><div className="mb-2 flex items-center justify-between"><div className="font-serif text-lg font-bold text-amber-200">{getPlayerLabel(player)}</div><div className="text-sm text-amber-100/75">Σ {total || "–"}</div></div><div className="overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/25 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><table className="w-full min-w-[620px] text-xs text-amber-50"><thead><tr><th className="px-2 py-1.5 text-left">Loch</th>{archiveHoles.map((hole) => <th key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hole.hole_number}</th>)}</tr></thead><tbody><tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold">Strokes</td>{playerRows.map(({ hole, score }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{score ? normalizeBoolean(score.picked_up) ? "X" : score.strokes || "–" : "–"}</td>)}</tr><tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold">Putts</td>{playerRows.map(({ hole, score }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{score?.putts_count ?? "–"}</td>)}</tr></tbody></table></div></CardContent></Card>;
+        })}
+      </motion.section>
+    );
+  }
+
+  function renderFunView() {
+    const funStats = playerStats.map((player) => ({ ...player, snakeEuro: player.puttPenaltyEuro || 0 })).sort((a, b) => Number(b.snakeEuro || 0) - Number(a.snakeEuro || 0));
+    const ladies = [...playerStats].sort((a, b) => Number(b.ladyCount || 0) - Number(a.ladyCount || 0));
+    return (
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
+        <Card className="mb-2 rounded-2xl border border-amber-500/30 bg-[linear-gradient(180deg,rgba(48,35,22,0.86),rgba(18,13,9,0.82))] shadow-xl backdrop-blur-sm">
+          <CardContent className="p-3">
+            <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Mittelerde</p>
+            <h2 className="font-serif text-lg text-amber-200">Die Chroniken der Runde</h2>
+            <p className="mt-1 text-sm text-amber-100/65">Fun-Tabellen aus den Scores der aktuellen Runde.</p>
+            <LeaderboardTable title="Shelobs Putt-Kammer" players={funStats} columns={[{ label: "3 Putts", render: (p) => p.threePutts }, { label: "4+ Putts", render: (p) => p.fourPlusPutts }, { label: "€", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} />
+            <LeaderboardTable title="Galadriels Spiegel" players={ladies} columns={[{ label: "Ladys", render: (p) => p.ladyCount, emphasize: true }, { label: "Löcher", render: (p) => `${p.played}/18` }]} />
+            <LeaderboardTable title="Strokes HCP adjusted" players={hcpAdjustedStrokeLeaderboard} columns={[{ label: "+/−", render: (p) => formatToPar(p.hcpAdjustedToPar, p.played), emphasize: true }, { label: "Löcher", render: (p) => `${p.played}/18` }]} />
+          </CardContent>
+        </Card>
+      </motion.section>
+    );
+  }
+
   function renderActiveView() {
     if (loading) return <Card className="rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm"><CardContent className="flex items-center gap-2 p-3 text-amber-100">⟳ Lade Datenbank ...</CardContent></Card>;
     if (view === "admin") return renderAdminView();
     if (view === "handicaps") return renderSettingsView();
     if (view === "leaderboard") return renderLeaderboardView();
+    if (view === "tournament") return renderTournamentView();
+    if (view === "archive") return renderArchiveView();
+    if (view === "fun") return renderFunView();
     return renderScoreView();
   }
 
