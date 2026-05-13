@@ -1698,7 +1698,7 @@ function LordOfTheHolesApp() {
               <div className="mb-2 rounded-xl border border-amber-700/30 bg-black/25 p-1.5 text-[10px] text-amber-100/75">Wähle zuerst im Start-Popup deinen Spieler aus.</div>
             )}
 
-            {myPlayerId && !currentAssignedScoredPlayerIsValid ? (
+            {myPlayerId && (!scoredPlayerId || !currentAssignedScoredPlayerIsValid) ? (
               <div className="mb-2 rounded-2xl border border-amber-500/45 bg-stone-950/75 p-2 shadow-xl shadow-black/30 backdrop-blur-sm">
                 <div className="mb-2 text-center">
                   <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300/75">Neue Zähl-Zuordnung</div>
