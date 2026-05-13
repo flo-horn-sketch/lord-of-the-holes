@@ -782,15 +782,22 @@ async function callSheetApi(payload) {
   return data;
 }
 
-function getFirstUnscoredHole(scores = [], roundId = "", playerId = "", fallbackHole = 1) {
-  const scoredHoleNumbers = new Set((scores || []).filter((score) => {
-    if (!score || score.strokes === "" || score.strokes == null) return false;
-    if (roundId && String(score.round_id || "") !== String(roundId)) return false;
-    if (playerId && String(score.player_id || "") !== String(playerId)) return false;
-    return Number(score.hole_number) > 0;
-  }).map((score) => Number(score.hole_number)));
+function getFirstUnscoredHole(scores = [], roundId = "", playerId = "", fallbackHole = 1, scorerPlayerId = "") {
+  const hasCompletedScore = (targetPlayerId, holeNumber, wantControlScore) => {
+    const score = findScoreForPlayerHole(scores, roundId, targetPlayerId, holeNumber, wantControlScore);
+    return Boolean(
+      score &&
+      score.strokes !== "" &&
+      score.strokes != null &&
+      score.putts_count !== "" &&
+      score.putts_count != null
+    );
+  };
+
   for (let holeNumber = 1; holeNumber <= 18; holeNumber += 1) {
-    if (!scoredHoleNumbers.has(holeNumber)) return holeNumber;
+    const officialComplete = playerId ? hasCompletedScore(playerId, holeNumber, false) : false;
+    const controlComplete = scorerPlayerId ? hasCompletedScore(scorerPlayerId, holeNumber, true) : false;
+    if (!officialComplete || !controlComplete) return holeNumber;
   }
   return Number(fallbackHole || 18);
 }
@@ -813,7 +820,7 @@ function LordOfTheHolesApp() {
   const [localHandicaps, setLocalHandicaps] = useState({});
   const [scoredPlayerId, setScoredPlayerId] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerId", "florian"));
   const [scoreEntryMode, setScoreEntryMode] = useState("player");
-  const [activeHole, setActiveHole] = useState(() => getFirstUnscoredHole(cachedState?.scores?.length ? cachedState.scores : cachedState?.allScores || [], cachedState?.selectedActiveRoundId || cachedState?.activeRound?.round_id || "", readLocalJson("lordOfTheHoles.scoredPlayerId", ""), 1));
+  const [activeHole, setActiveHole] = useState(() => getFirstUnscoredHole(cachedState?.scores?.length ? cachedState.scores : cachedState?.allScores || [], cachedState?.selectedActiveRoundId || cachedState?.activeRound?.round_id || "", readLocalJson("lordOfTheHoles.scoredPlayerId", ""), 1, readLocalJson("lordOfTheHoles.myPlayerId", "")));
   const [view, setView] = useState("score");
   const [mainMenu, setMainMenu] = useState("current");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1012,9 +1019,9 @@ function LordOfTheHolesApp() {
     const autoHoleTargetKey = `${selectedActiveRoundId}|${scoredPlayerId}`;
     if (lastAutoHoleTargetRef.current !== autoHoleTargetKey) {
       lastAutoHoleTargetRef.current = autoHoleTargetKey;
-      setActiveHole(getFirstUnscoredHole(mergedRoundScores, selectedActiveRoundId, scoredPlayerId, 1));
+      setActiveHole(getFirstUnscoredHole(mergedRoundScores, selectedActiveRoundId, scoredPlayerId, 1, myPlayerId));
     }
-  }, [selectedActiveRoundId, allScores, scoredPlayerId]);
+  }, [selectedActiveRoundId, allScores, scoredPlayerId, myPlayerId]);
   useEffect(() => {
     if (!activePopupSoundKey) { lastPopupSoundKeyRef.current = ""; return; }
     if (lastPopupSoundKeyRef.current === activePopupSoundKey) return;
