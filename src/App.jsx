@@ -546,13 +546,13 @@ function getFinalRound(rounds) {
   return (rounds?.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === "r4") || (rounds?.length ? rounds : fallbackRounds).find((round) => String(round.stage) === "final") || fallbackRounds[3];
 }
 
-function buildTournamentNetStandings(players, rounds, holes, scores) {
+function buildTournamentNetStandings(players, rounds, holes, scores, courses = fallbackCourses) {
   const qualificationRounds = getQualificationRounds(rounds);
   return (players || []).map((player) => {
     const roundResults = qualificationRounds.map((round) => {
       const roundHoles = getRoundHoles(round, holes);
       const roundScores = (scores || []).filter((score) => String(score.round_id) === String(round.round_id) && String(score.player_id) === String(player.id) && score.strokes !== "" && score.strokes != null);
-      const playerForRound = getPlayerForCourse(player, round.course_id || "goethe");
+      const playerForRound = getPlayerForCourse(player, round.course_id || "goethe", courses);
       const grossStrokes = roundScores.reduce((sum, score) => sum + Number(score.strokes || 0), 0);
       const hcpShotsUsed = roundScores.reduce((sum, score) => sum + getShotsOnHole(playerForRound.course_hcp, roundHoles.find((h) => Number(h.hole_number) === Number(score.hole_number))?.hcp), 0);
       const hcpAdjustedStrokes = roundScores.length ? grossStrokes - hcpShotsUsed : null;
@@ -565,8 +565,8 @@ function buildTournamentNetStandings(players, rounds, holes, scores) {
   }).sort((a, b) => (a.totalBestTwo == null && b.totalBestTwo != null ? 1 : b.totalBestTwo == null && a.totalBestTwo != null ? -1 : Number(a.totalBestTwo || 0) - Number(b.totalBestTwo || 0) || Number(b.roundsPlayed || 0) - Number(a.roundsPlayed || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0)));
 }
 
-function buildFinalNetStandings(players, rounds, holes, scores) {
-  const qualificationStandings = buildTournamentNetStandings(players, rounds, holes, scores);
+function buildFinalNetStandings(players, rounds, holes, scores, courses = fallbackCourses) {
+  const qualificationStandings = buildTournamentNetStandings(players, rounds, holes, scores, courses);
   const finalRound = getFinalRound(rounds);
   const finalHoles = getRoundHoles(finalRound, holes);
   const withFinalScores = qualificationStandings.map((player, qualificationIndex) => {
@@ -631,9 +631,9 @@ function MiddleEarthTables({ players, holes, scores, mismatches }) {
   );
 }
 
-function TournamentStandings({ players, rounds, holes, scores, activeRoundId = "" }) {
-  const standings = useMemo(() => buildTournamentNetStandings(players, rounds, holes, scores), [players, rounds, holes, scores]);
-  const finalStandings = useMemo(() => buildFinalNetStandings(players, rounds, holes, scores), [players, rounds, holes, scores]);
+function TournamentStandings({ players, rounds, holes, scores, courses = fallbackCourses, activeRoundId = "" }) {
+  const standings = useMemo(() => buildTournamentNetStandings(players, rounds, holes, scores, courses), [players, rounds, holes, scores, courses]);
+  const finalStandings = useMemo(() => buildFinalNetStandings(players, rounds, holes, scores, courses), [players, rounds, holes, scores, courses]);
   const qualificationRounds = getQualificationRounds(rounds);
   const finalRound = getFinalRound(rounds);
   const isFinalActive = String(activeRoundId) === String(finalRound?.round_id || "r4");
@@ -1446,7 +1446,7 @@ function LordOfTheHolesApp() {
   }
 
   function renderTournamentView() {
-    return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3"><div className="landscape:mx-auto landscape:max-w-none landscape:pb-6"><TournamentStandings players={allPlayers} rounds={rounds} holes={allHoles} scores={officialAllScores} activeRoundId={displayedActiveRound?.round_id} /></div></motion.section>;
+    return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3"><div className="landscape:mx-auto landscape:max-w-none landscape:pb-6"><TournamentStandings players={allPlayers} rounds={rounds} holes={allHoles} scores={officialAllScores} courses={courses} activeRoundId={displayedActiveRound?.round_id} /></div></motion.section>;
   }
 
   function getStrokesCellClass(score, hole) {
