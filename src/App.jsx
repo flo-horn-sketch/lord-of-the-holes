@@ -654,18 +654,18 @@ function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", sta
   const shownValue = hasValue || defaultValue != null ? (formatValue ? formatValue(baseValue) : baseValue) : emptyLabel;
   const setValue = (nextValue) => onChange(Math.max(min, Math.min(max, Number(nextValue || 0))));
   return (
-    <div className="rounded-xl border border-amber-700/40 bg-black/25 p-1.5">
-      <div className="mb-1 flex items-center justify-between gap-2">
-        <div className="text-xs font-semibold text-amber-100">{label}</div>
-        {status ? <div className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold text-amber-100/75">{status}</div> : null}
+    <div className="rounded-2xl border border-amber-700/40 bg-black/25 p-2.5">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <div className="text-sm font-semibold text-amber-100">{label}</div>
+        {status ? <div className="rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold text-amber-100/75">{status}</div> : null}
       </div>
-      <div className="grid grid-cols-[56px_1fr_56px] items-center gap-2">
-        <button type="button" onClick={() => setValue(baseValue - 1)} disabled={baseValue <= min} className="h-11 rounded-xl border border-amber-700/50 bg-stone-950 text-xl font-black leading-none text-amber-100 disabled:opacity-35">−</button>
-        <button type="button" onClick={() => setValue(baseValue)} className="h-11 rounded-xl border border-amber-700/30 bg-stone-950/70 text-center shadow-inner shadow-black/60">
-          <div className="font-serif text-3xl font-black leading-none text-amber-200">{shownValue}</div>
-          <div className="text-[8px] uppercase tracking-[0.16em] text-amber-100/50">{!hasValue && defaultValue != null ? "tippen" : label}</div>
+      <div className="grid grid-cols-[68px_1fr_68px] items-center gap-2.5">
+        <button type="button" onClick={() => setValue(baseValue - 1)} disabled={baseValue <= min} className="h-16 rounded-2xl border border-amber-700/50 bg-stone-950 text-3xl font-black leading-none text-amber-100 disabled:opacity-35">−</button>
+        <button type="button" onClick={() => setValue(baseValue)} className="h-16 rounded-2xl border border-amber-700/30 bg-stone-950/70 text-center shadow-inner shadow-black/60">
+          <div className="font-serif text-5xl font-black leading-none text-amber-200">{shownValue}</div>
+          <div className="text-[9px] uppercase tracking-[0.16em] text-amber-100/50">{!hasValue && defaultValue != null ? "tippen" : label}</div>
         </button>
-        <button type="button" onClick={() => setValue(baseValue + 1)} disabled={baseValue >= max} className="h-11 rounded-xl border border-amber-700/50 bg-stone-950 text-xl font-black leading-none text-amber-100 disabled:opacity-35">+</button>
+        <button type="button" onClick={() => setValue(baseValue + 1)} disabled={baseValue >= max} className="h-16 rounded-2xl border border-amber-700/50 bg-stone-950 text-3xl font-black leading-none text-amber-100 disabled:opacity-35">+</button>
       </div>
     </div>
   );
@@ -1361,10 +1361,10 @@ function LordOfTheHolesApp() {
               <div className="mb-2 rounded-xl border border-amber-700/30 bg-black/20 p-1.5 text-[10px] text-amber-100/75">Unter Einstellungen kannst du festlegen, wer du bist.</div>
             )}
 
-            <div className={cls("rounded-2xl border bg-amber-50/5 p-2", hasScoreMismatch ? "border-red-500/70 ring-1 ring-red-500/40" : "border-amber-700/40")}>
+            <div className={cls("rounded-3xl border bg-amber-50/5 p-3", hasScoreMismatch ? "border-red-500/70 ring-1 ring-red-500/40" : "border-amber-700/40")}>
               {myCurrentPlayer ? (
-                <div className="mb-2 grid grid-cols-2 gap-2 rounded-xl border border-amber-700/30 bg-black/25 p-1">
-                  <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-xl px-2 py-1.5 text-xs font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/60")}>
+                <div className="mb-3 grid grid-cols-2 gap-2 rounded-2xl border border-amber-700/30 bg-black/25 p-1.5">
+                  <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-xl px-2 py-2 text-sm font-bold", !isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/60")}>
                     {getPlayerLabel(scoredPlayer) || "Spieler"} {hasSelectedPlayerScoreMismatch ? "⚠" : ""}
                   </button>
                   <button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl px-2 py-1.5 text-xs font-bold", isScorerEntryMode ? "bg-amber-600 text-amber-50" : "text-amber-100", hasOwnScoreMismatch && "ring-1 ring-red-400/60")}>
@@ -1385,7 +1385,7 @@ function LordOfTheHolesApp() {
                 <span className="text-[10px] text-amber-100/65">Vorgabe <b className="text-amber-200 tracking-[0.18em]">{formatShotMarks(entryPlayerShotsOnActiveHole)}</b></span>
               </div>
 
-              <div className="mb-2">
+              <div className="mb-3">
                 <ScoreStepper
                   value={normalizeBoolean(currentScore.picked_up) ? 0 : currentScore.strokes ?? ""}
                   par={activeHoleData?.par || 4}
@@ -1398,25 +1398,25 @@ function LordOfTheHolesApp() {
                 />
               </div>
 
-              <div className="mb-2">
+              <div className="mb-3">
                 <PuttStepper value={currentScore.putts_count} onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })} />
               </div>
 
-              <div className="mb-2 rounded-xl border border-amber-700/40 bg-black/25 p-1.5">
+              <div className="mb-3 rounded-2xl border border-amber-700/40 bg-black/25 p-2">
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <div className="text-xs font-semibold text-amber-100">Lady</div>
                     <div className="text-[10px] text-amber-100/65">Markiert eine Lady.</div>
                   </div>
-                  <input type="checkbox" checked={normalizeBoolean(currentScore.lady)} onChange={(e) => saveScore({ lady: e.target.checked })} className="h-4 w-4 accent-amber-500" />
+                  <input type="checkbox" checked={normalizeBoolean(currentScore.lady)} onChange={(e) => saveScore({ lady: e.target.checked })} className="h-6 w-6 accent-amber-500" />
                 </div>
               </div>
 
               {scoreHintMessage ? <div className="mb-2 rounded-xl border border-amber-500/40 bg-amber-950/50 p-1.5 text-center text-xs font-semibold text-amber-100">{scoreHintMessage}</div> : null}
 
               <div className="grid grid-cols-2 gap-2">
-                <Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 py-2 text-amber-100">Zurück</Button>
-                <Button disabled={activeHole === 18} onClick={goToNextHole} className={cls("rounded-2xl py-2 text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>Loch {Math.min(18, Number(activeHole || 1) + 1)}</Button>
+                <Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 py-3 text-base font-bold text-amber-100">Zurück</Button>
+                <Button disabled={activeHole === 18} onClick={goToNextHole} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>Loch {Math.min(18, Number(activeHole || 1) + 1)}</Button>
               </div>
             </div>
           </CardContent>
