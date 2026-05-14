@@ -1527,16 +1527,26 @@ function LordOfTheHolesApp() {
     const safeHoleNumber = Number(activeHole || 0);
     if (!safeRoundId || !safePlayerId || !safeHoleNumber) throw new Error("Score kann noch nicht gespeichert werden: Runde, Spieler oder Loch fehlt.");
 
+    const latestScores = scoresRef.current || [];
+    const latestScore = findScoreForPlayerHole(
+      latestScores,
+      safeRoundId,
+      safePlayerId,
+      safeHoleNumber,
+      isScorerEntryMode
+    );
+
+    const baseScore = latestScore || currentScore || {};
     const next = normalizeScoreRecord({
       round_id: safeRoundId,
       player_id: safePlayerId,
       hole_number: safeHoleNumber,
-      strokes: currentScore.strokes ?? "",
-      picked_up: normalizeBoolean(currentScore.picked_up),
-      over_two_putts: normalizeBoolean(currentScore.over_two_putts),
-      putts_count: currentScore.putts_count ?? "",
-      lady: normalizeBoolean(currentScore.lady),
-      scorer_player_id: isScorerEntryMode ? entryPlayerId : myPlayerId || "",
+      strokes: baseScore.strokes ?? "",
+      picked_up: normalizeBoolean(baseScore.picked_up),
+      over_two_putts: normalizeBoolean(baseScore.over_two_putts),
+      putts_count: baseScore.putts_count ?? "",
+      lady: normalizeBoolean(baseScore.lady),
+      scorer_player_id: isScorerEntryMode ? safePlayerId : myPlayerId || "",
       updated_at: new Date().toISOString(),
       ...patch,
     });
@@ -1825,7 +1835,16 @@ function LordOfTheHolesApp() {
     if (!bothScoresComplete) {
       const missingItems = getMissingScoreItemsForCurrentHole();
       setScoreHintMessage(`Erst ${missingItems.join(", ")} eintragen, dann weiter.`);
-      window.setTimeout(() => setSc  function finishRoundFromHole18() {
+      window.setTimeout(() => setScoreHintMessage(""), 2400);
+      return;
+    }
+
+    setScoreHintMessage("");
+    syncCurrentHoleScoresNow();
+    setActiveHole((h) => Math.min(18, h + 1));
+  }
+
+  function finishRoundFromHole18() {
     if (isCurrentRoundScoringLocked) {
       setScoreHintMessage("Diese Runde ist vollständig und ohne Abweichung besiegelt.");
       window.setTimeout(() => setScoreHintMessage(""), 2400);
@@ -1843,11 +1862,6 @@ function LordOfTheHolesApp() {
     }
 
     setScoreHintMessage("Loch 18 wurde gespeichert. Die Chronik kann beginnen.");
-    window.setTimeout(() => setScoreHintMessage(""), 2400);
-    syncCurrentHoleScoresNow();
-  }
-
-  async function createRoundBackup() {Chronik kann beginnen.");
     window.setTimeout(() => setScoreHintMessage(""), 2400);
     syncCurrentHoleScoresNow();
   }
