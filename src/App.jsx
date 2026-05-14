@@ -2607,7 +2607,15 @@ function LordOfTheHolesApp() {
 
   function renderStatusMessages() {
     if (!error) return null;
-    return <Card className="mb-2 rounded-2xl border-amber-700/40 bg-amber-950/50"><CardContent className="p-3 text-sm text-amber-100">{error}</CardContent></Card
+
+    return (
+      <Card className="mb-2 rounded-2xl border-amber-700/40 bg-amber-950/50">
+        <CardContent className="p-3 text-sm text-amber-100">
+          {error}
+        </CardContent>
+      </Card>
+    );
+  }
 
   function renderScoreView() {
     const scoringTintClass = isScorerEntryMode ? "[--score-accent:56_189_248]" : "[--score-accent:245_158_11]";
