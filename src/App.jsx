@@ -984,6 +984,8 @@ function LordOfTheHolesApp() {
   const [flightRevealRunning, setFlightRevealRunning] = useState(false);
   const [flightRevealRoundIndex, setFlightRevealRoundIndex] = useState(0);
   const [flightRevealCount, setFlightRevealCount] = useState(0);
+  const [flightRevealIntroStep, setFlightRevealIntroStep] = useState(0);
+  const [flightRevealOutroStep, setFlightRevealOutroStep] = useState(0);
   const [localHandicaps, setLocalHandicaps] = useState({});
   const introAudioRef = useRef(null);
   const lastLoadedRoundRef = useRef("");
@@ -1141,7 +1143,35 @@ function LordOfTheHolesApp() {
   const flightDrawAvailable = lockCountdownNow.getTime() >= FLIGHT_DRAW_TARGET.getTime();
   const shouldAutoOpenFlightDraw = appLocked && flightDrawAvailable && !flightDraw && !flightDrawSaving;
   const currentRevealRound = flightDraw?.rounds?.[flightRevealRoundIndex] || null;
-  const currentRevealAssignments = currentRevealRound?.flights?.flatMap((flight) => (flight.scorers || []).map((assignment) => ({ ...assignment, flight_number: flight.flight_number }))) || [];
+  const currentRevealPlayers = currentRevealRound?.flights?.flatMap((flight) => (flight.players || []).map((playerId) => ({ player_id: playerId, flight_number: flight.flight_number }))) || [];
+  const flightRevealIntroLinesByRound = [
+    [
+      "Die Türen von Bruchtal schließen sich. Kein Hobbit raschelt mehr mit der Scorekarte.",
+      "Elrond hebt die Hand. Das erste Pergament wird in den Kreis getragen.",
+      "Runde 1 wird ohne Gangolf beschritten. Sein Pfad beginnt erst später.",
+      "Möge das erste Kapitel die Gemeinschaft nicht schon am Tee 1 entzweien.",
+    ],
+    [
+      "Das erste Pergament ist gesprochen. Manche Blicke sagen: Das war bestimmt kein Zufall.",
+      "Nun tritt Gangolf aus dem Schatten hinzu. Die Gemeinschaft ist vollständig.",
+      "Das zweite Pergament wird geöffnet — und irgendwo lacht ein Ork über die Startzeiten.",
+      "Runde 2 führt durch die Minen von Moria. Wer hier zittert, sollte wenigstens gerade putten.",
+    ],
+    [
+      "Zwei Kapitel sind besiegelt. Noch atmet die Gemeinschaft, wenn auch hörbar schwerer.",
+      "Das dritte Pergament liegt bereit. Vor den Toren Mordors zählt jede Allianz doppelt.",
+      "Die letzten Flights vor dem Schicksalsberg werden offenbart.",
+      "Mögen die Drives lang, die Ausreden kurz und die Zähler gnädig sein.",
+    ],
+  ];
+  const flightRevealOutroLines = [
+    "Die Pergamente sinken. Der Rat schweigt. Selbst Golfum sagt kurz nichts.",
+    "Die Flights der ersten drei Kapitel sind besiegelt.",
+    "Was am Schicksalsberg geschieht, entscheidet allein die Tabelle.",
+  ];
+  const currentIntroLines = flightRevealIntroLinesByRound[flightRevealRoundIndex] || flightRevealIntroLinesByRound[0];
+  const currentRevealLine = currentIntroLines[flightRevealIntroStep] || null;
+  const currentOutroLine = flightRevealOutroLines[flightRevealOutroStep] || null;
   const flightDrawCountdown = useMemo(() => {
     const diffMs = Math.max(0, FLIGHT_DRAW_TARGET.getTime() - lockCountdownNow.getTime());
     const totalSeconds = Math.floor(diffMs / 1000);
@@ -1630,6 +1660,8 @@ function LordOfTheHolesApp() {
     if (flightDraw && !replaceExisting) {
       setFlightRevealRoundIndex(0);
       setFlightRevealCount(0);
+      setFlightRevealIntroStep(0);
+      setFlightRevealOutroStep(0);
       setFlightRevealRunning(true);
       return;
     }
@@ -1641,6 +1673,8 @@ function LordOfTheHolesApp() {
     setFlightDraw(draw);
     setFlightRevealRoundIndex(0);
     setFlightRevealCount(0);
+    setFlightRevealIntroStep(0);
+    setFlightRevealOutroStep(0);
     setFlightRevealRunning(true);
     writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, draw);
     setFlightDrawSaving(true);
@@ -1665,23 +1699,35 @@ function LordOfTheHolesApp() {
 
   useEffect(() => {
     if (!flightRevealRunning || !flightDraw?.rounds?.length) return undefined;
-    const assignments = currentRevealAssignments;
-    const isRoundComplete = flightRevealCount >= assignments.length;
-    const delay = isRoundComplete ? 2400 : 1350;
+    const introDone = flightRevealIntroStep >= currentIntroLines.length;
+    const players = currentRevealPlayers;
+    const roundPlayersDone = introDone && flightRevealCount >= players.length;
+    const finalRoundDone = roundPlayersDone && flightRevealRoundIndex >= flightDraw.rounds.length - 1;
+    const outroDone = !finalRoundDone || flightRevealOutroStep >= flightRevealOutroLines.length;
+    const delay = !introDone ? 3200 : !roundPlayersDone ? 2200 : finalRoundDone && !outroDone ? 3300 : 3600;
     const timer = window.setTimeout(() => {
-      if (!isRoundComplete) {
+      if (!introDone) {
+        setFlightRevealIntroStep((step) => step + 1);
+        return;
+      }
+      if (!roundPlayersDone) {
         setFlightRevealCount((count) => count + 1);
+        return;
+      }
+      if (finalRoundDone && !outroDone) {
+        setFlightRevealOutroStep((step) => step + 1);
         return;
       }
       if (flightRevealRoundIndex < flightDraw.rounds.length - 1) {
         setFlightRevealRoundIndex((index) => index + 1);
         setFlightRevealCount(0);
+        setFlightRevealIntroStep(0);
         return;
       }
       setFlightRevealRunning(false);
     }, delay);
     return () => window.clearTimeout(timer);
-  }, [flightRevealRunning, flightDraw, flightRevealRoundIndex, flightRevealCount, currentRevealAssignments.length]);
+  }, [flightRevealRunning, flightDraw, flightRevealRoundIndex, flightRevealCount, flightRevealIntroStep, flightRevealOutroStep, currentRevealPlayers.length, currentIntroLines.length]);
 
   function saveLocalScoredPlayerForRound(roundId, scoredPlayerIdValue) {
     if (!roundId || !scoredPlayerIdValue) return;
@@ -1712,31 +1758,50 @@ function LordOfTheHolesApp() {
   function renderFlightDrawPanel() {
     const playerMap = new Map((allPlayers?.length ? allPlayers : fallbackPlayers).map((player) => [String(player.id), withFallbackAlias(player)]));
     if (flightDraw && flightRevealRunning && currentRevealRound) {
-      const visibleAssignments = currentRevealAssignments.slice(0, flightRevealCount);
+      const introDone = flightRevealIntroStep >= currentIntroLines.length;
+      const roundPlayersDone = introDone && flightRevealCount >= currentRevealPlayers.length;
+      const finalOutroRunning = roundPlayersDone && flightRevealRoundIndex >= flightDraw.rounds.length - 1 && flightRevealOutroStep < flightRevealOutroLines.length;
+      const visiblePlayers = currentRevealPlayers.slice(0, flightRevealCount);
       return (
-        <div className="flex min-h-[78vh] flex-col justify-center rounded-3xl border border-amber-300/55 bg-black/72 p-4 text-center text-amber-50 shadow-2xl shadow-black/80 backdrop-blur-sm">
+        <div className="flex min-h-[78vh] flex-col justify-center rounded-3xl border border-amber-300/55 bg-black/75 p-4 text-center text-amber-50 shadow-2xl shadow-black/80 backdrop-blur-sm">
           <div className="text-[10px] uppercase tracking-[0.32em] text-amber-300/75">Der Rat von Bruchtal</div>
-          <div className="mt-2 font-serif text-2xl font-black text-amber-200">{currentRevealRound.round_name}</div>
-          {currentRevealRound.note ? <div className="mx-auto mt-3 max-w-sm rounded-2xl border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-100/75">{currentRevealRound.note}</div> : null}
-          <div className="mt-5 grid gap-3 text-left">
-            {currentRevealRound.flights.map((flight) => {
-              const flightVisibleAssignments = visibleAssignments.filter((assignment) => assignment.flight_number === flight.flight_number);
-              return (
-                <div key={`${currentRevealRound.round_id}-${flight.flight_number}`} className="rounded-3xl border border-amber-500/30 bg-stone-950/60 p-3 shadow-lg shadow-black/35">
-                  <div className="font-serif text-lg font-black text-amber-200">Flight {flight.flight_number}</div>
-                  <div className="mt-1 text-xs text-amber-100/60">{flight.players.map((playerId) => getPlayerLabel(playerMap.get(String(playerId))) || playerId).join(" · ")}</div>
-                  <div className="mt-3 space-y-2">
-                    {flightVisibleAssignments.length ? flightVisibleAssignments.map((assignment) => (
-                      <div key={`${assignment.scorer_player_id}-${assignment.player_id}`} className="animate-pulse rounded-2xl border border-amber-400/25 bg-amber-500/15 px-3 py-2 text-sm font-bold text-amber-50">
-                        {getScorerLabel(assignment, playerMap)}
+          {!introDone || finalOutroRunning ? (
+            <div className="mx-auto mt-5 max-w-sm">
+              <div className="font-serif text-2xl font-black leading-tight text-amber-200">{finalOutroRunning ? "Der Rat hat gesprochen" : "Flight-Ziehung der Pergamente"}</div>
+              <div className="mt-6 rounded-3xl border border-amber-500/30 bg-stone-950/60 p-5 font-serif text-xl font-bold leading-snug text-amber-50 shadow-lg shadow-black/40">
+                {finalOutroRunning ? currentOutroLine : currentRevealLine}
+              </div>
+              <div className="mt-5 text-xs uppercase tracking-[0.22em] text-amber-100/45">{finalOutroRunning ? "Die Chronik wird geschlossen ..." : "Die Gemeinschaft wartet ..."}</div>
+            </div>
+          ) : (
+            <>
+              <div className="mt-2 font-serif text-2xl font-black leading-tight text-amber-200">{currentRevealRound.round_name}</div>
+              {currentRevealRound.note ? <div className="mx-auto mt-3 max-w-sm rounded-2xl border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-100/75">{currentRevealRound.note}</div> : null}
+              <div className="mt-5 grid gap-3 text-left">
+                {currentRevealRound.flights.map((flight) => {
+                  const flightVisiblePlayers = visiblePlayers.filter((entry) => entry.flight_number === flight.flight_number);
+                  return (
+                    <div key={`${currentRevealRound.round_id}-${flight.flight_number}`} className="rounded-3xl border border-amber-500/30 bg-stone-950/60 p-3 shadow-lg shadow-black/35">
+                      <div className="text-center font-serif text-lg font-black text-amber-200">Flight {flight.flight_number}</div>
+                      <div className="mt-3 grid gap-2">
+                        {flightVisiblePlayers.length ? flightVisiblePlayers.map((entry) => {
+                          const player = playerMap.get(String(entry.player_id));
+                          const normalized = withFallbackAlias(player || { id: entry.player_id });
+                          return (
+                            <div key={`${entry.flight_number}-${entry.player_id}`} className="rounded-2xl border border-amber-400/30 bg-amber-500/15 px-3 py-3 text-center shadow-md shadow-black/30">
+                              <div className="font-serif text-3xl font-black leading-none text-amber-100">{normalized.alias_name || normalized.character_name || entry.player_id}</div>
+                              <div className="mt-1 text-xs uppercase tracking-[0.18em] text-amber-100/55">{normalized.character_name || normalized.display_name || entry.player_id}</div>
+                            </div>
+                          );
+                        }) : <div className="rounded-2xl border border-dashed border-amber-500/25 px-3 py-4 text-center text-sm text-amber-100/45">Das Pergament bleibt noch verschlossen ...</div>}
                       </div>
-                    )) : <div className="rounded-2xl border border-dashed border-amber-500/25 px-3 py-2 text-sm text-amber-100/45">Die Pergamente rascheln ...</div>}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          <div className="mt-5 text-xs uppercase tracking-[0.22em] text-amber-100/55">Kapitel {flightRevealRoundIndex + 1} von {flightDraw.rounds.length}</div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-5 text-xs uppercase tracking-[0.22em] text-amber-100/55">Kapitel {flightRevealRoundIndex + 1} von {flightDraw.rounds.length}</div>
+            </>
+          )}
         </div>
       );
     }
