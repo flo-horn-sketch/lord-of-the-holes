@@ -48,7 +48,7 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
-const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbySHbh5V_FZTo4rCzEewajlM7Nvcg2_TG14RhIcR3GJWOqW4-eo6nEnYFHW31xyKQ0K/exec";
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbzAhD3jxR4FRHTEoE5rLnrEIVp4ilsKxo-ij7Pw0ubg9IWA58kWQNfHfW9H2BdQvxa8/exec";
 const ADMIN_PASSWORD = "weimar";
 const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T11:00:00+02:00");
 const FLIGHT_DRAW_TARGET = new Date("2026-05-21T20:00:00+02:00");
@@ -1705,28 +1705,39 @@ function LordOfTheHolesApp() {
       setFlightRevealRunning(true);
       return;
     }
-    if (replaceExisting) {
-      window.localStorage.removeItem(FLIGHT_DRAW_STORAGE_KEY);
-      setFlightDraw(null);
-    }
+
     const draw = buildFlightDraw(allPlayers, rounds);
-    setFlightDraw(draw);
-    setFlightRevealRoundIndex(0);
-    setFlightRevealCount(0);
-    setFlightRevealIntroStep(0);
-    setFlightRevealOutroStep(0);
-    setFlightRevealRunning(true);
-    writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, draw);
     setFlightDrawSaving(true);
     setError("");
+
     try {
-      await callSheetApi({ action: "saveFlightDraw", draw, test: Boolean(forceLocalTest || saveTestToSheet) });
+      const saveResult = await Promise.race([
+        callSheetApi({ action: "saveFlightDraw", draw, test: Boolean(forceLocalTest || saveTestToSheet) }),
+        new Promise((_, reject) => window.setTimeout(() => reject(new Error("saveFlightDraw hat zu lange gedauert. Bitte Apps Script Deployment und Berechtigungen prüfen.")), 15000)),
+      ]);
+      const savedDraw = saveResult?.flight_draw || saveResult?.flightDraw || draw;
+
+      if (replaceExisting) {
+        window.localStorage.removeItem(FLIGHT_DRAW_STORAGE_KEY);
+      }
+
+      setFlightDraw(savedDraw);
+      writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, savedDraw);
       setConnectionStatus("online");
-      setSetupSavedMessage(forceLocalTest || saveTestToSheet ? "Die Test-Ziehung der Pergamente wurde lokal und im Sheet gespeichert." : "Die Flight-Ziehung der Pergamente wurde gespeichert.");
+      setSetupSavedMessage(forceLocalTest || saveTestToSheet ? "Die Test-Ziehung der Pergamente wurde im Sheet gespeichert." : "Die Flight-Ziehung der Pergamente wurde gespeichert.");
+
+      setFlightRevealRoundIndex(0);
+      setFlightRevealCount(0);
+      setFlightRevealIntroStep(0);
+      setFlightRevealOutroStep(0);
+      setExpandedFlightKeys({});
+      setFlightRevealRunning(true);
+
       await loadData({ silent: true });
     } catch (err) {
       setConnectionStatus("offline");
-      setError(`${err.message || "saveFlightDraw konnte nicht gespeichert werden."} Die Ziehung ist lokal auf diesem Gerät gespeichert. Damit alle Handys dieselbe Ziehung sehen, muss saveFlightDraw im Apps Script ergänzt und bei getState als flight_draw oder flightDraw zurückgegeben werden.`);
+      setFlightRevealRunning(false);
+      setError(`${err.message || "saveFlightDraw konnte nicht gespeichert werden."} Die Zeremonie startet erst, wenn die Ziehung erfolgreich im Sheet gespeichert wurde.`);
     } finally {
       setFlightDrawSaving(false);
     }
