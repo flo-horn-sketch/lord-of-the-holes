@@ -1113,7 +1113,7 @@ function LordOfTheHolesApp() {
   const controlScoreForActiveHole = useMemo(() => (myPlayerId ? findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", myPlayerId, activeHole, true) : null), [scores, displayedActiveRound?.round_id, myPlayerId, activeHole]);
   const hasRequiredScoresForNext = useMemo(() => {
     if (!myPlayerId || !scoredPlayerId) return false;
-    const currentScores = scoresRef.current?.length ? scoresRef.current : scores;
+    const currentScores = scoresRef.current || [];
     const officialScore = findScoreForPlayerHole(currentScores, displayedActiveRound?.round_id || "r1", scoredPlayerId, activeHole, false);
     const controlScore = findScoreForPlayerHole(currentScores, displayedActiveRound?.round_id || "r1", myPlayerId, activeHole, true);
     return hasCompleteScoreValue(officialScore) && hasCompleteScoreValue(controlScore);
@@ -1766,11 +1766,18 @@ function LordOfTheHolesApp() {
     }
 
     try {
-      const updatedScore = optimisticUpdate(nextPatch);
-      markScoreDirty(updatedScore);
+      optimisticUpdate(nextPatch);
     } catch (err) {
       setError(err.message || "Score kann noch nicht lokal vorgemerkt werden.");
     }
+  }
+
+  function hasBothScoresForHoleNow(roundId, officialPlayerId, controlPlayerId, holeNumber) {
+    if (!roundId || !officialPlayerId || !controlPlayerId || !holeNumber) return false;
+    const currentScores = scoresRef.current || [];
+    const officialScore = findScoreForPlayerHole(currentScores, roundId, officialPlayerId, holeNumber, false);
+    const controlScore = findScoreForPlayerHole(currentScores, roundId, controlPlayerId, holeNumber, true);
+    return hasCompleteScoreValue(officialScore) && hasCompleteScoreValue(controlScore);
   }
 
   function getMissingScoreItemsForCurrentHole() {
@@ -1812,31 +1819,35 @@ function LordOfTheHolesApp() {
       return;
     }
     if (activeHole === 18) return;
-    if (!hasRequiredScoresForNext) {
+
+    const roundId = displayedActiveRound?.round_id || "r1";
+    const bothScoresComplete = hasBothScoresForHoleNow(roundId, scoredPlayerId, myPlayerId, activeHole);
+    if (!bothScoresComplete) {
       const missingItems = getMissingScoreItemsForCurrentHole();
       setScoreHintMessage(`Erst ${missingItems.join(", ")} eintragen, dann weiter.`);
-      window.setTimeout(() => setScoreHintMessage(""), 2400);
-      return;
-    }
-    setScoreHintMessage("");
-    syncCurrentHoleScoresNow();
-    setActiveHole((h) => Math.min(18, h + 1));
-  }
-
-  function finishRoundFromHole18() {
+      window.setTimeout(() => setSc  function finishRoundFromHole18() {
     if (isCurrentRoundScoringLocked) {
       setScoreHintMessage("Diese Runde ist vollständig und ohne Abweichung besiegelt.");
       window.setTimeout(() => setScoreHintMessage(""), 2400);
       return;
     }
     if (activeHole !== 18) return;
-    if (!hasRequiredScoresForNext) {
+
+    const roundId = displayedActiveRound?.round_id || "r1";
+    const bothScoresComplete = hasBothScoresForHoleNow(roundId, scoredPlayerId, myPlayerId, activeHole);
+    if (!bothScoresComplete) {
       const missingItems = getMissingScoreItemsForCurrentHole();
       setScoreHintMessage(`Erst ${missingItems.join(", ")} eintragen, dann abschließen.`);
       window.setTimeout(() => setScoreHintMessage(""), 2400);
       return;
     }
+
     setScoreHintMessage("Loch 18 wurde gespeichert. Die Chronik kann beginnen.");
+    window.setTimeout(() => setScoreHintMessage(""), 2400);
+    syncCurrentHoleScoresNow();
+  }
+
+  async function createRoundBackup() {Chronik kann beginnen.");
     window.setTimeout(() => setScoreHintMessage(""), 2400);
     syncCurrentHoleScoresNow();
   }
