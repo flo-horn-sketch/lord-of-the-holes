@@ -1370,12 +1370,40 @@ function LordOfTheHolesApp() {
   }, [displayedActiveRound?.round_id, myPlayerId, assignedScoredPlayerId, scoredPlayerId, showSplash, appLocked, lockAdminBypass]);
 
   async function callSheetApi(payload) {
+    const payloadText = JSON.stringify(payload || { action: "getState" });
     const url = new URL(GOOGLE_SHEETS_API_URL);
-    url.searchParams.set("payload", JSON.stringify(payload));
+    url.searchParams.set("payload", payloadText);
     url.searchParams.set("cacheBust", String(Date.now()));
-    const response = await fetch(url.toString(), { method: "GET" });
-    if (!response.ok) throw new Error("Datenbank nicht erreichbar.");
-    const data = await response.json();
+
+    let response;
+    try {
+      response = await fetch(url.toString(), {
+        method: "GET",
+        cache: "no-store",
+        redirect: "follow",
+        headers: {
+          Accept: "application/json",
+        },
+      });
+    } catch (err) {
+      throw new Error(
+        `Datenbank nicht erreichbar: ${err?.message || "Netzwerk-/CORS-Fehler"}. Bitte prüfen: Apps-Script-Web-App muss als neue Version deployed und für „Jeder“ freigegeben sein.`
+      );
+    }
+
+    const text = await response.text();
+
+    if (!response.ok) {
+      throw new Error(`Datenbank antwortet mit HTTP ${response.status}: ${text.slice(0, 180) || response.statusText}`);
+    }
+
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (err) {
+      throw new Error(`Datenbank liefert kein gültiges JSON: ${text.slice(0, 180) || err?.message || "Unbekannte Antwort"}`);
+    }
+
     if (data && data.ok === false) throw new Error(data.error || "Datenbank meldet einen Fehler.");
     return data;
   }
@@ -1490,6 +1518,7 @@ function LordOfTheHolesApp() {
       return data;
     } catch (err) {
       setConnectionStatus("offline");
+      setError(err?.message || "Datenbank konnte nicht geladen werden.");
       return null;
     } finally {
       if (!silent) setLoading(false);
@@ -2577,10 +2606,8 @@ function LordOfTheHolesApp() {
   }
 
   function renderStatusMessages() {
-    const isDatabaseStatusOnly = /Datenbank|offline|nicht erreichbar|nicht geladen|lokal gesichert|load failed|failed to fetch|synchronisiert|network/i.test(String(error || ""));
-    if (!error || isDatabaseStatusOnly) return null;
-    return <Card className="mb-2 rounded-2xl border-amber-700/40 bg-amber-950/50"><CardContent className="p-3 text-sm text-amber-100">{error}</CardContent></Card>;
-  }
+    if (!error) return null;
+    return <Card className="mb-2 rounded-2xl border-amber-700/40 bg-amber-950/50"><CardContent className="p-3 text-sm text-amber-100">{error}</CardContent></Card
 
   function renderScoreView() {
     const scoringTintClass = isScorerEntryMode ? "[--score-accent:56_189_248]" : "[--score-accent:245_158_11]";
