@@ -48,7 +48,7 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
-const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbxEilxqZTg7tU3wEiazn7nyT3E5y2lR634VnJg0JZVkOgs0e1eLdlN2yDWWRyksd-Dc/exec";
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbxPDXioaPlYU8fNras_JIz5QPJptOyHey_UrEH979jRmCUYbDRsvPOWKI4WGdbtD9E
 const ADMIN_PASSWORD = "weimar";
 const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T10:00:00+02:00");
 const FLIGHT_DRAW_TARGET = new Date("2026-05-21T20:00:00+02:00");
@@ -1790,36 +1790,56 @@ function LordOfTheHolesApp() {
     return hasCompleteScoreValue(officialScore) && hasCompleteScoreValue(controlScore);
   }
 
+  function getCurrentHoleScoreSnapshot() {
+    const roundId = String(displayedActiveRound?.round_id || "r1");
+    const holeNumber = Number(activeHole || 0);
+    const latestScores = scoresRef.current || scores || [];
+
+    return {
+      officialScore: findScoreForPlayerHole(latestScores, roundId, scoredPlayerId, holeNumber, false),
+      controlScore: myPlayerId ? findScoreForPlayerHole(latestScores, roundId, myPlayerId, holeNumber, true) : null,
+    };
+  }
+
+  function hasRequiredScoresForCurrentHoleNow() {
+    const snapshot = getCurrentHoleScoreSnapshot();
+    return Boolean(
+      myPlayerId &&
+      hasCompleteScoreValue(snapshot.officialScore) &&
+      hasCompleteScoreValue(snapshot.controlScore)
+    );
+  }
+
   function getMissingScoreItemsForCurrentHole() {
+    const snapshot = getCurrentHoleScoreSnapshot();
     const missingItems = [];
-    if (!officialScoreForActiveHole || officialScoreForActiveHole.strokes === "" || officialScoreForActiveHole.strokes == null) missingItems.push(`Score für ${getPlayerLabel(scoredPlayer) || "Spieler"}`);
-    if (!officialScoreForActiveHole || officialScoreForActiveHole.putts_count === "" || officialScoreForActiveHole.putts_count == null) missingItems.push(`Putts für ${getPlayerLabel(scoredPlayer) || "Spieler"}`);
-    if (!controlScoreForActiveHole || controlScoreForActiveHole.strokes === "" || controlScoreForActiveHole.strokes == null) missingItems.push("mein Score");
-    if (!controlScoreForActiveHole || controlScoreForActiveHole.putts_count === "" || controlScoreForActiveHole.putts_count == null) missingItems.push("meine Putts");
+
+    if (!snapshot.officialScore || snapshot.officialScore.strokes === "" || snapshot.officialScore.strokes == null) {
+      missingItems.push(`Score für ${getPlayerLabel(scoredPlayer) || "Spieler"}`);
+    }
+    if (!snapshot.officialScore || snapshot.officialScore.putts_count === "" || snapshot.officialScore.putts_count == null) {
+      missingItems.push(`Putts für ${getPlayerLabel(scoredPlayer) || "Spieler"}`);
+    }
+    if (!snapshot.controlScore || snapshot.controlScore.strokes === "" || snapshot.controlScore.strokes == null) {
+      missingItems.push("mein Score");
+    }
+    if (!snapshot.controlScore || snapshot.controlScore.putts_count === "" || snapshot.controlScore.putts_count == null) {
+      missingItems.push("meine Putts");
+    }
+
     return missingItems;
   }
 
-  function getCompleteScoresForCurrentHoleFromRef() {
-    const roundId = displayedActiveRound?.round_id || "r1";
-    const holeNumber = activeHole;
-    const currentScores = scoresRef.current || scores || [];
-    const scoresToSync = [];
-
-    const officialScore = findScoreForPlayerHole(currentScores, roundId, scoredPlayerId, holeNumber, false);
-    const controlScore = myPlayerId ? findScoreForPlayerHole(currentScores, roundId, myPlayerId, holeNumber, true) : null;
-
-    if (officialScore && hasCompleteScoreValue(officialScore)) scoresToSync.push(officialScore);
-    if (controlScore && hasCompleteScoreValue(controlScore)) scoresToSync.push(controlScore);
-
-    return scoresToSync;
-  }
-
   function syncCurrentHoleScoresNow() {
-    getCompleteScoresForCurrentHoleFromRef().forEach((score) => {
-      addPendingScore(score);
-      markScoreDirty(score);
-      queueScoreForBackgroundSync(score);
-    });
+    const snapshot = getCurrentHoleScoreSnapshot();
+
+    if (snapshot.officialScore && hasCompleteScoreValue(snapshot.officialScore)) {
+      queueScoreForBackgroundSync(snapshot.officialScore);
+    }
+
+    if (snapshot.controlScore && hasCompleteScoreValue(snapshot.controlScore)) {
+      queueScoreForBackgroundSync(snapshot.controlScore);
+    }
   }
 
   function goToNextHole() {
@@ -1829,16 +1849,12 @@ function LordOfTheHolesApp() {
       return;
     }
     if (activeHole === 18) return;
-
-    const roundId = displayedActiveRound?.round_id || "r1";
-    const bothScoresComplete = hasBothScoresForHoleNow(roundId, scoredPlayerId, myPlayerId, activeHole);
-    if (!bothScoresComplete) {
+    if (!hasRequiredScoresForCurrentHoleNow()) {
       const missingItems = getMissingScoreItemsForCurrentHole();
       setScoreHintMessage(`Erst ${missingItems.join(", ")} eintragen, dann weiter.`);
       window.setTimeout(() => setScoreHintMessage(""), 2400);
       return;
     }
-
     setScoreHintMessage("");
     syncCurrentHoleScoresNow();
     setActiveHole((h) => Math.min(18, h + 1));
@@ -1851,16 +1867,12 @@ function LordOfTheHolesApp() {
       return;
     }
     if (activeHole !== 18) return;
-
-    const roundId = displayedActiveRound?.round_id || "r1";
-    const bothScoresComplete = hasBothScoresForHoleNow(roundId, scoredPlayerId, myPlayerId, activeHole);
-    if (!bothScoresComplete) {
+    if (!hasRequiredScoresForCurrentHoleNow()) {
       const missingItems = getMissingScoreItemsForCurrentHole();
       setScoreHintMessage(`Erst ${missingItems.join(", ")} eintragen, dann abschließen.`);
       window.setTimeout(() => setScoreHintMessage(""), 2400);
       return;
     }
-
     setScoreHintMessage("Loch 18 wurde gespeichert. Die Chronik kann beginnen.");
     window.setTimeout(() => setScoreHintMessage(""), 2400);
     syncCurrentHoleScoresNow();
