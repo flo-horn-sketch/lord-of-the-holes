@@ -48,7 +48,7 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
-const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbzAhD3jxR4FRHTEoE5rLnrEIVp4ilsKxo-ij7Pw0ubg9IWA58kWQNfHfW9H2BdQvxa8/exec";
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbyE6MLL_zaD2a9b0g1YKbSsOmGANhhNVmgJKyIBMDHOSz7gFr6qOP106NeqoJ8SuGLJ/exec";
 const ADMIN_PASSWORD = "weimar";
 const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T11:00:00+02:00");
 const FLIGHT_DRAW_TARGET = new Date("2026-05-21T20:00:00+02:00");
@@ -294,14 +294,25 @@ function getScorerLabel(assignment, playerMap = new Map()) {
 }
 
 function getAssignedScoredPlayerIdFromDraw(flightDraw, roundId, scorerPlayerId) {
-  if (!flightDraw?.rounds?.length || !roundId || !scorerPlayerId) return "";
-  const roundPlan = flightDraw.rounds.find((round) => String(round.round_id) === String(roundId));
-  if (!roundPlan?.flights?.length) return "";
-  for (const flight of roundPlan.flights) {
-    const assignment = (flight.scorers || []).find((item) => String(item.scorer_player_id) === String(scorerPlayerId));
-    if (assignment?.player_id) return String(assignment.player_id);
+  const normalizedRoundId = String(roundId || "");
+  const normalizedScorerId = String(scorerPlayerId || "");
+  if (!flightDraw || !normalizedRoundId || !normalizedScorerId) return "";
+
+  // Normales React-Objekt aus Apps Script: flightDraw.rounds[].flights[].scorers[]
+  if (flightDraw?.rounds?.length) {
+    const roundPlan = flightDraw.rounds.find((round) => String(round.round_id) === normalizedRoundId);
+    if (!roundPlan?.flights?.length) return "";
+    for (const flight of roundPlan.flights) {
+      const assignment = (flight.scorers || []).find((item) => String(item.scorer_player_id) === normalizedScorerId);
+      if (assignment?.player_id) return String(assignment.player_id);
+    }
+    return "";
   }
-  return "";
+
+  // Fallback, falls irgendwann direkt tabellarische FlightDraw-Zeilen im Client landen.
+  const rows = Array.isArray(flightDraw) ? flightDraw : flightDraw.rows || flightDraw.flight_draw_rows || [];
+  const row = rows.find((item) => String(item.round_id) === normalizedRoundId && String(item.scorer_player_id) === normalizedScorerId);
+  return row?.player_id ? String(row.player_id) : "";
 }
 
 function getPlayerFlightFromDraw(flightDraw, roundId, playerId) {
