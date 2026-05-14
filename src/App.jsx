@@ -566,6 +566,22 @@ function getMismatchesForRound(scores, roundId, players = []) {
   return holeNumbers.flatMap((holeNumber) => getMismatchesForHole(scores, roundId, holeNumber, players));
 }
 
+function hasCompleteScoreValue(score) {
+  return Boolean(score && score.strokes !== "" && score.strokes != null && score.putts_count !== "" && score.putts_count != null);
+}
+
+function isRoundFullyScoredAndClean(scores, roundId, players = [], holes = []) {
+  if (!roundId || !(players || []).length || !(holes || []).length) return false;
+  const mismatches = getMismatchesForRound(scores, roundId, players);
+  if (mismatches.length > 0) return false;
+
+  return (players || []).every((player) => (holes || []).every((hole) => {
+    const officialScore = findScoreForPlayerHole(scores, roundId, player.id, hole.hole_number, false);
+    const controlScore = findScoreForPlayerHole(scores, roundId, player.id, hole.hole_number, true);
+    return hasCompleteScoreValue(officialScore) && hasCompleteScoreValue(controlScore);
+  }));
+}
+
 function buildPlayerStats(players, holes, scores) {
   return (players || []).map((p) => {
     const playerScores = (scores || []).filter((s) => String(s.player_id) === String(p.id) && s.strokes !== "" && s.strokes != null);
@@ -1091,6 +1107,11 @@ function LordOfTheHolesApp() {
   const officialScoreForActiveHole = useMemo(() => findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", scoredPlayerId, activeHole, false), [scores, displayedActiveRound?.round_id, scoredPlayerId, activeHole]);
   const controlScoreForActiveHole = useMemo(() => (myPlayerId ? findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", myPlayerId, activeHole, true) : null), [scores, displayedActiveRound?.round_id, myPlayerId, activeHole]);
   const hasRequiredScoresForNext = Boolean(myPlayerId && officialScoreForActiveHole?.strokes !== "" && officialScoreForActiveHole?.strokes != null && officialScoreForActiveHole?.putts_count !== "" && officialScoreForActiveHole?.putts_count != null && controlScoreForActiveHole?.strokes !== "" && controlScoreForActiveHole?.strokes != null && controlScoreForActiveHole?.putts_count !== "" && controlScoreForActiveHole?.putts_count != null);
+  const currentRoundPendingScores = useMemo(() => (pendingScores || []).filter((score) => String(score.round_id || "") === String(displayedActiveRound?.round_id || "")), [pendingScores, displayedActiveRound?.round_id]);
+  const isCurrentRoundScoringLocked = useMemo(() => {
+    if (currentRoundPendingScores.length) return false;
+    return isRoundFullyScoredAndClean(scores, displayedActiveRound?.round_id || "", visiblePlayers, holes);
+  }, [currentRoundPendingScores.length, scores, displayedActiveRound?.round_id, visiblePlayers, holes]);
   const pendingHoleUpdateCount = useMemo(() => new Set((pendingScores || []).filter(isValidScorePayload).map((score) => `${score.round_id}|${score.hole_number}`)).size, [pendingScores]);
   const officialScores = useMemo(() => getOfficialScores(scores), [scores]);
   const officialAllScores = useMemo(() => getOfficialScores(allScores), [allScores]);
@@ -1539,6 +1560,12 @@ function LordOfTheHolesApp() {
       nextPatch.over_two_putts = Number(nextPatch.putts_count || 0) >= 3;
     }
 
+    if (isCurrentRoundScoringLocked) {
+      setScoreHintMessage("Diese Runde ist vollständig und ohne Abweichung besiegelt. Scores können nicht mehr geändert werden.");
+      window.setTimeout(() => setScoreHintMessage(""), 2400);
+      return;
+    }
+
     if (!canEnterScores) {
       setScoreHintMessage("Erst Handy-Besitzer wählen und Flight-Ziehung laden.");
       window.setTimeout(() => setScoreHintMessage(""), 1800);
@@ -1552,22 +1579,54 @@ function LordOfTheHolesApp() {
     }
   }
 
+  function getMissingScoreItemsForCurrentHole() {
+    const missingItems = [];
+    if (!officialScoreForActiveHole || officialScoreForActiveHole.strokes === "" || officialScoreForActiveHole.strokes == null) missingItems.push(`Score für ${getPlayerLabel(scoredPlayer) || "Spieler"}`);
+    if (!officialScoreForActiveHole || officialScoreForActiveHole.putts_count === "" || officialScoreForActiveHole.putts_count == null) missingItems.push(`Putts für ${getPlayerLabel(scoredPlayer) || "Spieler"}`);
+    if (!controlScoreForActiveHole || controlScoreForActiveHole.strokes === "" || controlScoreForActiveHole.strokes == null) missingItems.push("mein Score");
+    if (!controlScoreForActiveHole || controlScoreForActiveHole.putts_count === "" || controlScoreForActiveHole.putts_count == null) missingItems.push("meine Putts");
+    return missingItems;
+  }
+
+  function syncCurrentHoleScoresNow() {
+    if (officialScoreForActiveHole) queueScoreForBackgroundSync(officialScoreForActiveHole);
+    if (controlScoreForActiveHole) queueScoreForBackgroundSync(controlScoreForActiveHole);
+  }
+
   function goToNextHole() {
+    if (isCurrentRoundScoringLocked) {
+      setScoreHintMessage("Diese Runde ist vollständig und ohne Abweichung besiegelt.");
+      window.setTimeout(() => setScoreHintMessage(""), 2400);
+      return;
+    }
     if (activeHole === 18) return;
     if (!hasRequiredScoresForNext) {
-      const missingItems = [];
-      if (!officialScoreForActiveHole || officialScoreForActiveHole.strokes === "" || officialScoreForActiveHole.strokes == null) missingItems.push(`Score für ${getPlayerLabel(scoredPlayer) || "Spieler"}`);
-      if (!officialScoreForActiveHole || officialScoreForActiveHole.putts_count === "" || officialScoreForActiveHole.putts_count == null) missingItems.push(`Putts für ${getPlayerLabel(scoredPlayer) || "Spieler"}`);
-      if (!controlScoreForActiveHole || controlScoreForActiveHole.strokes === "" || controlScoreForActiveHole.strokes == null) missingItems.push("mein Score");
-      if (!controlScoreForActiveHole || controlScoreForActiveHole.putts_count === "" || controlScoreForActiveHole.putts_count == null) missingItems.push("meine Putts");
+      const missingItems = getMissingScoreItemsForCurrentHole();
       setScoreHintMessage(`Erst ${missingItems.join(", ")} eintragen, dann weiter.`);
       window.setTimeout(() => setScoreHintMessage(""), 2400);
       return;
     }
     setScoreHintMessage("");
-    if (officialScoreForActiveHole) queueScoreForBackgroundSync(officialScoreForActiveHole);
-    if (controlScoreForActiveHole) queueScoreForBackgroundSync(controlScoreForActiveHole);
+    syncCurrentHoleScoresNow();
     setActiveHole((h) => Math.min(18, h + 1));
+  }
+
+  function finishRoundFromHole18() {
+    if (isCurrentRoundScoringLocked) {
+      setScoreHintMessage("Diese Runde ist vollständig und ohne Abweichung besiegelt.");
+      window.setTimeout(() => setScoreHintMessage(""), 2400);
+      return;
+    }
+    if (activeHole !== 18) return;
+    if (!hasRequiredScoresForNext) {
+      const missingItems = getMissingScoreItemsForCurrentHole();
+      setScoreHintMessage(`Erst ${missingItems.join(", ")} eintragen, dann abschließen.`);
+      window.setTimeout(() => setScoreHintMessage(""), 2400);
+      return;
+    }
+    setScoreHintMessage("Loch 18 wurde gespeichert. Die Chronik kann beginnen.");
+    window.setTimeout(() => setScoreHintMessage(""), 2400);
+    syncCurrentHoleScoresNow();
   }
 
   async function createRoundBackup() {
@@ -2250,11 +2309,12 @@ function LordOfTheHolesApp() {
                   </div>
                 ) : null}
                 <div className="mb-1.5 grid grid-cols-[auto_1fr] items-center gap-2 rounded-2xl border border-[rgb(var(--score-accent)/0.30)] bg-black/25 px-3 py-2 text-[10px] text-amber-100/70"><div className="font-serif text-xl font-black leading-none text-amber-200">Loch {activeHole}</div><div className="flex items-center justify-end gap-2.5 text-right text-[11px]"><span>Par <b className="text-amber-200">{activeHoleData.par}</b></span><span>HCP <b className="text-amber-200">{activeHoleData.hcp}</b></span><span>{activeHoleData.meters} m</span><span>Vorgabe <b className="text-amber-200 tracking-[0.18em]">{formatShotMarks(entryPlayerShotsOnActiveHole)}</b></span></div></div>
-                <div className="mb-3"><ScoreStepper value={normalizeBoolean(currentScore.picked_up) ? 0 : currentScore.strokes ?? ""} par={activeHoleData?.par || 4} pickedUpStrokes={pickedUpStrokes} disabled={!canEnterScores} onChange={(scoreValue) => Number(scoreValue) === 0 || Number(scoreValue) >= Number(pickedUpStrokes || 0) ? saveScore({ strokes: pickedUpStrokes, picked_up: true }) : saveScore({ strokes: scoreValue, picked_up: false })} /></div>
-                <div className="mb-3"><PuttStepper value={currentScore.putts_count} disabled={!canEnterScores || currentEffectiveStrokes <= 1} max={maxPuttsForCurrentScore} onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })} /></div>
-                <div className="mb-3 rounded-2xl border border-[rgb(var(--score-accent)/0.30)] bg-black/25 p-2"><div className="flex items-center justify-between gap-2"><div><div className="text-xs font-semibold text-amber-100">Lady</div><div className="text-[10px] text-amber-100/65">Markiert eine Lady.</div></div><input type="checkbox" disabled={!canEnterScores} checked={normalizeBoolean(currentScore.lady)} onChange={(e) => saveScore({ lady: e.target.checked })} className="h-6 w-6 accent-amber-500 disabled:opacity-40" /></div></div>
+                {isCurrentRoundScoringLocked ? <div className="mb-2 rounded-2xl border border-emerald-500/45 bg-emerald-950/40 p-2 text-center text-xs font-bold text-emerald-100">Diese Runde ist vollständig und ohne Abweichung besiegelt. Scores können nicht mehr geändert werden.</div> : null}
+                <div className="mb-3"><ScoreStepper value={normalizeBoolean(currentScore.picked_up) ? 0 : currentScore.strokes ?? ""} par={activeHoleData?.par || 4} pickedUpStrokes={pickedUpStrokes} disabled={!canEnterScores || isCurrentRoundScoringLocked} onChange={(scoreValue) => Number(scoreValue) === 0 || Number(scoreValue) >= Number(pickedUpStrokes || 0) ? saveScore({ strokes: pickedUpStrokes, picked_up: true }) : saveScore({ strokes: scoreValue, picked_up: false })} /></div>
+                <div className="mb-3"><PuttStepper value={currentScore.putts_count} disabled={!canEnterScores || isCurrentRoundScoringLocked || currentEffectiveStrokes <= 1} max={maxPuttsForCurrentScore} onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })} /></div>
+                <div className="mb-3 rounded-2xl border border-[rgb(var(--score-accent)/0.30)] bg-black/25 p-2"><div className="flex items-center justify-between gap-2"><div><div className="text-xs font-semibold text-amber-100">Lady</div><div className="text-[10px] text-amber-100/65">Markiert eine Lady.</div></div><input type="checkbox" disabled={!canEnterScores || isCurrentRoundScoringLocked} checked={normalizeBoolean(currentScore.lady)} onChange={(e) => saveScore({ lady: e.target.checked })} className="h-6 w-6 accent-amber-500 disabled:opacity-40" /></div></div>
                 {scoreHintMessage ? <div className="mb-2 rounded-xl border border-amber-500/40 bg-amber-950/50 p-1.5 text-center text-xs font-semibold text-amber-100">{scoreHintMessage}</div> : null}
-                <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 py-3 text-base font-bold text-amber-100">Zurück</Button><Button disabled={activeHole === 18 || !canEnterScores} onClick={goToNextHole} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>Loch {Math.min(18, Number(activeHole || 1) + 1)}</Button></div>
+                <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 py-3 text-base font-bold text-amber-100">Zurück</Button><Button disabled={!canEnterScores || isCurrentRoundScoringLocked} onClick={activeHole === 18 ? finishRoundFromHole18 : goToNextHole} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>{activeHole === 18 ? "Runde abschließen" : `Loch ${Math.min(18, Number(activeHole || 1) + 1)}` }</Button></div>
               </div>
             )}
           </CardContent>
