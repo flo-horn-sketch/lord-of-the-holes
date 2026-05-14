@@ -1091,6 +1091,7 @@ function LordOfTheHolesApp() {
   const officialScoreForActiveHole = useMemo(() => findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", scoredPlayerId, activeHole, false), [scores, displayedActiveRound?.round_id, scoredPlayerId, activeHole]);
   const controlScoreForActiveHole = useMemo(() => (myPlayerId ? findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", myPlayerId, activeHole, true) : null), [scores, displayedActiveRound?.round_id, myPlayerId, activeHole]);
   const hasRequiredScoresForNext = Boolean(myPlayerId && officialScoreForActiveHole?.strokes !== "" && officialScoreForActiveHole?.strokes != null && officialScoreForActiveHole?.putts_count !== "" && officialScoreForActiveHole?.putts_count != null && controlScoreForActiveHole?.strokes !== "" && controlScoreForActiveHole?.strokes != null && controlScoreForActiveHole?.putts_count !== "" && controlScoreForActiveHole?.putts_count != null);
+  const pendingHoleUpdateCount = useMemo(() => new Set((pendingScores || []).filter(isValidScorePayload).map((score) => `${score.round_id}|${score.hole_number}`)).size, [pendingScores]);
   const officialScores = useMemo(() => getOfficialScores(scores), [scores]);
   const officialAllScores = useMemo(() => getOfficialScores(allScores), [allScores]);
   const roundMismatches = useMemo(() => getMismatchesForRound(scores, displayedActiveRound?.round_id || "r1", visiblePlayers), [scores, displayedActiveRound?.round_id, visiblePlayers]);
@@ -1419,7 +1420,6 @@ function LordOfTheHolesApp() {
       return data;
     } catch (err) {
       setConnectionStatus("offline");
-      setError(err.message || "Datenbank konnte nicht geladen werden.");
       return null;
     } finally {
       if (!silent) setLoading(false);
@@ -1464,7 +1464,7 @@ function LordOfTheHolesApp() {
   async function savePendingScore(score) {
     if (!isValidScorePayload(score)) { removePendingScore(score); return true; }
     try { await callSheetApi({ action: "upsertScore", score }); removePendingScore(score); setConnectionStatus("online"); setError(""); return true; }
-    catch (err) { setConnectionStatus("offline"); setError(err.message || "Score ist lokal gesichert und wird später synchronisiert."); return false; }
+    catch (err) { setConnectionStatus("offline"); return false; }
   }
 
   async function flushPendingScores() {
@@ -1483,38 +1483,80 @@ function LordOfTheHolesApp() {
     return allSaved;
   }
 
-  async function saveScore(patch) {
+  function queueScoreForBackgroundSync(score) {
+    const normalizedScore = {
+      ...score,
+      updated_at: new Date().toISOString(),
+    };
+    const scoreKey = [
+      normalizedScore.round_id,
+      normalizedScore.player_id,
+      normalizedScore.hole_number,
+      normalizedScore.scorer_player_id || "official",
+    ].join("|");
+
+    setPendingScores((current) => {
+      const filtered = (current || []).filter((item) => {
+        const itemKey = [item.round_id, item.player_id, item.hole_number, item.scorer_player_id || "official"].join("|");
+        return itemKey !== scoreKey;
+      });
+      return [...filtered, normalizedScore];
+    });
+
+    setScores((current) => {
+      const filtered = (current || []).filter((item) => {
+        const itemKey = [item.round_id, item.player_id, item.hole_number, item.scorer_player_id || "official"].join("|");
+        return itemKey !== scoreKey;
+      });
+      return [...filtered, normalizedScore];
+    });
+
+    callSheetApi({ action: "upsertScore", score: normalizedScore })
+      .then(() => {
+        setConnectionStatus("online");
+        setPendingScores((current) => (current || []).filter((item) => {
+          const itemKey = [item.round_id, item.player_id, item.hole_number, item.scorer_player_id || "official"].join("|");
+          return itemKey !== scoreKey;
+        }));
+      })
+      .catch(() => {
+        setConnectionStatus("offline");
+      });
+  }
+
+  function saveScore(patch) {
     const nextPatch = { ...patch };
     const nextStrokes = nextPatch.strokes !== undefined ? Number(nextPatch.strokes || 0) : currentEffectiveStrokes;
+
     if (nextPatch.putts_count !== undefined && nextStrokes > 0 && Number(nextPatch.putts_count || 0) > Math.max(0, nextStrokes - 1)) {
       setScoreHintMessage("Putts dürfen maximal Schläge minus 1 sein.");
       window.setTimeout(() => setScoreHintMessage(""), 1800);
       return;
     }
+
     if (nextPatch.strokes !== undefined && currentScore.putts_count !== "" && currentScore.putts_count != null && Number(currentScore.putts_count || 0) > Math.max(0, Number(nextPatch.strokes || 0) - 1)) {
       nextPatch.putts_count = Math.max(0, Number(nextPatch.strokes || 0) - 1);
       nextPatch.over_two_putts = Number(nextPatch.putts_count || 0) >= 3;
     }
+
     if (!canEnterScores) {
       setScoreHintMessage("Erst Handy-Besitzer wählen und Flight-Ziehung laden.");
       window.setTimeout(() => setScoreHintMessage(""), 1800);
       return;
     }
-    let next;
-    try { next = optimisticUpdate(nextPatch); }
-    catch (err) { setError(err.message || "Score kann noch nicht gespeichert werden."); return; }
-    addPendingScore(next);
-    setSaving(true);
-    try { await callSheetApi({ action: "upsertScore", score: next }); removePendingScore(next); setConnectionStatus("online"); setError(""); }
-    catch { addPendingScore(next); setConnectionStatus("offline"); setError("Score lokal gesichert. Wird automatisch synchronisiert, sobald die Datenbank erreichbar ist."); }
-    finally { setSaving(false); }
+
+    try {
+      optimisticUpdate(nextPatch);
+    } catch (err) {
+      setError(err.message || "Score kann noch nicht lokal vorgemerkt werden.");
+    }
   }
 
   function goToNextHole() {
     if (activeHole === 18) return;
     if (!hasRequiredScoresForNext) {
       const missingItems = [];
-      if (!officialScoreForActiveHole || officialScoreForActiveHole.strokes === "" || officialScoreForActiveHole.strokes == null) missingItems.push(`Score für ${getPlayerLabel(scoredPlayer) || "zugelosten Spieler"}`);
+      if (!officialScoreForActiveHole || officialScoreForActiveHole.strokes === "" || officialScoreForActiveHole.strokes == null) missingItems.push(`Score für ${getPlayerLabel(scoredPlayer) || "Spieler"}`);
       if (!officialScoreForActiveHole || officialScoreForActiveHole.putts_count === "" || officialScoreForActiveHole.putts_count == null) missingItems.push(`Putts für ${getPlayerLabel(scoredPlayer) || "Spieler"}`);
       if (!controlScoreForActiveHole || controlScoreForActiveHole.strokes === "" || controlScoreForActiveHole.strokes == null) missingItems.push("mein Score");
       if (!controlScoreForActiveHole || controlScoreForActiveHole.putts_count === "" || controlScoreForActiveHole.putts_count == null) missingItems.push("meine Putts");
@@ -1523,6 +1565,8 @@ function LordOfTheHolesApp() {
       return;
     }
     setScoreHintMessage("");
+    if (officialScoreForActiveHole) queueScoreForBackgroundSync(officialScoreForActiveHole);
+    if (controlScoreForActiveHole) queueScoreForBackgroundSync(controlScoreForActiveHole);
     setActiveHole((h) => Math.min(18, h + 1));
   }
 
@@ -2102,7 +2146,7 @@ function LordOfTheHolesApp() {
         <div className="relative flex h-8 items-center justify-center">
           <div className="pointer-events-none absolute left-1/2 top-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 rounded-full border border-amber-500/35 bg-black/40 px-2.5 py-0.5 text-[10px] text-amber-100/80 shadow-[inset_0_1px_0_rgba(251,191,36,0.12),0_8px_18px_rgba(0,0,0,0.28)]">
             <span className={connectionStatus === "online" ? "animate-pulse text-emerald-300" : "text-red-300"}>{connectionStatus === "online" ? "●" : "○"}</span>
-            <span>{pendingScores.length ? `${pendingScores.length} offen` : connectionStatus === "online" ? "Datenbank verbunden" : "Datenbank offline"}</span>
+            <span>{pendingHoleUpdateCount ? `${pendingHoleUpdateCount} Loch${pendingHoleUpdateCount === 1 ? "" : "er"} offen` : connectionStatus === "online" ? "Datenbank verbunden" : "Datenbank offline"}</span>
           </div>
           <button type="button" onClick={() => setMenuOpen((value) => !value)} className="ml-auto rounded-xl border border-amber-500/35 bg-[linear-gradient(180deg,rgba(48,35,22,0.82),rgba(12,10,9,0.82))] px-2.5 py-1 text-base leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.12),0_8px_18px_rgba(0,0,0,0.35)] backdrop-blur-sm transition active:scale-[0.96]" aria-label="Menü öffnen">☰</button>
           {menuOpen ? (
@@ -2145,7 +2189,7 @@ function LordOfTheHolesApp() {
   }
 
   function renderStatusMessages() {
-    const isDatabaseStatusOnly = /Datenbank|offline|nicht erreichbar|nicht geladen|lokal gesichert/i.test(String(error || ""));
+    const isDatabaseStatusOnly = /Datenbank|offline|nicht erreichbar|nicht geladen|lokal gesichert|load failed|failed to fetch|synchronisiert|network/i.test(String(error || ""));
     if (!error || isDatabaseStatusOnly) return null;
     return <Card className="mb-2 rounded-2xl border-amber-700/40 bg-amber-950/50"><CardContent className="p-3 text-sm text-amber-100">{error}</CardContent></Card>;
   }
@@ -2286,7 +2330,6 @@ function LordOfTheHolesApp() {
             {appLocked ? <Button disabled={!isAdminUnlocked} onClick={() => { setGlobalAppLock(false); setLockAdminBypass(false); }} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-800/70 py-2 text-emerald-50 disabled:opacity-50">App für alle freigeben</Button> : <Button disabled={!isAdminUnlocked} onClick={() => { setMenuOpen(false); setLockAdminBypass(false); setGlobalAppLock(true); }} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">App für alle sperren</Button>}
             <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={() => setClearScoresConfirmOpen(true)} className="mt-2 w-full rounded-2xl border border-red-500/50 bg-red-950/60 py-2 text-red-100 disabled:opacity-50">Scores löschen</Button>
             <Button disabled={!isAdminUnlocked || flightDrawSaving || connectionStatus !== "online"} onClick={redrawFlightsFromAdmin} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-amber-800/70 py-2 text-amber-50 disabled:opacity-50">{flightDrawSaving ? "Flights werden bestimmt ..." : "Flights neu bestimmen"}</Button>
-            <Button disabled={!isAdminUnlocked || connectionStatus !== "online"} onClick={resetDeviceAssignmentsForAll} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">Handy-Besitzer zurücksetzen</Button>
             <Button disabled={!isAdminUnlocked} onClick={clearLocalCache} className="mt-2 w-full rounded-2xl border border-sky-500/40 bg-sky-950/60 py-2 text-sky-100 disabled:opacity-50">Lokalen Cache dieses Geräts löschen</Button>
             <Button disabled={!isAdminUnlocked || connectionStatus !== "online"} onClick={fullResetForAllDevices} className="mt-2 w-full rounded-2xl border border-red-400/60 bg-red-950/80 py-2 text-red-100 disabled:opacity-50">Script-Cache löschen + Komplett-Reset für alle</Button>
           </CardContent>
