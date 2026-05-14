@@ -48,7 +48,7 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
-const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbyE6MLL_zaD2a9b0g1YKbSsOmGANhhNVmgJKyIBMDHOSz7gFr6qOP106NeqoJ8SuGLJ/exec";
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbxKf1uW82C9dB1tf7v1EAwmLOWcHVgssqaVqVAGRpWkZaAbQZnqPMwcxENIRRFnVdAT/exec";
 const ADMIN_PASSWORD = "weimar";
 const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T11:00:00+02:00");
 const FLIGHT_DRAW_TARGET = new Date("2026-05-21T20:00:00+02:00");
@@ -1735,15 +1735,14 @@ function LordOfTheHolesApp() {
     setLockUnlockOpen(false);
     setLockPasswordInput("");
     setError("");
-    await openFlightDrawPergaments({ automatic: true, forceLocalTest: true, replaceExisting: true, saveTestToSheet: true });
   }
 
-  async function openFlightDrawPergaments({ automatic = false, forceLocalTest = false, replaceExisting = false, saveTestToSheet = false } = {}) {
+  async function openFlightDrawPergaments({ automatic = false, forceLocalTest = false, replaceExisting = false, saveTestToSheet = false, startReveal = true, allowBeforeTarget = false } = {}) {
     if (!automatic && !isAdminUnlocked) {
       setError("Nur der Zeremonienmeister kann die Pergamente öffnen.");
       return;
     }
-    if (!flightDrawAvailable && !automatic && !forceLocalTest) {
+    if (!flightDrawAvailable && !automatic && !forceLocalTest && !allowBeforeTarget) {
       setError("Die Pergamente sind noch versiegelt.");
       return;
     }
@@ -1774,14 +1773,14 @@ function LordOfTheHolesApp() {
       setFlightDraw(savedDraw);
       writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, savedDraw);
       setConnectionStatus("online");
-      setSetupSavedMessage(forceLocalTest || saveTestToSheet ? "Die Test-Ziehung der Pergamente wurde im Sheet gespeichert." : "Die Flight-Ziehung der Pergamente wurde gespeichert.");
+      setSetupSavedMessage(forceLocalTest || saveTestToSheet ? "Die Test-Ziehung der Pergamente wurde im Sheet gespeichert." : "Die Flight-Ziehung wurde neu bestimmt und im Sheet gespeichert.");
 
       setFlightRevealRoundIndex(0);
       setFlightRevealCount(0);
       setFlightRevealIntroStep(0);
       setFlightRevealOutroStep(0);
       setExpandedFlightKeys({});
-      setFlightRevealRunning(true);
+      setFlightRevealRunning(Boolean(startReveal));
 
       await loadData({ silent: true });
     } catch (err) {
@@ -1807,6 +1806,16 @@ function LordOfTheHolesApp() {
     } catch (err) {
       console.warn("clearFlightDraw fehlt vermutlich noch im Apps Script:", err);
     }
+  }
+
+  async function redrawFlightsFromAdmin() {
+    await openFlightDrawPergaments({
+      automatic: false,
+      allowBeforeTarget: true,
+      replaceExisting: true,
+      saveTestToSheet: false,
+      startReveal: false,
+    });
   }
 
   useEffect(() => {
@@ -2187,6 +2196,7 @@ function LordOfTheHolesApp() {
             <Button disabled={!isAdminUnlocked} onClick={createRoundBackup} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-700/80 py-2 text-emerald-50 disabled:opacity-50">Backup für aktive Runde erstellen</Button>
             {appLocked ? <Button disabled={!isAdminUnlocked} onClick={() => { setGlobalAppLock(false); setLockAdminBypass(false); }} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-800/70 py-2 text-emerald-50 disabled:opacity-50">App für alle freigeben</Button> : <Button disabled={!isAdminUnlocked} onClick={() => { setMenuOpen(false); setLockAdminBypass(false); setGlobalAppLock(true); }} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">App für alle sperren</Button>}
             <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={() => setClearScoresConfirmOpen(true)} className="mt-2 w-full rounded-2xl border border-red-500/50 bg-red-950/60 py-2 text-red-100 disabled:opacity-50">Scores löschen</Button>
+            <Button disabled={!isAdminUnlocked || flightDrawSaving || connectionStatus !== "online"} onClick={redrawFlightsFromAdmin} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-amber-800/70 py-2 text-amber-50 disabled:opacity-50">{flightDrawSaving ? "Flights werden bestimmt ..." : "Flights neu bestimmen"}</Button>
             <Button disabled={!isAdminUnlocked || connectionStatus !== "online"} onClick={resetDeviceAssignmentsForAll} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">Handy-Besitzer zurücksetzen</Button>
             <Button disabled={!isAdminUnlocked} onClick={clearLocalCache} className="mt-2 w-full rounded-2xl border border-sky-500/40 bg-sky-950/60 py-2 text-sky-100 disabled:opacity-50">Lokalen Cache dieses Geräts löschen</Button>
             <Button disabled={!isAdminUnlocked || connectionStatus !== "online"} onClick={fullResetForAllDevices} className="mt-2 w-full rounded-2xl border border-red-400/60 bg-red-950/80 py-2 text-red-100 disabled:opacity-50">Script-Cache löschen + Komplett-Reset für alle</Button>
