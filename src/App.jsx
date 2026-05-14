@@ -2839,3 +2839,111 @@ export default function LordOfTheHolesPWA() {
     </AppErrorBoundary>
   );
 }
+
+
+## Kritischer Fix: Scores beim Weiterklicken immer vollständig synchronisieren
+
+### Problem aus dem Test
+
+Im Sheet wurden nach dem Test nur einzelne Score-Zeilen gespeichert:
+
+```text
+Andreas: Loch 2, 3, 4, 5
+Florian: Loch 1, 5, 6, 7
+```
+
+Erwartet wären bei Scoring bis Loch 8 grundsätzlich beide Score-Arten pro Loch:
+
+```text
+r1 | andreas | Loch 1–8 | scorer florian
+r1 | florian | Loch 1–8 | scorer florian
+```
+
+Also bei Klick bis Loch 9 insgesamt 16 Zeilen. Wenn Loch 8 noch nicht per „Weiter“ verlassen wurde, wären es 14 Zeilen bis Loch 7.
+
+Die vorhandenen Timestamps und Lücken deuten nicht auf ein Apps-Script-Sortierproblem hin, sondern darauf, dass React manche lokal vollständigen Scores nicht mehr als uploadpflichtig erkannt hat.
+
+### Ursache
+
+Aktuell werden beim Klick auf „Weiter“ nur Scores hochgeladen, wenn sie als `dirty` markiert sind:
+
+```js
+function syncCurrentHoleScoresNow() {
+  if (officialScoreForActiveHole && isScoreDirty(officialScoreForActiveHole)) queueScoreForBackgroundSync(officialScoreForActiveHole);
+  if (controlScoreForActiveHole && isScoreDirty(controlScoreForActiveHole)) queueScoreForBackgroundSync(controlScoreForActiveHole);
+}
+```
+
+Das ist zu riskant. Wenn ein Score lokal vollständig vorhanden ist, aber durch Timing, Cache, Reload oder State-Merge nicht mehr als `dirty` gilt, lässt die App den Nutzer trotzdem weitergehen, lädt diesen Score aber nicht ins Sheet hoch.
+
+### Sichere Änderung
+
+Die Funktion muss so geändert werden, dass beim Weiterklick immer beide vollständigen Scores des aktuellen Lochs hochgeladen werden — unabhängig vom Dirty-Status.
+
+Ersetzen durch:
+
+```js
+function syncCurrentHoleScoresNow() {
+  if (officialScoreForActiveHole && hasCompleteScoreValue(officialScoreForActiveHole)) {
+    queueScoreForBackgroundSync(officialScoreForActiveHole);
+  }
+
+  if (controlScoreForActiveHole && hasCompleteScoreValue(controlScoreForActiveHole)) {
+    queueScoreForBackgroundSync(controlScoreForActiveHole);
+  }
+}
+```
+
+### Warum diese Änderung sicher ist
+
+`queueScoreForBackgroundSync()` ruft im Backend `upsertScore` auf. Apps Script ersetzt bestehende Score-Zeilen anhand der Score-Identität:
+
+```text
+round_id + player_id + hole_number + Score-Typ
+```
+
+Dadurch ist ein erneuter Upload desselben vollständigen Scores unschädlich. Er erzeugt keine Duplikate, sondern überschreibt denselben Score.
+
+Die Datenmenge ist sehr klein. Zwei Uploads beim Weiterklick sind performance-mäßig unkritisch. Die Korrektheit ist hier wichtiger als minimale Upload-Ersparnis.
+
+### Erwartetes Verhalten nach dem Fix
+
+Beim Klick auf „Weiter“ gilt künftig:
+
+```text
+Aktuelles Loch vollständig
+→ offizieller Score wird hochgeladen
+→ eigener Kontrollscore wird hochgeladen
+→ erst dann geht es weiter zum nächsten Loch
+```
+
+Damit darf kein vollständig eingetragener Score mehr lokal hängen bleiben, ohne im Sheet zu landen.
+
+### Test nach Umsetzung
+
+Nach Einbau bitte einmal sauber testen:
+
+```text
+1. Admin → Runde kann beginnen
+2. Sheet „Scores“ prüfen: leer
+3. App lokal neu laden
+4. Florian als Handy-Besitzer wählen
+5. Loch 1:
+   - Andreas-Score eintragen
+   - Mein Score eintragen
+   - Weiter klicken
+6. Sheet prüfen:
+   - r1 | andreas | hole 1 | scorer florian
+   - r1 | florian | hole 1 | scorer florian
+7. Dasselbe bis Loch 3 wiederholen
+```
+
+Wenn nach jedem Weiterklick beide Zeilen im Sheet erscheinen, ist der kritische Speicherpfad sauber.
+
+### Entscheidung
+
+Die Dirty-Optimierung an dieser Stelle entfernen. Sie spart nur minimale Uploads, kann aber dazu führen, dass vollständige Scores nicht gespeichert werden. Für diese App gilt hier klar:
+
+```text
+Korrektheit vor Performance.
+```
