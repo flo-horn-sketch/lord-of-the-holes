@@ -2024,7 +2024,12 @@ function LordOfTheHolesApp() {
         <div className="text-center">
           <div className="text-[10px] uppercase tracking-[0.28em] text-amber-300/80">Der Rat von Bruchtal</div>
           <div className="mt-1 font-serif text-xl font-black text-amber-200">Flight-Ziehung der Pergamente</div>
-          <p className="mt-1 text-xs text-amber-100/75">Die Ziehung der Flights findet am 21.05.26 punkt 20:00 Uhr hier in dieser App statt. Öffnet die App am besten 1–2 Minuten vorher, damit kein Hobbit verschlafen vor verschlossenen Toren steht.</p>
+          <div className="mt-2 rounded-2xl border border-amber-400/35 bg-amber-500/10 p-3 text-center">
+            <div className="text-[10px] uppercase tracking-[0.24em] text-amber-300/80">Flight-Ziehung</div>
+            <div className="mt-1 font-serif text-2xl font-black leading-none text-amber-200">21.05.26</div>
+            <div className="mt-1 font-serif text-xl font-black leading-none text-amber-100">20:00 Uhr</div>
+          </div>
+          <p className="mt-2 text-xs text-amber-100/75">Öffnet die App am besten 1–2 Minuten vorher, damit kein Hobbit verschlafen vor verschlossenen Toren steht.</p>
         </div>
 
         {!flightDraw ? (
