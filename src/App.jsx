@@ -1730,22 +1730,19 @@ function LordOfTheHolesApp() {
     if (lockPasswordInput !== ADMIN_PASSWORD) { setError("Passwort ist falsch."); return; }
     if (splashEntering || flightDrawSaving) return;
 
-    setSplashEntering(true);
-    await loadData({ silent: true });
-    setSplashEntering(false);
-
-    const storedDraw = readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null) || flightDraw;
+    const storedDraw = flightDraw || readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null);
     if (!storedDraw?.rounds?.length) {
       setError("Keine gespeicherte Flight-Ziehung gefunden. Bitte zuerst im Admin-Bereich „Flights neu bestimmen“ ausführen.");
+      loadData({ silent: true });
       return;
     }
 
-    setFlightDraw(storedDraw);
     setIsAdminUnlocked(true);
     setLockAdminBypass(false);
     setShowSplash(true);
     setLockUnlockOpen(false);
     setLockPasswordInput("");
+    setFlightDraw(storedDraw);
     setFlightRevealRoundIndex(0);
     setFlightRevealCount(0);
     setFlightRevealIntroStep(0);
@@ -1753,6 +1750,8 @@ function LordOfTheHolesApp() {
     setExpandedFlightKeys({});
     setFlightRevealRunning(true);
     setError("");
+
+    loadData({ silent: true });
   }
 
   async function enterAppWithoutFlightDraw() {
