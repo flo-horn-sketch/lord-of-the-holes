@@ -48,7 +48,7 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
-const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbxPDXioaPlYU8fNras_JIz5QPJptOyHey_UrEH979jRmCUYbDRsvPOWKI4WGdbtD9E
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbxPDXioaPlYU8fNras_JIz5QPJptOyHey_UrEH979jRmCUYbDRsvPOWKI4WGdbtD9E/exec";
 const ADMIN_PASSWORD = "weimar";
 const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T10:00:00+02:00");
 const FLIGHT_DRAW_TARGET = new Date("2026-05-21T20:00:00+02:00");
