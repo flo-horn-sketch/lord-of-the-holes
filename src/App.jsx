@@ -1049,6 +1049,8 @@ function LordOfTheHolesApp() {
   const [flightRevealIntroStep, setFlightRevealIntroStep] = useState(0);
   const [flightRevealOutroStep, setFlightRevealOutroStep] = useState(0);
   const [expandedFlightKeys, setExpandedFlightKeys] = useState({});
+  const [flightSummaryOpen, setFlightSummaryOpen] = useState(false);
+  const [flightDrawCeremonyCompleted, setFlightDrawCeremonyCompleted] = useState(false);
   const [flightAutoRevealStarted, setFlightAutoRevealStarted] = useState(false);
   const [localHandicaps, setLocalHandicaps] = useState({});
   const introAudioRef = useRef(null);
@@ -1920,6 +1922,12 @@ function LordOfTheHolesApp() {
         return;
       }
       if (finalRoundDone && !outroDone) {
+        if (flightRevealOutroStep >= flightRevealOutroLines.length - 1) {
+          setFlightRevealRunning(false);
+          setFlightDrawCeremonyCompleted(true);
+          setFlightSummaryOpen(false);
+          return;
+        }
         setFlightRevealOutroStep((step) => step + 1);
         return;
       }
@@ -2042,42 +2050,39 @@ function LordOfTheHolesApp() {
               </>
             )}
           </div>
-        ) : (
-          <div className="mt-3 max-h-[54vh] overflow-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        ) : !flightDrawCeremonyCompleted ? null : (
+          <div className="mt-3">
+            <button type="button" onClick={() => setFlightSummaryOpen((open) => !open)} className="flex w-full items-center justify-between rounded-2xl border border-amber-500/30 bg-stone-950/75 px-4 py-3 font-serif text-lg font-black text-amber-200 shadow-lg shadow-black/35">
+              <span>Flights</span>
+              <span className="text-xs uppercase tracking-[0.18em] text-amber-100/55">{flightSummaryOpen ? "schließen" : "öffnen"}</span>
+            </button>
+            {flightSummaryOpen ? <div className="mt-3 max-h-[54vh] overflow-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {flightDraw.rounds.map((roundPlan) => (
               <div key={roundPlan.round_id} className="mb-3 rounded-2xl border border-amber-500/25 bg-black/30 p-3 last:mb-0">
                 <div className="font-serif text-base font-black text-amber-200">{roundPlan.round_name}</div>
                 {roundPlan.note ? <div className="mt-1 rounded-xl border border-amber-500/20 bg-amber-500/10 p-2 text-xs text-amber-100/75">{roundPlan.note}</div> : null}
                 <div className="mt-2 grid gap-2">
-                  {roundPlan.flights.map((flight) => {
-                    const flightKey = `${roundPlan.round_id}-${flight.flight_number}`;
-                    const isExpanded = Boolean(expandedFlightKeys[flightKey]);
-                    return (
-                      <div key={flightKey} className="rounded-2xl border border-amber-700/30 bg-stone-950/55 p-2">
-                        <button type="button" onClick={() => setExpandedFlightKeys((current) => ({ ...current, [flightKey]: !current[flightKey] }))} className="flex w-full items-center justify-between gap-3 rounded-xl px-1 py-1 text-left">
-                          <span className="font-serif text-sm font-bold text-amber-200">Flight {flight.flight_number}</span>
-                          <span className="text-xs uppercase tracking-[0.16em] text-amber-100/55">{isExpanded ? "schließen" : "öffnen"}</span>
-                        </button>
-                        {isExpanded ? (
-                          <div className="mt-2 grid gap-1.5">
-                            {flight.players.map((playerId) => {
-                              const player = withFallbackAlias(playerMap.get(String(playerId)) || { id: playerId });
-                              return (
-                                <div key={playerId} className="rounded-xl bg-amber-500/10 px-3 py-2 text-center">
-                                  <div className="font-serif text-xl font-black text-amber-100">{player.alias_name || player.character_name || playerId}</div>
-                                  <div className="text-[10px] uppercase tracking-[0.16em] text-amber-100/50">{player.character_name || player.display_name || playerId}</div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : null}
+                  {roundPlan.flights.map((flight) => (
+                    <div key={`${roundPlan.round_id}-${flight.flight_number}`} className="rounded-2xl border border-amber-700/30 bg-stone-950/55 p-2">
+                      <div className="mb-2 text-center font-serif text-sm font-bold text-amber-200">Flight {flight.flight_number}</div>
+                      <div className="grid gap-1.5">
+                        {flight.players.map((playerId) => {
+                          const player = withFallbackAlias(playerMap.get(String(playerId)) || { id: playerId });
+                          return (
+                            <div key={playerId} className="rounded-xl bg-amber-500/10 px-3 py-2 text-center">
+                              <div className="font-serif text-xl font-black text-amber-100">{player.alias_name || player.character_name || playerId}</div>
+                              <div className="text-[10px] uppercase tracking-[0.16em] text-amber-100/50">{player.character_name || player.display_name || playerId}</div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
             <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-3 text-center font-serif text-sm font-bold text-amber-100">Die Flights der ersten drei Kapitel sind besiegelt. Was am Schicksalsberg geschieht, entscheidet allein die Tabelle.</div>
+            </div> : null}
           </div>
         )}
       </div>
