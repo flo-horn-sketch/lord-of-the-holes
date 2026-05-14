@@ -986,6 +986,7 @@ function LordOfTheHolesApp() {
   const [flightRevealCount, setFlightRevealCount] = useState(0);
   const [flightRevealIntroStep, setFlightRevealIntroStep] = useState(0);
   const [flightRevealOutroStep, setFlightRevealOutroStep] = useState(0);
+  const [expandedFlightKeys, setExpandedFlightKeys] = useState({});
   const [localHandicaps, setLocalHandicaps] = useState({});
   const introAudioRef = useRef(null);
   const lastLoadedRoundRef = useRef("");
@@ -1704,7 +1705,7 @@ function LordOfTheHolesApp() {
     const roundPlayersDone = introDone && flightRevealCount >= players.length;
     const finalRoundDone = roundPlayersDone && flightRevealRoundIndex >= flightDraw.rounds.length - 1;
     const outroDone = !finalRoundDone || flightRevealOutroStep >= flightRevealOutroLines.length;
-    const delay = !introDone ? 3200 : !roundPlayersDone ? 2200 : finalRoundDone && !outroDone ? 3300 : 3600;
+    const delay = !introDone ? 5600 : !roundPlayersDone ? 4100 : finalRoundDone && !outroDone ? 5600 : 7200;
     const timer = window.setTimeout(() => {
       if (!introDone) {
         setFlightRevealIntroStep((step) => step + 1);
@@ -1764,11 +1765,12 @@ function LordOfTheHolesApp() {
       const visiblePlayers = currentRevealPlayers.slice(0, flightRevealCount);
       return (
         <div className="flex min-h-[78vh] flex-col justify-center rounded-3xl border border-amber-300/55 bg-black/75 p-4 text-center text-amber-50 shadow-2xl shadow-black/80 backdrop-blur-sm">
+          <style>{`@keyframes lotrSoftReveal { 0% { opacity: 0; transform: translateY(10px) scale(.985); filter: blur(3px); } 18% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } 78% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } 100% { opacity: .18; transform: translateY(-5px) scale(.995); filter: blur(2px); } } @keyframes lotrPlayerReveal { 0% { opacity: 0; transform: translateY(12px) scale(.96); filter: blur(4px); } 26% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } 100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } } .lotr-soft-reveal { animation: lotrSoftReveal 5.3s ease-in-out both; } .lotr-player-reveal { animation: lotrPlayerReveal 1.6s ease-out both; }`}</style>
           <div className="text-[10px] uppercase tracking-[0.32em] text-amber-300/75">Der Rat von Bruchtal</div>
           {!introDone || finalOutroRunning ? (
             <div className="mx-auto mt-5 max-w-sm">
               <div className="font-serif text-2xl font-black leading-tight text-amber-200">{finalOutroRunning ? "Der Rat hat gesprochen" : "Flight-Ziehung der Pergamente"}</div>
-              <div className="mt-6 rounded-3xl border border-amber-500/30 bg-stone-950/60 p-5 font-serif text-xl font-bold leading-snug text-amber-50 shadow-lg shadow-black/40">
+              <div key={finalOutroRunning ? `outro-${flightRevealOutroStep}` : `intro-${flightRevealRoundIndex}-${flightRevealIntroStep}`} className="lotr-soft-reveal mt-6 rounded-3xl border border-amber-500/30 bg-stone-950/60 p-5 font-serif text-xl font-bold leading-snug text-amber-50 shadow-lg shadow-black/40">
                 {finalOutroRunning ? currentOutroLine : currentRevealLine}
               </div>
               <div className="mt-5 text-xs uppercase tracking-[0.22em] text-amber-100/45">{finalOutroRunning ? "Die Chronik wird geschlossen ..." : "Die Gemeinschaft wartet ..."}</div>
@@ -1788,7 +1790,7 @@ function LordOfTheHolesApp() {
                           const player = playerMap.get(String(entry.player_id));
                           const normalized = withFallbackAlias(player || { id: entry.player_id });
                           return (
-                            <div key={`${entry.flight_number}-${entry.player_id}`} className="rounded-2xl border border-amber-400/30 bg-amber-500/15 px-3 py-3 text-center shadow-md shadow-black/30">
+                            <div key={`${entry.flight_number}-${entry.player_id}`} className="lotr-player-reveal rounded-2xl border border-amber-400/30 bg-amber-500/15 px-3 py-3 text-center shadow-md shadow-black/30">
                               <div className="font-serif text-3xl font-black leading-none text-amber-100">{normalized.alias_name || normalized.character_name || entry.player_id}</div>
                               <div className="mt-1 text-xs uppercase tracking-[0.18em] text-amber-100/55">{normalized.character_name || normalized.display_name || entry.player_id}</div>
                             </div>
@@ -1843,15 +1845,31 @@ function LordOfTheHolesApp() {
                 <div className="font-serif text-base font-black text-amber-200">{roundPlan.round_name}</div>
                 {roundPlan.note ? <div className="mt-1 rounded-xl border border-amber-500/20 bg-amber-500/10 p-2 text-xs text-amber-100/75">{roundPlan.note}</div> : null}
                 <div className="mt-2 grid gap-2">
-                  {roundPlan.flights.map((flight) => (
-                    <div key={`${roundPlan.round_id}-${flight.flight_number}`} className="rounded-2xl border border-amber-700/30 bg-stone-950/55 p-2">
-                      <div className="mb-1 font-serif text-sm font-bold text-amber-200">Flight {flight.flight_number}</div>
-                      <div className="mb-2 text-xs text-amber-100/70">{flight.players.map((playerId) => getPlayerLabel(playerMap.get(String(playerId))) || playerId).join(" · ")}</div>
-                      <div className="space-y-1">
-                        {flight.scorers.map((assignment) => <div key={`${assignment.scorer_player_id}-${assignment.player_id}`} className="rounded-xl bg-amber-500/10 px-2 py-1 text-xs text-amber-50">{getScorerLabel(assignment, playerMap)}</div>)}
+                  {roundPlan.flights.map((flight) => {
+                    const flightKey = `${roundPlan.round_id}-${flight.flight_number}`;
+                    const isExpanded = Boolean(expandedFlightKeys[flightKey]);
+                    return (
+                      <div key={flightKey} className="rounded-2xl border border-amber-700/30 bg-stone-950/55 p-2">
+                        <button type="button" onClick={() => setExpandedFlightKeys((current) => ({ ...current, [flightKey]: !current[flightKey] }))} className="flex w-full items-center justify-between gap-3 rounded-xl px-1 py-1 text-left">
+                          <span className="font-serif text-sm font-bold text-amber-200">Flight {flight.flight_number}</span>
+                          <span className="text-xs uppercase tracking-[0.16em] text-amber-100/55">{isExpanded ? "schließen" : "öffnen"}</span>
+                        </button>
+                        {isExpanded ? (
+                          <div className="mt-2 grid gap-1.5">
+                            {flight.players.map((playerId) => {
+                              const player = withFallbackAlias(playerMap.get(String(playerId)) || { id: playerId });
+                              return (
+                                <div key={playerId} className="rounded-xl bg-amber-500/10 px-3 py-2 text-center">
+                                  <div className="font-serif text-xl font-black text-amber-100">{player.alias_name || player.character_name || playerId}</div>
+                                  <div className="text-[10px] uppercase tracking-[0.16em] text-amber-100/50">{player.character_name || player.display_name || playerId}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : null}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ))}
