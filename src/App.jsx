@@ -154,16 +154,36 @@ function cleanHandicapInput(value) {
   return firstMinus + parts[0] + (parts.length > 1 ? "." + parts.slice(1).join("") : "");
 }
 
+function looksNumericValue(value) {
+  if (value === null || value === undefined) return false;
+  const text = String(value).trim();
+  if (!text) return false;
+  return Number.isFinite(Number(text.replace(",", ".")));
+}
+
+function cleanAliasValue(value) {
+  const text = String(value || "").trim();
+  return text && !looksNumericValue(text) ? text : "";
+}
+
 function withFallbackAlias(player) {
   if (!player) return player;
-  const id = String(player.id || "").trim();
+  const characterName = String(player.character_name || player.display_name || player.name || player.id || "").trim();
+  const displayName = String(player.display_name || player.character_name || player.name || player.id || "").trim();
+  const fallbackAliasById = {
+    florian: "Sliceron",
+    mucky: "Gimme",
+    kio: "Foredo",
+    andreas: "Bogeymir",
+    achim: "Gangolf",
+    phillip: "Golfum",
+  };
+  const alias = cleanAliasValue(player.alias_name) || cleanAliasValue(player.alias) || fallbackAliasById[String(player.id || "").toLowerCase()] || "";
   return {
     ...player,
-    id,
-    character_name: String(player.character_name || player.display_name || id || "").trim(),
-    display_name: String(player.display_name || player.character_name || id || "").trim(),
-    alias_name: String(player.alias_name || fallbackAliases[id] || "").trim(),
-    sort_order: Number(player.sort_order || 0),
+    character_name: characterName,
+    display_name: displayName,
+    alias_name: alias,
   };
 }
 
@@ -291,6 +311,19 @@ function getScorerLabel(assignment, playerMap = new Map()) {
   const scorer = playerMap.get(String(assignment?.scorer_player_id || ""));
   const player = playerMap.get(String(assignment?.player_id || ""));
   return `${getPlayerLabel(scorer) || assignment?.scorer_player_id || "Zähler"} zählt ${getPlayerLabel(player) || assignment?.player_id || "Spieler"}`;
+}
+
+function stableFlightDrawSignature(draw) {
+  if (!draw) return "";
+  try {
+    return JSON.stringify(draw);
+  } catch (err) {
+    return String(Date.now());
+  }
+}
+
+function areFlightDrawsEqual(a, b) {
+  return stableFlightDrawSignature(a) === stableFlightDrawSignature(b);
 }
 
 function getAssignedScoredPlayerIdFromDraw(flightDraw, roundId, scorerPlayerId) {
@@ -1332,12 +1365,18 @@ function LordOfTheHolesApp() {
         setDeviceAssignmentsResetAt(nextDeviceAssignmentsResetAt);
       }
       const serverFlightDraw = data.flight_draw || data.flightDraw || null;
+      const serverSentFlightDraw = Object.prototype.hasOwnProperty.call(data, "flight_draw") || Object.prototype.hasOwnProperty.call(data, "flightDraw");
+      const localStoredFlightDraw = readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null);
       if (serverFlightDraw?.rounds?.length) {
-        setFlightDraw(serverFlightDraw);
-        writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, serverFlightDraw);
-      } else if (Object.prototype.hasOwnProperty.call(data, "flight_draw") || Object.prototype.hasOwnProperty.call(data, "flightDraw")) {
-        setFlightDraw(null);
-        window.localStorage.removeItem(FLIGHT_DRAW_STORAGE_KEY);
+        const currentDraw = flightDraw || localStoredFlightDraw;
+        if (!areFlightDrawsEqual(currentDraw, serverFlightDraw)) {
+          setFlightDraw(serverFlightDraw);
+          writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, serverFlightDraw);
+        } else if (!flightDraw) {
+          setFlightDraw(localStoredFlightDraw || serverFlightDraw);
+        }
+      } else if (serverSentFlightDraw && localStoredFlightDraw) {
+        setFlightDraw(localStoredFlightDraw);
       }
       const nextAllPlayers = (data.players?.length ? data.players : fallbackPlayers).map(withFallbackAlias);
       const nextRounds = data.rounds?.length ? data.rounds : fallbackRounds;
