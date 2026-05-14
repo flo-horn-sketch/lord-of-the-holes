@@ -1113,10 +1113,29 @@ function LordOfTheHolesApp() {
   const controlScoreForActiveHole = useMemo(() => (myPlayerId ? findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", myPlayerId, activeHole, true) : null), [scores, displayedActiveRound?.round_id, myPlayerId, activeHole]);
   const hasRequiredScoresForNext = Boolean(myPlayerId && officialScoreForActiveHole?.strokes !== "" && officialScoreForActiveHole?.strokes != null && officialScoreForActiveHole?.putts_count !== "" && officialScoreForActiveHole?.putts_count != null && controlScoreForActiveHole?.strokes !== "" && controlScoreForActiveHole?.strokes != null && controlScoreForActiveHole?.putts_count !== "" && controlScoreForActiveHole?.putts_count != null);
   const currentRoundPendingScores = useMemo(() => (pendingScores || []).filter((score) => String(score.round_id || "") === String(displayedActiveRound?.round_id || "")), [pendingScores, displayedActiveRound?.round_id]);
+  const currentRoundHasDirtyScores = useMemo(() => {
+    const roundId = String(displayedActiveRound?.round_id || "");
+    if (!roundId) return false;
+
+    return Object.keys(dirtyScoreKeys || {}).some((key) => key.startsWith(`${roundId}|`));
+  }, [dirtyScoreKeys, displayedActiveRound?.round_id]);
   const isCurrentRoundScoringLocked = useMemo(() => {
-    if (currentRoundPendingScores.length) return false;
-    return isRoundFullyScoredAndClean(scores, displayedActiveRound?.round_id || "", visiblePlayers, holes);
-  }, [currentRoundPendingScores.length, scores, displayedActiveRound?.round_id, visiblePlayers, holes]);
+    if (currentRoundPendingScores.length || currentRoundHasDirtyScores) return false;
+
+    return isRoundFullyScoredAndClean(
+      scores,
+      displayedActiveRound?.round_id || "",
+      visiblePlayers,
+      holes
+    );
+  }, [
+    currentRoundPendingScores.length,
+    currentRoundHasDirtyScores,
+    scores,
+    displayedActiveRound?.round_id,
+    visiblePlayers,
+    holes,
+  ]);
   const pendingHoleUpdateCount = useMemo(() => new Set((pendingScores || []).filter(isValidScorePayload).map((score) => `${score.round_id}|${score.hole_number}`)).size, [pendingScores]);
   const officialScores = useMemo(() => getOfficialScores(scores), [scores]);
   const officialAllScores = useMemo(() => getOfficialScores(allScores), [allScores]);
@@ -1379,13 +1398,22 @@ function LordOfTheHolesApp() {
       const localScoresResetAt = String(readLocalJson("lordOfTheHoles.scoresResetAt", "") || "");
       if (nextScoresResetAt && nextScoresResetAt !== localScoresResetAt) {
         const emptyScores = [];
+
         setScores(emptyScores);
         setAllScores(emptyScores);
+
         setPendingScores(emptyScores);
         pendingScoresRef.current = emptyScores;
         writeLocalJson("lordOfTheHoles.pendingScores", emptyScores);
+
+        setDirtyScoreKeys({});
+        dirtyScoreKeysRef.current = {};
+        syncingScoreKeysRef.current = {};
+        writeLocalJson("lordOfTheHoles.dirtyScoreKeys", {});
+
         writeLocalJson("lordOfTheHoles.cachedState", null);
         writeLocalJson("lordOfTheHoles.scoresResetAt", nextScoresResetAt);
+
         setScoresResetAt(nextScoresResetAt);
         setActiveHole(1);
       }
@@ -1498,9 +1526,55 @@ function LordOfTheHolesApp() {
   }
 
   async function savePendingScore(score) {
-    if (!isValidScorePayload(score)) { removePendingScore(score); return true; }
-    try { await callSheetApi({ action: "upsertScore", score }); removePendingScore(score); setConnectionStatus("online"); setError(""); return true; }
-    catch (err) { setConnectionStatus("offline"); return false; }
+    if (!isValidScorePayload(score)) {
+      removePendingScore(score);
+      clearScoreDirty(score);
+      return true;
+    }
+
+    const scoreKey = getScoreSyncKey(score);
+    const scoreTimestamp = getScoreTimestamp(score);
+
+    if (
+      syncingScoreKeysRef.current[scoreKey] &&
+      getScoreTimestamp(syncingScoreKeysRef.current[scoreKey]) >= scoreTimestamp
+    ) {
+      return false;
+    }
+
+    syncingScoreKeysRef.current = {
+      ...syncingScoreKeysRef.current,
+      [scoreKey]: score,
+    };
+
+    try {
+      await callSheetApi({ action: "upsertScore", score });
+
+      syncingScoreKeysRef.current = { ...syncingScoreKeysRef.current };
+      delete syncingScoreKeysRef.current[scoreKey];
+
+      removePendingScore(score);
+
+      const stillHasNewerPending = (pendingScoresRef.current || []).some(
+        (item) =>
+          getScoreSyncKey(item) === scoreKey &&
+          getScoreTimestamp(item) > scoreTimestamp
+      );
+
+      if (!stillHasNewerPending) {
+        clearScoreDirty(score);
+      }
+
+      setConnectionStatus("online");
+      setError("");
+      return true;
+    } catch (err) {
+      syncingScoreKeysRef.current = { ...syncingScoreKeysRef.current };
+      delete syncingScoreKeysRef.current[scoreKey];
+
+      setConnectionStatus("offline");
+      return false;
+    }
   }
 
   async function flushPendingScores() {
@@ -1731,6 +1805,10 @@ function LordOfTheHolesApp() {
       setPendingScores(emptyScores);
       pendingScoresRef.current = emptyScores;
       writeLocalJson("lordOfTheHoles.pendingScores", emptyScores);
+      setDirtyScoreKeys({});
+      dirtyScoreKeysRef.current = {};
+      syncingScoreKeysRef.current = {};
+      writeLocalJson("lordOfTheHoles.dirtyScoreKeys", {});
       writeLocalJson("lordOfTheHoles.cachedState", null);
       if (result?.scores_reset_at || result?.scoresResetAt) {
         const resetAt = String(result.scores_reset_at || result.scoresResetAt);
@@ -1810,6 +1888,47 @@ function LordOfTheHolesApp() {
     } catch (err) {
       setConnectionStatus("offline");
       setError(err.message || "Kompletter Reset konnte nicht ausgelöst werden.");
+    }
+  }
+
+  async function startRoundWithFullResetAndFlightDraw() {
+    if (!isAdminUnlocked || flightDrawSaving) return;
+    setSetupSavedMessage("");
+    setError("");
+    setFlightDrawSaving(true);
+    try {
+      const resetResult = await callSheetApi({ action: "clearResetMarkersAndFullReset" });
+      const resetAt = String(resetResult?.full_reset_at || resetResult?.fullResetAt || new Date().toISOString());
+      clearLocalDeviceCacheAfterFullReset(resetAt);
+      setFullResetAt(resetAt);
+      writeLocalJson("lordOfTheHoles.fullResetAt", resetAt);
+      if (resetResult?.backup_sheet_name) setBackupSavedMessage(`Backup erstellt: ${resetResult.backup_sheet_name}`);
+
+      const draw = buildFlightDraw(allPlayers, rounds);
+      const saveResult = await callSheetApi({ action: "saveFlightDraw", draw, test: false });
+      const savedDraw = saveResult?.flight_draw || saveResult?.flightDraw || draw;
+      setFlightDraw(savedDraw);
+      writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, savedDraw);
+      setFlightRevealRunning(false);
+      setFlightSummaryOpen(false);
+      setFlightDrawCeremonyCompleted(false);
+      setFlightAutoRevealStarted(false);
+      setFlightRevealRoundIndex(0);
+      setFlightRevealCount(0);
+      setFlightRevealIntroStep(0);
+      setFlightRevealOutroStep(0);
+      setExpandedFlightKeys({});
+      setConnectionStatus("online");
+      setError("");
+      setSetupSavedMessage(
+        "Runde vorbereitet: Full Reset für alle ausgeführt, alte Caches gelöscht und neue Flights im Sheet gespeichert. Runde und Kurs kannst du manuell im Admin setzen."
+      );
+      await loadData({ silent: true });
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Rundenstart konnte nicht vorbereitet werden.");
+    } finally {
+      setFlightDrawSaving(false);
     }
   }
 
@@ -1905,8 +2024,6 @@ function LordOfTheHolesApp() {
     pendingScoresRef.current = [];
     setDirtyScoreKeys({});
     dirtyScoreKeysRef.current = {};
-    syncingScoreKeysRef.current = {};
-    writeLocalJson("lordOfTheHoles.dirtyScoreKeys", {});
     syncingScoreKeysRef.current = {};
     writeLocalJson("lordOfTheHoles.dirtyScoreKeys", {});
     setScores([]);
@@ -2268,7 +2385,7 @@ function LordOfTheHolesApp() {
                 <div className="font-serif text-base font-bold text-amber-200">{flightDrawSaving ? "Die Pergamente öffnen sich ..." : "Die Pergamente öffnen sich von selbst."}</div>
                 {isAdminUnlocked ? (
                   <button type="button" disabled={flightDrawSaving} onClick={enterLockedAppAsAdmin} className="mt-3 w-full rounded-2xl border border-amber-300/50 bg-amber-600 px-4 py-2.5 font-serif text-base font-black text-amber-50 shadow-lg shadow-black/40 disabled:opacity-60">
-                    Neu auslosen und lokal testen
+                    Zeremonie testen
                   </button>
                 ) : null}
               </>
@@ -2505,6 +2622,7 @@ function LordOfTheHolesApp() {
             {appLocked ? <Button disabled={!isAdminUnlocked} onClick={() => { setGlobalAppLock(false); setLockAdminBypass(false); }} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-800/70 py-2 text-emerald-50 disabled:opacity-50">App für alle freigeben</Button> : <Button disabled={!isAdminUnlocked} onClick={() => { setMenuOpen(false); setLockAdminBypass(false); setGlobalAppLock(true); }} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">App für alle sperren</Button>}
             <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={() => setClearScoresConfirmOpen(true)} className="mt-2 w-full rounded-2xl border border-red-500/50 bg-red-950/60 py-2 text-red-100 disabled:opacity-50">Scores löschen</Button>
             <Button disabled={!isAdminUnlocked || flightDrawSaving || connectionStatus !== "online"} onClick={redrawFlightsFromAdmin} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-amber-800/70 py-2 text-amber-50 disabled:opacity-50">{flightDrawSaving ? "Flights werden bestimmt ..." : "Flights neu bestimmen"}</Button>
+            <Button disabled={!isAdminUnlocked || flightDrawSaving || connectionStatus !== "online"} onClick={startRoundWithFullResetAndFlightDraw} className="mt-2 w-full rounded-2xl border border-emerald-400/60 bg-emerald-800/80 py-2 text-emerald-50 disabled:opacity-50">{flightDrawSaving ? "Rundenstart wird vorbereitet ..." : "Runde kann beginnen"}</Button>
             <Button disabled={!isAdminUnlocked} onClick={clearLocalCache} className="mt-2 w-full rounded-2xl border border-sky-500/40 bg-sky-950/60 py-2 text-sky-100 disabled:opacity-50">Lokalen Cache dieses Geräts löschen</Button>
             <Button disabled={!isAdminUnlocked || connectionStatus !== "online"} onClick={fullResetForAllDevices} className="mt-2 w-full rounded-2xl border border-red-400/60 bg-red-950/80 py-2 text-red-100 disabled:opacity-50">Script-Cache löschen + Komplett-Reset für alle</Button>
           </CardContent>
