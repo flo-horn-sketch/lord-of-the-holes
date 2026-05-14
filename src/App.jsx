@@ -1049,6 +1049,7 @@ function LordOfTheHolesApp() {
   const [flightRevealIntroStep, setFlightRevealIntroStep] = useState(0);
   const [flightRevealOutroStep, setFlightRevealOutroStep] = useState(0);
   const [expandedFlightKeys, setExpandedFlightKeys] = useState({});
+  const [flightAutoRevealStarted, setFlightAutoRevealStarted] = useState(false);
   const [localHandicaps, setLocalHandicaps] = useState({});
   const introAudioRef = useRef(null);
   const lastLoadedRoundRef = useRef("");
@@ -1207,7 +1208,8 @@ function LordOfTheHolesApp() {
     return { days, hours, minutes, seconds };
   }, [lockCountdownNow]);
   const flightDrawAvailable = lockCountdownNow.getTime() >= FLIGHT_DRAW_TARGET.getTime();
-  const shouldAutoOpenFlightDraw = appLocked && flightDrawAvailable && !flightDraw && !flightDrawSaving;
+  const shouldAutoOpenFlightDraw = appLocked && flightDrawAvailable && !flightDraw && !flightDrawSaving && !flightAutoRevealStarted;
+  const shouldAutoReplayStoredFlightDraw = appLocked && flightDrawAvailable && Boolean(flightDraw?.rounds?.length) && !flightRevealRunning && !flightAutoRevealStarted;
   const currentRevealRound = flightDraw?.rounds?.[flightRevealRoundIndex] || null;
   const currentRevealPlayers = currentRevealRound?.flights?.flatMap((flight) => (flight.players || []).map((playerId) => ({ player_id: playerId, flight_number: flight.flight_number }))) || [];
   const flightRevealIntroLinesByRound = [
@@ -1610,6 +1612,7 @@ function LordOfTheHolesApp() {
     setRoundTableRoundId("");
     setFlightDraw(null);
     setFlightRevealRunning(false);
+    setFlightAutoRevealStarted(false);
     setFlightRevealRoundIndex(0);
     setFlightRevealCount(0);
     setFlightRevealIntroStep(0);
@@ -1826,6 +1829,7 @@ function LordOfTheHolesApp() {
     window.localStorage.removeItem(FLIGHT_DRAW_STORAGE_KEY);
     setFlightDraw(null);
     setFlightRevealRunning(false);
+    setFlightAutoRevealStarted(false);
     setFlightRevealRoundIndex(0);
     setFlightRevealCount(0);
     setFlightRevealIntroStep(0);
@@ -1849,8 +1853,53 @@ function LordOfTheHolesApp() {
   }
 
   useEffect(() => {
+    if (!shouldAutoReplayStoredFlightDraw) return;
+    const storedDraw = flightDraw || readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null);
+    if (!storedDraw?.rounds?.length) {
+      setError("Keine gespeicherte Flight-Ziehung gefunden. Bitte zuerst im Admin-Bereich „Flights neu bestimmen“ ausführen.");
+      return;
+    }
+    setFlightAutoRevealStarted(true);
+    setFlightDraw(storedDraw);
+    setFlightRevealRoundIndex(0);
+    setFlightRevealCount(0);
+    setFlightRevealIntroStep(0);
+    setFlightRevealOutroStep(0);
+    setExpandedFlightKeys({});
+    setFlightRevealRunning(true);
+    loadData({ silent: true });
+  }, [shouldAutoReplayStoredFlightDraw]);
+
+  useEffect(() => {
     if (!shouldAutoOpenFlightDraw) return;
-    openFlightDrawPergaments({ automatic: true });
+    const storedDraw = flightDraw || readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null);
+    if (storedDraw?.rounds?.length) {
+      setFlightAutoRevealStarted(true);
+      setFlightDraw(storedDraw);
+      setFlightRevealRoundIndex(0);
+      setFlightRevealCount(0);
+      setFlightRevealIntroStep(0);
+      setFlightRevealOutroStep(0);
+      setExpandedFlightKeys({});
+      setFlightRevealRunning(true);
+      loadData({ silent: true });
+      return;
+    }
+    setFlightAutoRevealStarted(true);
+    loadData({ silent: true }).finally(() => {
+      const latestStoredDraw = readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null);
+      if (latestStoredDraw?.rounds?.length) {
+        setFlightDraw(latestStoredDraw);
+        setFlightRevealRoundIndex(0);
+        setFlightRevealCount(0);
+        setFlightRevealIntroStep(0);
+        setFlightRevealOutroStep(0);
+        setExpandedFlightKeys({});
+        setFlightRevealRunning(true);
+        return;
+      }
+      setError("Keine gespeicherte Flight-Ziehung gefunden. Bitte zuerst im Admin-Bereich „Flights neu bestimmen“ ausführen.");
+    });
   }, [shouldAutoOpenFlightDraw]);
 
   useEffect(() => {
