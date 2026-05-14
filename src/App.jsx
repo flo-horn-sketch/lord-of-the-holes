@@ -1990,7 +1990,7 @@ function LordOfTheHolesApp() {
           ) : (
             <>
               <div className="mt-2 font-serif text-2xl font-black leading-tight text-amber-200">{currentRevealRound.round_name}</div>
-              {currentRevealRound.note ? <div className="mx-auto mt-3 max-w-sm rounded-2xl border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-100/75">{currentRevealRound.note}</div> : null}
+              {null}
               <div className="mt-5 grid gap-3 text-left">
                 {currentRevealRound.flights.map((flight) => {
                   const flightVisiblePlayers = visiblePlayers.filter((entry) => entry.flight_number === flight.flight_number);
@@ -2024,7 +2024,7 @@ function LordOfTheHolesApp() {
         <div className="text-center">
           <div className="text-[10px] uppercase tracking-[0.28em] text-amber-300/80">Der Rat von Bruchtal</div>
           <div className="mt-1 font-serif text-xl font-black text-amber-200">Flight-Ziehung der Pergamente</div>
-          <p className="mt-1 text-xs text-amber-100/75">Die ersten drei Kapitel werden ausgelost. Runde 1 ohne Gangolf, danach treten alle Gefährten in den Lostopf.</p>
+          <p className="mt-1 text-xs text-amber-100/75">Die Ziehung der Flights findet am 21.05.26 punkt 20:00 Uhr hier in dieser App statt. Öffnet die App am besten 1–2 Minuten vorher, damit kein Hobbit verschlafen vor verschlossenen Toren steht.</p>
         </div>
 
         {!flightDraw ? (
@@ -2032,6 +2032,7 @@ function LordOfTheHolesApp() {
             {!flightDrawAvailable ? (
               <>
                 <div className="font-serif text-base font-bold text-amber-200">Die Pergamente sind noch versiegelt.</div>
+                <div className="mt-1 text-xs text-amber-100/65">Die Pforten sind noch verschlossen. Gandalf selbst würde jetzt sagen: „Du kommst hier noch nicht rein.“</div>
                 <div className="mt-2 grid grid-cols-4 gap-1.5 rounded-2xl border border-amber-500/20 bg-black/30 p-2 text-center">
                   <div><div className="font-serif text-lg font-black text-amber-200">{flightDrawCountdown.days}</div><div className="text-[8px] uppercase tracking-[0.14em] text-amber-100/55">Tage</div></div>
                   <div><div className="font-serif text-lg font-black text-amber-200">{String(flightDrawCountdown.hours).padStart(2, "0")}</div><div className="text-[8px] uppercase tracking-[0.14em] text-amber-100/55">Std</div></div>
@@ -2060,7 +2061,7 @@ function LordOfTheHolesApp() {
             {flightDraw.rounds.map((roundPlan) => (
               <div key={roundPlan.round_id} className="mb-3 rounded-2xl border border-amber-500/25 bg-black/30 p-3 last:mb-0">
                 <div className="font-serif text-base font-black text-amber-200">{roundPlan.round_name}</div>
-                {roundPlan.note ? <div className="mt-1 rounded-xl border border-amber-500/20 bg-amber-500/10 p-2 text-xs text-amber-100/75">{roundPlan.note}</div> : null}
+                {null}
                 <div className="mt-2 grid gap-2">
                   {roundPlan.flights.map((flight) => (
                     <div key={`${roundPlan.round_id}-${flight.flight_number}`} className="rounded-2xl border border-amber-700/30 bg-stone-950/55 p-2">
