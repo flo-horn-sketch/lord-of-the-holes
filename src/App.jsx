@@ -2188,7 +2188,11 @@ function LordOfTheHolesApp() {
             <div className="mt-1 font-serif text-2xl font-black leading-none text-amber-200">21.05.26</div>
             <div className="mt-1 font-serif text-xl font-black leading-none text-amber-100">20:00 Uhr</div>
           </div>
-          <p className="mt-2 text-xs text-amber-100/75">Öffnet die App am besten 1–2 Minuten vorher, damit kein Hobbit verschlafen vor verschlossenen Toren steht.</p>
+          <div className="mt-2 rounded-2xl border border-amber-400/30 bg-black/35 p-2 text-center">
+            <div className="text-[10px] uppercase tracking-[0.22em] text-amber-300/80">hier in der App</div>
+            <div className="font-serif text-base font-black text-amber-100">Die Flight-Ziehung erscheint live auf diesem Bildschirm.</div>
+          </div>
+          <p className="mt-2 text-xs text-amber-100/75">Bitte öffnet die App 1–2 Minuten vorher, damit die Pergamente rechtzeitig geladen sind.</p>
         </div>
 
         {!flightDraw ? (
