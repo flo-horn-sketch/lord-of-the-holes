@@ -1111,7 +1111,13 @@ function LordOfTheHolesApp() {
   const maxPuttsForCurrentScore = currentEffectiveStrokes > 1 ? currentEffectiveStrokes - 1 : 0;
   const officialScoreForActiveHole = useMemo(() => findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", scoredPlayerId, activeHole, false), [scores, displayedActiveRound?.round_id, scoredPlayerId, activeHole]);
   const controlScoreForActiveHole = useMemo(() => (myPlayerId ? findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", myPlayerId, activeHole, true) : null), [scores, displayedActiveRound?.round_id, myPlayerId, activeHole]);
-  const hasRequiredScoresForNext = Boolean(myPlayerId && officialScoreForActiveHole?.strokes !== "" && officialScoreForActiveHole?.strokes != null && officialScoreForActiveHole?.putts_count !== "" && officialScoreForActiveHole?.putts_count != null && controlScoreForActiveHole?.strokes !== "" && controlScoreForActiveHole?.strokes != null && controlScoreForActiveHole?.putts_count !== "" && controlScoreForActiveHole?.putts_count != null);
+  const hasRequiredScoresForNext = useMemo(() => {
+    if (!myPlayerId || !scoredPlayerId) return false;
+    const currentScores = scoresRef.current?.length ? scoresRef.current : scores;
+    const officialScore = findScoreForPlayerHole(currentScores, displayedActiveRound?.round_id || "r1", scoredPlayerId, activeHole, false);
+    const controlScore = findScoreForPlayerHole(currentScores, displayedActiveRound?.round_id || "r1", myPlayerId, activeHole, true);
+    return hasCompleteScoreValue(officialScore) && hasCompleteScoreValue(controlScore);
+  }, [myPlayerId, scoredPlayerId, scores, displayedActiveRound?.round_id, activeHole]);
   const currentRoundPendingScores = useMemo(() => (pendingScores || []).filter((score) => String(score.round_id || "") === String(displayedActiveRound?.round_id || "")), [pendingScores, displayedActiveRound?.round_id]);
   const currentRoundHasDirtyScores = useMemo(() => {
     const roundId = String(displayedActiveRound?.round_id || "");
@@ -1490,16 +1496,52 @@ function LordOfTheHolesApp() {
     }
   }
 
+  function upsertScoreIntoList(currentScores, score) {
+    const normalizedScore = normalizeScoreRecord(score);
+    const scoreKey = getScoreIdentityKey(normalizedScore);
+    return [
+      ...(currentScores || []).filter((item) => getScoreIdentityKey(item) !== scoreKey),
+      normalizedScore,
+    ];
+  }
+
+  function persistScoreLocally(score) {
+    if (!isValidScorePayload(score)) return;
+
+    const normalizedScore = normalizeScoreRecord(score);
+
+    scoresRef.current = upsertScoreIntoList(scoresRef.current, normalizedScore);
+    allScoresRef.current = upsertScoreIntoList(allScoresRef.current, normalizedScore);
+
+    setScores(scoresRef.current);
+    setAllScores(allScoresRef.current);
+
+    addPendingScore(normalizedScore);
+    markScoreDirty(normalizedScore);
+    queueScoreForBackgroundSync(normalizedScore);
+  }
+
   function optimisticUpdate(patch) {
     const safeRoundId = String(displayedActiveRound?.round_id || "").trim();
     const safePlayerId = String(entryPlayerId || "").trim();
     const safeHoleNumber = Number(activeHole || 0);
     if (!safeRoundId || !safePlayerId || !safeHoleNumber) throw new Error("Score kann noch nicht gespeichert werden: Runde, Spieler oder Loch fehlt.");
-    const next = normalizeScoreRecord({ round_id: safeRoundId, player_id: safePlayerId, hole_number: safeHoleNumber, strokes: currentScore.strokes ?? "", picked_up: normalizeBoolean(currentScore.picked_up), over_two_putts: normalizeBoolean(currentScore.over_two_putts), putts_count: currentScore.putts_count ?? "", lady: normalizeBoolean(currentScore.lady), scorer_player_id: isScorerEntryMode ? entryPlayerId : myPlayerId || "", updated_at: new Date().toISOString(), ...patch });
-    const sameScore = (score) => String(score.round_id) === String(next.round_id) && String(score.player_id) === String(next.player_id) && Number(score.hole_number) === Number(next.hole_number) && isScorerControlScore(score) === isScorerControlScore(next);
-    const updateList = (current) => current.some(sameScore) ? current.map((s) => sameScore(s) ? next : s) : [...current, next];
-    setScores(updateList);
-    setAllScores(updateList);
+
+    const next = normalizeScoreRecord({
+      round_id: safeRoundId,
+      player_id: safePlayerId,
+      hole_number: safeHoleNumber,
+      strokes: currentScore.strokes ?? "",
+      picked_up: normalizeBoolean(currentScore.picked_up),
+      over_two_putts: normalizeBoolean(currentScore.over_two_putts),
+      putts_count: currentScore.putts_count ?? "",
+      lady: normalizeBoolean(currentScore.lady),
+      scorer_player_id: isScorerEntryMode ? entryPlayerId : myPlayerId || "",
+      updated_at: new Date().toISOString(),
+      ...patch,
+    });
+
+    persistScoreLocally(next);
     return next;
   }
 
@@ -1740,14 +1782,27 @@ function LordOfTheHolesApp() {
     return missingItems;
   }
 
-  function syncCurrentHoleScoresNow() {
-    if (officialScoreForActiveHole && hasCompleteScoreValue(officialScoreForActiveHole)) {
-      queueScoreForBackgroundSync(officialScoreForActiveHole);
-    }
+  function getCompleteScoresForCurrentHoleFromRef() {
+    const roundId = displayedActiveRound?.round_id || "r1";
+    const holeNumber = activeHole;
+    const currentScores = scoresRef.current || scores || [];
+    const scoresToSync = [];
 
-    if (controlScoreForActiveHole && hasCompleteScoreValue(controlScoreForActiveHole)) {
-      queueScoreForBackgroundSync(controlScoreForActiveHole);
-    }
+    const officialScore = findScoreForPlayerHole(currentScores, roundId, scoredPlayerId, holeNumber, false);
+    const controlScore = myPlayerId ? findScoreForPlayerHole(currentScores, roundId, myPlayerId, holeNumber, true) : null;
+
+    if (officialScore && hasCompleteScoreValue(officialScore)) scoresToSync.push(officialScore);
+    if (controlScore && hasCompleteScoreValue(controlScore)) scoresToSync.push(controlScore);
+
+    return scoresToSync;
+  }
+
+  function syncCurrentHoleScoresNow() {
+    getCompleteScoresForCurrentHoleFromRef().forEach((score) => {
+      addPendingScore(score);
+      markScoreDirty(score);
+      queueScoreForBackgroundSync(score);
+    });
   }
 
   function goToNextHole() {
