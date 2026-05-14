@@ -1017,6 +1017,8 @@ function LordOfTheHolesApp() {
   const [allScores, setAllScores] = useState(cachedState?.allScores?.length ? cachedState.allScores.map(normalizeScoreRecord) : []);
   const [pendingScores, setPendingScores] = useState(() => readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord).filter(isValidScorePayload));
   const pendingScoresRef = useRef(readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord).filter(isValidScorePayload));
+  const [dirtyScoreKeys, setDirtyScoreKeys] = useState({});
+  const dirtyScoreKeysRef = useRef({});
   const scoresRef = useRef([]);
   const allScoresRef = useRef([]);
   const [scoredPlayerId, setScoredPlayerId] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerId", ""));
@@ -1516,21 +1518,42 @@ function LordOfTheHolesApp() {
     return allSaved;
   }
 
+  function getScoreSyncKey(score) {
+    return [score?.round_id || "", score?.player_id || "", score?.hole_number || "", score?.scorer_player_id || "official"].join("|");
+  }
+
+  function markScoreDirty(score) {
+    if (!score) return;
+    const key = getScoreSyncKey(score);
+    dirtyScoreKeysRef.current = { ...dirtyScoreKeysRef.current, [key]: true };
+    setDirtyScoreKeys(dirtyScoreKeysRef.current);
+  }
+
+  function clearScoreDirty(score) {
+    if (!score) return;
+    const key = getScoreSyncKey(score);
+    if (!dirtyScoreKeysRef.current[key]) return;
+    const next = { ...dirtyScoreKeysRef.current };
+    delete next[key];
+    dirtyScoreKeysRef.current = next;
+    setDirtyScoreKeys(next);
+  }
+
+  function isScoreDirty(score) {
+    if (!score) return false;
+    return Boolean(dirtyScoreKeysRef.current[getScoreSyncKey(score)]);
+  }
+
   function queueScoreForBackgroundSync(score) {
     const normalizedScore = {
       ...score,
       updated_at: new Date().toISOString(),
     };
-    const scoreKey = [
-      normalizedScore.round_id,
-      normalizedScore.player_id,
-      normalizedScore.hole_number,
-      normalizedScore.scorer_player_id || "official",
-    ].join("|");
+    const scoreKey = getScoreSyncKey(normalizedScore);
 
     setPendingScores((current) => {
       const filtered = (current || []).filter((item) => {
-        const itemKey = [item.round_id, item.player_id, item.hole_number, item.scorer_player_id || "official"].join("|");
+        const itemKey = getScoreSyncKey(item);
         return itemKey !== scoreKey;
       });
       const nextPendingScores = [...filtered, normalizedScore];
@@ -1541,7 +1564,7 @@ function LordOfTheHolesApp() {
 
     setScores((current) => {
       const filtered = (current || []).filter((item) => {
-        const itemKey = [item.round_id, item.player_id, item.hole_number, item.scorer_player_id || "official"].join("|");
+        const itemKey = getScoreSyncKey(item);
         return itemKey !== scoreKey;
       });
       return [...filtered, normalizedScore];
@@ -1549,7 +1572,7 @@ function LordOfTheHolesApp() {
 
     setAllScores((current) => {
       const filtered = (current || []).filter((item) => {
-        const itemKey = [item.round_id, item.player_id, item.hole_number, item.scorer_player_id || "official"].join("|");
+        const itemKey = getScoreSyncKey(item);
         return itemKey !== scoreKey;
       });
       return [...filtered, normalizedScore];
@@ -1558,8 +1581,9 @@ function LordOfTheHolesApp() {
     callSheetApi({ action: "upsertScore", score: normalizedScore })
       .then(() => {
         setConnectionStatus("online");
+        clearScoreDirty(normalizedScore);
         setPendingScores((current) => (current || []).filter((item) => {
-          const itemKey = [item.round_id, item.player_id, item.hole_number, item.scorer_player_id || "official"].join("|");
+          const itemKey = getScoreSyncKey(item);
           return itemKey !== scoreKey;
         }));
       })
@@ -1596,6 +1620,15 @@ function LordOfTheHolesApp() {
     }
 
     try {
+      const dirtyScore = {
+        ...currentScore,
+        ...nextPatch,
+        round_id: displayedActiveRound?.round_id || currentScore?.round_id || "r1",
+        player_id: entryPlayerId || currentScore?.player_id || "",
+        hole_number: activeHole,
+        scorer_player_id: isScorerEntryMode ? myPlayerId : (currentScore?.scorer_player_id || ""),
+      };
+      markScoreDirty(dirtyScore);
       optimisticUpdate(nextPatch);
     } catch (err) {
       setError(err.message || "Score kann noch nicht lokal vorgemerkt werden.");
@@ -1612,8 +1645,8 @@ function LordOfTheHolesApp() {
   }
 
   function syncCurrentHoleScoresNow() {
-    if (officialScoreForActiveHole) queueScoreForBackgroundSync(officialScoreForActiveHole);
-    if (controlScoreForActiveHole) queueScoreForBackgroundSync(controlScoreForActiveHole);
+    if (officialScoreForActiveHole && isScoreDirty(officialScoreForActiveHole)) queueScoreForBackgroundSync(officialScoreForActiveHole);
+    if (controlScoreForActiveHole && isScoreDirty(controlScoreForActiveHole)) queueScoreForBackgroundSync(controlScoreForActiveHole);
   }
 
   function goToNextHole() {
