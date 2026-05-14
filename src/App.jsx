@@ -1737,6 +1737,21 @@ function LordOfTheHolesApp() {
     setError("");
   }
 
+  async function enterAppWithoutFlightDraw() {
+    if (lockPasswordInput !== ADMIN_PASSWORD && !isAdminUnlocked) { setError("Passwort ist falsch."); return; }
+    if (splashEntering || flightDrawSaving) return;
+    setSplashEntering(true);
+    await loadData({ silent: true });
+    setSplashEntering(false);
+    setIsAdminUnlocked(true);
+    setLockAdminBypass(true);
+    setShowSplash(false);
+    setLockUnlockOpen(false);
+    setLockPasswordInput("");
+    setFlightRevealRunning(false);
+    setError("");
+  }
+
   async function openFlightDrawPergaments({ automatic = false, forceLocalTest = false, replaceExisting = false, saveTestToSheet = false, startReveal = true, allowBeforeTarget = false } = {}) {
     if (!automatic && !isAdminUnlocked) {
       setError("Nur der Zeremonienmeister kann die Pergamente öffnen.");
