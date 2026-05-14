@@ -1615,12 +1615,10 @@ function LordOfTheHolesApp() {
     setLockUnlockOpen(false);
     setLockPasswordInput("");
     setError("");
-    if (!flightDraw) {
-      await openFlightDrawPergaments({ automatic: true, forceLocalTest: true });
-    }
+    await openFlightDrawPergaments({ automatic: true, forceLocalTest: true, replaceExisting: true });
   }
 
-  async function openFlightDrawPergaments({ automatic = false, forceLocalTest = false } = {}) {
+  async function openFlightDrawPergaments({ automatic = false, forceLocalTest = false, replaceExisting = false } = {}) {
     if (!automatic && !isAdminUnlocked) {
       setError("Nur der Zeremonienmeister kann die Pergamente öffnen.");
       return;
@@ -1628,6 +1626,16 @@ function LordOfTheHolesApp() {
     if (!flightDrawAvailable && !automatic && !forceLocalTest) {
       setError("Die Pergamente sind noch versiegelt.");
       return;
+    }
+    if (flightDraw && !replaceExisting) {
+      setFlightRevealRoundIndex(0);
+      setFlightRevealCount(0);
+      setFlightRevealRunning(true);
+      return;
+    }
+    if (replaceExisting) {
+      window.localStorage.removeItem(FLIGHT_DRAW_STORAGE_KEY);
+      setFlightDraw(null);
     }
     const draw = buildFlightDraw(allPlayers, rounds);
     setFlightDraw(draw);
@@ -1756,8 +1764,8 @@ function LordOfTheHolesApp() {
               <>
                 <div className="font-serif text-base font-bold text-amber-200">{flightDrawSaving ? "Die Pergamente öffnen sich ..." : "Die Pergamente öffnen sich von selbst."}</div>
                 {isAdminUnlocked ? (
-                  <button type="button" disabled={flightDrawSaving} onClick={() => openFlightDrawPergaments({ automatic: true, forceLocalTest: true })} className="mt-3 w-full rounded-2xl border border-amber-300/50 bg-amber-600 px-4 py-2.5 font-serif text-base font-black text-amber-50 shadow-lg shadow-black/40 disabled:opacity-60">
-                    Test-Ziehung lokal starten
+                  <button type="button" disabled={flightDrawSaving} onClick={() => openFlightDrawPergaments({ automatic: true, forceLocalTest: true, replaceExisting: true })} className="mt-3 w-full rounded-2xl border border-amber-300/50 bg-amber-600 px-4 py-2.5 font-serif text-base font-black text-amber-50 shadow-lg shadow-black/40 disabled:opacity-60">
+                    Neu auslosen und lokal testen
                   </button>
                 ) : null}
               </>
