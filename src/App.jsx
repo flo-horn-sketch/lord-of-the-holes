@@ -1017,8 +1017,9 @@ function LordOfTheHolesApp() {
   const [allScores, setAllScores] = useState(cachedState?.allScores?.length ? cachedState.allScores.map(normalizeScoreRecord) : []);
   const [pendingScores, setPendingScores] = useState(() => readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord).filter(isValidScorePayload));
   const pendingScoresRef = useRef(readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord).filter(isValidScorePayload));
-  const [dirtyScoreKeys, setDirtyScoreKeys] = useState({});
-  const dirtyScoreKeysRef = useRef({});
+  const [dirtyScoreKeys, setDirtyScoreKeys] = useState(() => readLocalJson("lordOfTheHoles.dirtyScoreKeys", {}));
+  const dirtyScoreKeysRef = useRef(readLocalJson("lordOfTheHoles.dirtyScoreKeys", {}));
+  const syncingScoreKeysRef = useRef({});
   const scoresRef = useRef([]);
   const allScoresRef = useRef([]);
   const [scoredPlayerId, setScoredPlayerId] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerId", ""));
@@ -1045,7 +1046,7 @@ function LordOfTheHolesApp() {
   const [scoreHintMessage, setScoreHintMessage] = useState("");
   const [showSplash, setShowSplash] = useState(true);
   const [splashEntering, setSplashEntering] = useState(false);
-  const [appLocked, setAppLocked] = useState(() => readLocalJson("lordOfTheHoles.appLocked", false));
+  const [appLocked, setAppLocked] = useState(true);
   const [lockUnlockOpen, setLockUnlockOpen] = useState(false);
   const [lockPasswordInput, setLockPasswordInput] = useState("");
   const [lockAdminBypass, setLockAdminBypass] = useState(false);
@@ -1284,6 +1285,7 @@ function LordOfTheHolesApp() {
   useEffect(() => { writeLocalJson("lordOfTheHoles.selectedActiveRoundId", selectedActiveRoundId); }, [selectedActiveRoundId]);
   useEffect(() => { pendingScoresRef.current = pendingScores; writeLocalJson("lordOfTheHoles.pendingScores", pendingScores); }, [pendingScores]);
   useEffect(() => { scoresRef.current = scores; }, [scores]);
+  useEffect(() => { dirtyScoreKeysRef.current = dirtyScoreKeys; writeLocalJson("lordOfTheHoles.dirtyScoreKeys", dirtyScoreKeys); }, [dirtyScoreKeys]);
   useEffect(() => { allScoresRef.current = allScores; }, [allScores]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.appLocked", appLocked); }, [appLocked]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", deviceAssignmentsResetAt); }, [deviceAssignmentsResetAt]);
@@ -1372,8 +1374,7 @@ function LordOfTheHolesApp() {
         if (nextAppLocked && !lockAdminBypass) setShowSplash(true);
       }
       const nextFullResetAt = String(data.full_reset_at || data.fullResetAt || "");
-      const localFullResetAt = String(readLocalJson("lordOfTheHoles.fullResetAt", "") || "");
-      if (nextFullResetAt && nextFullResetAt !== localFullResetAt) applyLocalCacheClear(nextFullResetAt, "Kompletter Reset wurde übernommen.");
+      applyFullResetFromServer(nextFullResetAt);
       const nextScoresResetAt = String(data.scores_reset_at || data.scoresResetAt || "");
       const localScoresResetAt = String(readLocalJson("lordOfTheHoles.scoresResetAt", "") || "");
       if (nextScoresResetAt && nextScoresResetAt !== localScoresResetAt) {
@@ -1439,7 +1440,7 @@ function LordOfTheHolesApp() {
       const sheetActiveScores = (data.activeScores || []).map(normalizeScoreRecord);
       const livePendingScores = pendingScoresRef.current;
       const localAllScores = allScoresRef.current || [];
-      const localActiveScores = scoresRef.current || [];
+      const localActiveScores = (scoresRef.current || []).filter((score) => String(score.round_id || "") === String(nextActiveRound?.round_id || ""));
       const nextAllScores = mergeScoresPreservingPending(
         mergeScoresPreservingPending(sheetAllScores, localAllScores),
         livePendingScores
@@ -1527,6 +1528,7 @@ function LordOfTheHolesApp() {
     const key = getScoreSyncKey(score);
     dirtyScoreKeysRef.current = { ...dirtyScoreKeysRef.current, [key]: true };
     setDirtyScoreKeys(dirtyScoreKeysRef.current);
+    writeLocalJson("lordOfTheHoles.dirtyScoreKeys", dirtyScoreKeysRef.current);
   }
 
   function clearScoreDirty(score) {
@@ -1537,6 +1539,7 @@ function LordOfTheHolesApp() {
     delete next[key];
     dirtyScoreKeysRef.current = next;
     setDirtyScoreKeys(next);
+    writeLocalJson("lordOfTheHoles.dirtyScoreKeys", next);
   }
 
   function isScoreDirty(score) {
@@ -1547,9 +1550,15 @@ function LordOfTheHolesApp() {
   function queueScoreForBackgroundSync(score) {
     const normalizedScore = {
       ...score,
-      updated_at: new Date().toISOString(),
+      updated_at: score?.updated_at || new Date().toISOString(),
     };
     const scoreKey = getScoreSyncKey(normalizedScore);
+    const normalizedTimestamp = getScoreTimestamp(normalizedScore);
+
+    if (syncingScoreKeysRef.current[scoreKey] && getScoreTimestamp(syncingScoreKeysRef.current[scoreKey]) >= normalizedTimestamp) {
+      return;
+    }
+    syncingScoreKeysRef.current = { ...syncingScoreKeysRef.current, [scoreKey]: normalizedScore };
 
     setPendingScores((current) => {
       const filtered = (current || []).filter((item) => {
@@ -1581,13 +1590,30 @@ function LordOfTheHolesApp() {
     callSheetApi({ action: "upsertScore", score: normalizedScore })
       .then(() => {
         setConnectionStatus("online");
-        clearScoreDirty(normalizedScore);
-        setPendingScores((current) => (current || []).filter((item) => {
-          const itemKey = getScoreSyncKey(item);
-          return itemKey !== scoreKey;
-        }));
+        const currentSync = syncingScoreKeysRef.current[scoreKey];
+        const currentSyncTimestamp = getScoreTimestamp(currentSync);
+        syncingScoreKeysRef.current = { ...syncingScoreKeysRef.current };
+        delete syncingScoreKeysRef.current[scoreKey];
+
+        setPendingScores((current) => {
+          const nextPendingScores = (current || []).filter((item) => {
+            const itemKey = getScoreSyncKey(item);
+            if (itemKey !== scoreKey) return true;
+            return getScoreTimestamp(item) > currentSyncTimestamp;
+          });
+          pendingScoresRef.current = nextPendingScores;
+          writeLocalJson("lordOfTheHoles.pendingScores", nextPendingScores);
+          return nextPendingScores;
+        });
+
+        const stillHasNewerPending = (pendingScoresRef.current || []).some((item) => getScoreSyncKey(item) === scoreKey && getScoreTimestamp(item) > currentSyncTimestamp);
+        if (!stillHasNewerPending && getScoreTimestamp(normalizedScore) >= currentSyncTimestamp) {
+          clearScoreDirty(normalizedScore);
+        }
       })
       .catch(() => {
+        syncingScoreKeysRef.current = { ...syncingScoreKeysRef.current };
+        delete syncingScoreKeysRef.current[scoreKey];
         setConnectionStatus("offline");
       });
   }
@@ -1595,6 +1621,10 @@ function LordOfTheHolesApp() {
   function saveScore(patch) {
     const nextPatch = { ...patch };
     const nextStrokes = nextPatch.strokes !== undefined ? Number(nextPatch.strokes || 0) : currentEffectiveStrokes;
+    if ((nextPatch.strokes !== undefined || nextPatch.picked_up !== undefined) && !normalizeBoolean(nextPatch.picked_up) && Number(nextStrokes) <= 1) {
+      nextPatch.putts_count = 0;
+      nextPatch.over_two_putts = false;
+    }
 
     if (nextPatch.putts_count !== undefined && nextStrokes > 0 && Number(nextPatch.putts_count || 0) > Math.max(0, nextStrokes - 1)) {
       setScoreHintMessage("Putts dürfen maximal Schläge minus 1 sein.");
@@ -1620,16 +1650,8 @@ function LordOfTheHolesApp() {
     }
 
     try {
-      const dirtyScore = {
-        ...currentScore,
-        ...nextPatch,
-        round_id: displayedActiveRound?.round_id || currentScore?.round_id || "r1",
-        player_id: entryPlayerId || currentScore?.player_id || "",
-        hole_number: activeHole,
-        scorer_player_id: isScorerEntryMode ? myPlayerId : (currentScore?.scorer_player_id || ""),
-      };
-      markScoreDirty(dirtyScore);
-      optimisticUpdate(nextPatch);
+      const updatedScore = optimisticUpdate(nextPatch);
+      markScoreDirty(updatedScore);
     } catch (err) {
       setError(err.message || "Score kann noch nicht lokal vorgemerkt werden.");
     }
@@ -1756,45 +1778,19 @@ function LordOfTheHolesApp() {
   }
 
   function applyLocalCacheClear(resetAt = "", message = "Lokaler Cache auf diesem Gerät wurde gelöscht.") {
-    try {
-      Object.keys(window.localStorage || {}).forEach((key) => {
-        if (String(key).startsWith("lordOfTheHoles.")) window.localStorage.removeItem(key);
-      });
-    } catch {}
-    setMyPlayerId("");
-    setScoredPlayerId("");
-    setScoredPlayerByRound({});
-    setPendingScores([]);
-    pendingScoresRef.current = [];
-    setWinnerPopupDismissedKey("");
-    setRoundHonorDismissedKeys([]);
-    setRoundSummaryDismissedKeys([]);
-    setScorecardRoundId("");
-    setRoundTableRoundId("");
-    setFlightDraw(null);
-    setFlightRevealRunning(false);
-    setFlightAutoRevealStarted(false);
-    setFlightRevealRoundIndex(0);
-    setFlightRevealCount(0);
-    setFlightRevealIntroStep(0);
-    setFlightRevealOutroStep(0);
-    setExpandedFlightKeys({});
-    setSelectedActiveRoundId(displayedActiveRound?.round_id || activeRound?.round_id || "r1");
+    clearLocalDeviceCacheAfterFullReset(resetAt || new Date().toISOString());
     setDeviceAssignmentsResetAt("");
     setScoresResetAt("");
+    setFullResetAt(resetAt || "");
+    if (resetAt) writeLocalJson("lordOfTheHoles.fullResetAt", resetAt);
+    setSelectedActiveRoundId(displayedActiveRound?.round_id || activeRound?.round_id || "r1");
     setScoreEntryMode("player");
     setActiveHole(1);
-    if (resetAt) {
-      setFullResetAt(resetAt);
-      writeLocalJson("lordOfTheHoles.fullResetAt", resetAt);
-    } else {
-      setFullResetAt("");
-    }
     setSetupSavedMessage(message);
   }
 
   function clearLocalCache() {
-    applyLocalCacheClear("", "Lokaler Cache auf diesem Gerät wurde gelöscht.");
+    applyLocalCacheClear("", "Lokaler Cache auf diesem Gerät wurde vollständig gelöscht.");
   }
 
   async function fullResetForAllDevices() {
@@ -1803,13 +1799,14 @@ function LordOfTheHolesApp() {
     try {
       const result = await callSheetApi({ action: "clearResetMarkersAndFullReset" });
       const resetAt = String(result?.full_reset_at || result?.fullResetAt || new Date().toISOString());
-      const emptyScores = [];
-      setScores(emptyScores);
-      setAllScores(emptyScores);
-      applyLocalCacheClear(resetAt, "Kompletter Reset wurde für alle Geräte ausgelöst.");
+      clearLocalDeviceCacheAfterFullReset(resetAt);
+      setFullResetAt(resetAt);
+      writeLocalJson("lordOfTheHoles.fullResetAt", resetAt);
       setConnectionStatus("online");
       setError("");
       if (result?.backup_sheet_name) setBackupSavedMessage(`Backup erstellt: ${result.backup_sheet_name}`);
+      setSetupSavedMessage("Kompletter Reset wurde für alle Geräte ausgelöst. Scores, FlightDraw und lokale Caches werden auf allen Geräten gelöscht.");
+      await loadData({ silent: true });
     } catch (err) {
       setConnectionStatus("offline");
       setError(err.message || "Kompletter Reset konnte nicht ausgelöst werden.");
@@ -1885,6 +1882,65 @@ function LordOfTheHolesApp() {
       setConnectionStatus("offline");
       setError(err.message || "App-Sperre konnte nicht global gespeichert werden.");
     }
+  }
+
+  function clearLocalDeviceCacheAfterFullReset(fullResetAt = "") {
+    try {
+      const markerKey = "lordOfTheHoles.fullResetSeenAt";
+      const preserveMarker = String(fullResetAt || new Date().toISOString());
+      Object.keys(window.localStorage || {}).forEach((key) => {
+        if (key.startsWith("lordOfTheHoles")) window.localStorage.removeItem(key);
+      });
+      window.localStorage.setItem(markerKey, JSON.stringify(preserveMarker));
+      if (window.sessionStorage) {
+        Object.keys(window.sessionStorage).forEach((key) => {
+          if (key.startsWith("lordOfTheHoles")) window.sessionStorage.removeItem(key);
+        });
+      }
+    } catch (err) {
+      console.warn("Lokaler Cache konnte nicht vollständig gelöscht werden:", err);
+    }
+
+    setPendingScores([]);
+    pendingScoresRef.current = [];
+    setDirtyScoreKeys({});
+    dirtyScoreKeysRef.current = {};
+    syncingScoreKeysRef.current = {};
+    writeLocalJson("lordOfTheHoles.dirtyScoreKeys", {});
+    syncingScoreKeysRef.current = {};
+    writeLocalJson("lordOfTheHoles.dirtyScoreKeys", {});
+    setScores([]);
+    setAllScores([]);
+    scoresRef.current = [];
+    allScoresRef.current = [];
+    setMyPlayerId("");
+    setScoredPlayerId("");
+    setScoredPlayerByRound({});
+    setScoreEntryMode("player");
+    setActiveHole(1);
+    setWinnerPopupDismissedKey("");
+    setRoundHonorDismissedKeys([]);
+    setRoundSummaryDismissedKeys([]);
+    setScorecardRoundId("");
+    setRoundTableRoundId("");
+    setFlightDraw(null);
+    setFlightRevealRunning(false);
+    setFlightSummaryOpen(false);
+    setFlightDrawCeremonyCompleted(false);
+    setFlightAutoRevealStarted(false);
+    setFlightRevealRoundIndex(0);
+    setFlightRevealCount(0);
+    setFlightRevealIntroStep(0);
+    setFlightRevealOutroStep(0);
+    setExpandedFlightKeys({});
+  }
+
+  function applyFullResetFromServer(fullResetAt) {
+    if (!fullResetAt) return;
+    const markerKey = "lordOfTheHoles.fullResetSeenAt";
+    const seenAt = readLocalJson(markerKey, "");
+    if (String(seenAt || "") === String(fullResetAt || "")) return;
+    clearLocalDeviceCacheAfterFullReset(fullResetAt);
   }
 
   async function enterLockedAppAsAdmin() {
@@ -2211,7 +2267,7 @@ function LordOfTheHolesApp() {
               <>
                 <div className="font-serif text-base font-bold text-amber-200">{flightDrawSaving ? "Die Pergamente öffnen sich ..." : "Die Pergamente öffnen sich von selbst."}</div>
                 {isAdminUnlocked ? (
-                  <button type="button" disabled={flightDrawSaving} onClick={() => openFlightDrawPergaments({ automatic: true, forceLocalTest: true, replaceExisting: true, saveTestToSheet: true })} className="mt-3 w-full rounded-2xl border border-amber-300/50 bg-amber-600 px-4 py-2.5 font-serif text-base font-black text-amber-50 shadow-lg shadow-black/40 disabled:opacity-60">
+                  <button type="button" disabled={flightDrawSaving} onClick={enterLockedAppAsAdmin} className="mt-3 w-full rounded-2xl border border-amber-300/50 bg-amber-600 px-4 py-2.5 font-serif text-base font-black text-amber-50 shadow-lg shadow-black/40 disabled:opacity-60">
                     Neu auslosen und lokal testen
                   </button>
                 ) : null}
