@@ -1017,6 +1017,8 @@ function LordOfTheHolesApp() {
   const [allScores, setAllScores] = useState(cachedState?.allScores?.length ? cachedState.allScores.map(normalizeScoreRecord) : []);
   const [pendingScores, setPendingScores] = useState(() => readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord).filter(isValidScorePayload));
   const pendingScoresRef = useRef(readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord).filter(isValidScorePayload));
+  const scoresRef = useRef([]);
+  const allScoresRef = useRef([]);
   const [scoredPlayerId, setScoredPlayerId] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerId", ""));
   const [scoredPlayerByRound, setScoredPlayerByRound] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerByRound", {}));
   const [scoreEntryMode, setScoreEntryMode] = useState("player");
@@ -1279,6 +1281,8 @@ function LordOfTheHolesApp() {
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerByRound", scoredPlayerByRound); }, [scoredPlayerByRound]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.selectedActiveRoundId", selectedActiveRoundId); }, [selectedActiveRoundId]);
   useEffect(() => { pendingScoresRef.current = pendingScores; writeLocalJson("lordOfTheHoles.pendingScores", pendingScores); }, [pendingScores]);
+  useEffect(() => { scoresRef.current = scores; }, [scores]);
+  useEffect(() => { allScoresRef.current = allScores; }, [allScores]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.appLocked", appLocked); }, [appLocked]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", deviceAssignmentsResetAt); }, [deviceAssignmentsResetAt]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoresResetAt", scoresResetAt); }, [scoresResetAt]);
@@ -1432,8 +1436,16 @@ function LordOfTheHolesApp() {
       const sheetAllScores = (data.scores || []).map(normalizeScoreRecord);
       const sheetActiveScores = (data.activeScores || []).map(normalizeScoreRecord);
       const livePendingScores = pendingScoresRef.current;
-      const nextAllScores = mergeScoresPreservingPending(sheetAllScores, livePendingScores);
-      const nextActiveScores = mergeScoresPreservingPending(sheetActiveScores, livePendingScores.filter((score) => String(score.round_id || "") === String(nextActiveRound?.round_id || "")));
+      const localAllScores = allScoresRef.current || [];
+      const localActiveScores = scoresRef.current || [];
+      const nextAllScores = mergeScoresPreservingPending(
+        mergeScoresPreservingPending(sheetAllScores, localAllScores),
+        livePendingScores
+      );
+      const nextActiveScores = mergeScoresPreservingPending(
+        mergeScoresPreservingPending(sheetActiveScores, localActiveScores),
+        livePendingScores.filter((score) => String(score.round_id || "") === String(nextActiveRound?.round_id || ""))
+      );
       setAllScores(nextAllScores);
       setScores(nextActiveScores);
       setConnectionStatus("online");
@@ -1521,10 +1533,21 @@ function LordOfTheHolesApp() {
         const itemKey = [item.round_id, item.player_id, item.hole_number, item.scorer_player_id || "official"].join("|");
         return itemKey !== scoreKey;
       });
-      return [...filtered, normalizedScore];
+      const nextPendingScores = [...filtered, normalizedScore];
+      pendingScoresRef.current = nextPendingScores;
+      writeLocalJson("lordOfTheHoles.pendingScores", nextPendingScores);
+      return nextPendingScores;
     });
 
     setScores((current) => {
+      const filtered = (current || []).filter((item) => {
+        const itemKey = [item.round_id, item.player_id, item.hole_number, item.scorer_player_id || "official"].join("|");
+        return itemKey !== scoreKey;
+      });
+      return [...filtered, normalizedScore];
+    });
+
+    setAllScores((current) => {
       const filtered = (current || []).filter((item) => {
         const itemKey = [item.round_id, item.player_id, item.hole_number, item.scorer_player_id || "official"].join("|");
         return itemKey !== scoreKey;
