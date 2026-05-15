@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 
 function Card({ className = "", children }) {
   return <div className={className}>{children}</div>;
@@ -1273,7 +1273,7 @@ function LordOfTheHolesApp() {
       ? (currentStep.roundPlan?.flights || []).reduce((sum, flight) => sum + (flight.players || []).length, 0)
       : 0;
     const revealIsComplete = currentStep?.type === "reveal" && Number(currentStep.revealCount || 0) >= completedRevealPlayers;
-    const delay = currentStep?.type === "reveal" ? (revealIsComplete ? 2400 : 850) : 3100;
+    const delay = currentStep?.type === "reveal" ? (revealIsComplete ? 4200 : 1700) : 5200;
     const timer = window.setTimeout(() => {
       if (isLastStep) {
         setFlightCeremonyRunning(false);
@@ -2293,7 +2293,7 @@ function LordOfTheHolesApp() {
   function renderFlightPlayerCard(playerId, index = 0) {
     const player = withFallbackAlias((allPlayers?.length ? allPlayers : fallbackPlayers).find((item) => String(item.id) === String(playerId)) || { id: playerId });
     return (
-      <motion.div key={playerId} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.34, delay: index * 0.04 }} className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)]">
+      <motion.div key={playerId} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.9, ease: "easeOut", delay: index * 0.08 }} className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)]">
         <div className="font-serif text-xl font-black leading-tight text-amber-100">{player.alias_name || player.character_name || playerId}</div>
         <div className="text-[10px] uppercase tracking-[0.16em] text-amber-100/50">{player.character_name || player.display_name || playerId}</div>
       </motion.div>
@@ -2332,16 +2332,20 @@ function LordOfTheHolesApp() {
           <div className="text-[10px] uppercase tracking-[0.28em] text-amber-300/75">DER RAT VON BRUCHTAL</div>
           {step.type === "reveal" ? (
             <>
-              <motion.div key={`${step.roundPlan?.round_id}-${step.revealCount}-title`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-2 font-serif text-2xl font-black text-amber-200">{step.roundPlan?.round_name || "Runde"}</motion.div>
+              <div className="mt-2 font-serif text-2xl font-black text-amber-200">{step.roundPlan?.round_name || "Runde"}</div>
               {renderFlightCards(step.roundPlan, step.revealCount)}
               <div className="mt-3 text-xs uppercase tracking-[0.2em] text-amber-100/55">Kapitel {step.chapter} von 3</div>
             </>
           ) : (
-            <motion.div key={`${step.type}-${flightCeremonyStepIndex}`} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="mt-5 rounded-3xl border border-amber-500/35 bg-black/30 p-5 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)]">
+            <div className="mt-5 rounded-3xl border border-amber-500/35 bg-black/30 p-5 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)]">
               <div className="font-serif text-2xl font-black text-amber-200">{step.title}</div>
-              <div className="mt-4 text-lg font-semibold leading-relaxed text-amber-50">{step.text}</div>
-              <div className="mt-5 text-xs uppercase tracking-[0.2em] text-amber-100/55">{step.waitLabel}</div>
-            </motion.div>
+              <AnimatePresence mode="wait">
+                <motion.div key={`${step.type}-${flightCeremonyStepIndex}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 1.15, ease: "easeInOut" }}>
+                  <div className="mt-4 text-lg font-semibold leading-relaxed text-amber-50">{step.text}</div>
+                  <div className="mt-5 text-xs uppercase tracking-[0.2em] text-amber-100/55">{step.waitLabel}</div>
+                </motion.div>
+              </AnimatePresence>
+            </div>
           )}
         </div>
       </div>
