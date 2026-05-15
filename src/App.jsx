@@ -706,7 +706,20 @@ function PuttStepper({ value, disabled = false, max = 6, onChange }) {
 function ScoreStepper({ value, par, pickedUpStrokes, disabled = false, onChange }) {
   const displayScore = value === "" || value == null ? Number(par || 4) : value;
   const isPickedValue = Number(displayScore) === 0 || Number(displayScore) >= Number(pickedUpStrokes || 0);
-  const effectiveStatus = value === "" || value == null ? "" : isPickedValue ? `X · gewertet ${pickedUpStrokes}` : Number(displayScore) === Number(par) ? "Par" : Number(displayScore) < Number(par) ? "Birdie+" : `+${Number(displayScore) - Number(par)}`;
+  const getScoreStatus = () => {
+    if (value === "" || value == null) return "";
+    if (isPickedValue) return `X · gewertet ${pickedUpStrokes}`;
+    const diff = Number(displayScore) - Number(par || 0);
+    if (diff <= -3) return "Albatros";
+    if (diff === -2) return "Eagle";
+    if (diff === -1) return "Birdie";
+    if (diff === 0) return "Par";
+    if (diff === 1) return "Bogey";
+    if (diff === 2) return "Doppelbogey";
+    if (diff === 3) return "Triplebogey";
+    return `+${diff}`;
+  };
+  const effectiveStatus = getScoreStatus();
   return <TouchStepper label="Score" value={value} min={0} max={30} emptyLabel={String(par || 4)} defaultValue={Number(par || 4)} status={effectiveStatus} disabled={disabled} formatValue={(nextValue) => (Number(nextValue) === 0 ? "X" : nextValue)} onChange={onChange} />;
 }
 
