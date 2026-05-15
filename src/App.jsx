@@ -1050,6 +1050,10 @@ function LordOfTheHolesApp() {
   const [roundSummaryDismissedKeys, setRoundSummaryDismissedKeys] = useState(() => readLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", []));
   const [flightDraw, setFlightDraw] = useState(() => readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null));
   const [flightDrawSaving, setFlightDrawSaving] = useState(false);
+  const [flightCeremonyRunning, setFlightCeremonyRunning] = useState(false);
+  const [flightCeremonyStepIndex, setFlightCeremonyStepIndex] = useState(0);
+  const [flightCeremonyCompleted, setFlightCeremonyCompleted] = useState(() => readLocalJson("lordOfTheHoles.flightCeremonyCompleted", false));
+  const [flightSummaryOpen, setFlightSummaryOpen] = useState(() => readLocalJson("lordOfTheHoles.flightSummaryOpen", false));
   const [localHandicaps, setLocalHandicaps] = useState({});
   const introAudioRef = useRef(null);
   const lastLoadedRoundRef = useRef("");
@@ -1208,6 +1212,16 @@ function LordOfTheHolesApp() {
     const seconds = totalSeconds % 60;
     return { days, hours, minutes, seconds };
   }, [lockCountdownNow]);
+  const flightDrawCountdown = useMemo(() => {
+    const diffMs = Math.max(0, FLIGHT_DRAW_TARGET.getTime() - lockCountdownNow.getTime());
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return { days, hours, minutes, seconds };
+  }, [lockCountdownNow]);
+  const flightDrawUnlocked = lockCountdownNow.getTime() >= FLIGHT_DRAW_TARGET.getTime();
 
   useEffect(() => { writeLocalJson("lordOfTheHoles.myPlayerId", myPlayerId); }, [myPlayerId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerId", scoredPlayerId); }, [scoredPlayerId]);
@@ -1224,6 +1238,8 @@ function LordOfTheHolesApp() {
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundTableRoundId", roundTableRoundId); }, [roundTableRoundId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", roundSummaryDismissedKeys); }, [roundSummaryDismissedKeys]);
   useEffect(() => { writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, flightDraw); }, [flightDraw]);
+  useEffect(() => { writeLocalJson("lordOfTheHoles.flightCeremonyCompleted", flightCeremonyCompleted); }, [flightCeremonyCompleted]);
+  useEffect(() => { writeLocalJson("lordOfTheHoles.flightSummaryOpen", flightSummaryOpen); }, [flightSummaryOpen]);
   useEffect(() => {
     writeLocalJson("lordOfTheHoles.cachedState", { players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId, flightDraw, cachedAt: new Date().toISOString() });
   }, [players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId, flightDraw]);
@@ -1243,10 +1259,33 @@ function LordOfTheHolesApp() {
     }
   }, [selectedActiveRoundId, allScores, scoredPlayerId, myPlayerId]);
   useEffect(() => {
-    if (!appLocked) return undefined;
+    if (!appLocked && !showSplash) return undefined;
     const timer = window.setInterval(() => setLockCountdownNow(new Date()), 1000);
     return () => window.clearInterval(timer);
-  }, [appLocked]);
+  }, [appLocked, showSplash]);
+  useEffect(() => {
+    if (!flightCeremonyRunning) return undefined;
+    const timeline = buildFlightCeremonyTimeline(flightDraw);
+    if (!timeline.length) return undefined;
+    const isLastStep = flightCeremonyStepIndex >= timeline.length - 1;
+    const currentStep = timeline[Math.min(flightCeremonyStepIndex, timeline.length - 1)];
+    const delay = currentStep?.type === "reveal" ? 850 : 3100;
+    const timer = window.setTimeout(() => {
+      if (isLastStep) {
+        setFlightCeremonyRunning(false);
+        setFlightCeremonyCompleted(true);
+        setFlightSummaryOpen(false);
+        return;
+      }
+      setFlightCeremonyStepIndex((index) => Math.min(index + 1, timeline.length - 1));
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [flightCeremonyRunning, flightCeremonyStepIndex, flightDraw]);
+  useEffect(() => {
+    if (!appLocked || lockAdminBypass || flightCeremonyRunning || flightCeremonyCompleted) return;
+    if (!flightDrawUnlocked || !flightDraw?.rounds?.length) return;
+    startFlightCeremony();
+  }, [appLocked, lockAdminBypass, flightCeremonyRunning, flightCeremonyCompleted, flightDrawUnlocked, flightDraw]);
   useEffect(() => {
     if (!myPlayerId && scoreEntryMode === "scorer") setScoreEntryMode("player");
     if (Number(activeHole) < 1 || Number(activeHole) > 18) setActiveHole(1);
@@ -2162,12 +2201,244 @@ function LordOfTheHolesApp() {
     return <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 px-3 backdrop-blur-sm"><div className="max-h-[82vh] w-full max-w-md overflow-hidden rounded-3xl border border-amber-500/45 bg-stone-950 text-amber-50 shadow-2xl shadow-black/80"><div className="flex items-start justify-between gap-2 border-b border-amber-700/35 bg-amber-500/10 p-3"><div><div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Tabelle</div><div className="font-serif text-lg text-amber-200">{title}</div></div><button type="button" onClick={() => setStandingsPopup(null)} className="rounded-xl border border-amber-500/40 bg-black/25 px-3 py-1 text-lg font-bold leading-none text-amber-100">×</button></div><div className="max-h-[68vh] overflow-auto p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><table className="w-full border-collapse text-sm text-amber-50"><thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100/80"><th className="px-2 py-2">#</th><th className="px-2 py-2">Spieler</th><th className="px-2 py-2 text-right">{isNetStableford ? "Punkte" : "+/−"}</th><th className="px-2 py-2 text-right">Löcher</th></tr></thead><tbody>{tablePlayers.map((player, index) => <tr key={player.id} className={cls("border-t border-amber-700/20", myPlayerId && String(player.id) === String(myPlayerId) && "bg-amber-500/15")}><td className="px-2 py-2 text-amber-200/80">{index + 1}</td><td className="px-2 py-2 font-semibold text-amber-100">{getPlayerLabel(player)}</td><td className="px-2 py-2 text-right font-serif text-lg font-bold text-amber-300">{isStrokePlay ? formatToPar(player.toPar, player.played) : isNetStableford ? player.netStableford : formatToPar(player.hcpAdjustedToPar, player.played)}</td><td className="px-2 py-2 text-right text-amber-100/80">{player.played}/18</td></tr>)}</tbody></table></div></div></div>;
   }
 
+  function buildFlightCeremonyTimeline(draw = flightDraw) {
+    const drawRounds = (draw?.rounds || []).filter((roundPlan) => ["r1", "r2", "r3"].includes(String(roundPlan.round_id || "")));
+    const introTexts = {
+      r1: [
+        "Die Türen von Bruchtal schließen sich. Kein Hobbit raschelt mehr mit der Scorekarte.",
+        "Elrond hebt die Hand. Das erste Pergament wird in den Kreis getragen.",
+        "Runde 1 wird ohne Gangolf beschritten. Sein Pfad beginnt erst später.",
+        "Möge das erste Kapitel die Gemeinschaft nicht schon am Tee 1 entzweien.",
+      ],
+      r2: [
+        "Das erste Pergament ist gesprochen. Manche Blicke sagen: Das war bestimmt kein Zufall.",
+        "Nun tritt Gangolf aus dem Schatten hinzu. Die Gemeinschaft ist vollständig.",
+        "Das zweite Pergament wird geöffnet — und irgendwo lacht ein Ork über die Startzeiten.",
+        "Runde 2 führt durch die Minen von Moria. Wer hier zittert, sollte wenigstens gerade putten.",
+      ],
+      r3: [
+        "Zwei Kapitel sind besiegelt. Noch atmet die Gemeinschaft, wenn auch hörbar schwerer.",
+        "Das dritte Pergament liegt bereit. Vor den Toren Mordors zählt jede Allianz doppelt.",
+        "Die letzten Flights vor dem Schicksalsberg werden offenbart.",
+        "Mögen die Drives lang, die Ausreden kurz und die Zähler gnädig sein.",
+      ],
+    };
+    const steps = [];
+    drawRounds.forEach((roundPlan, roundIndex) => {
+      const chapter = roundIndex + 1;
+      (introTexts[String(roundPlan.round_id)] || []).forEach((text) => {
+        steps.push({ type: "text", title: "Flight-Ziehung der Pergamente", text, waitLabel: "Die Gemeinschaft wartet ...", chapter });
+      });
+      const totalPlayers = (roundPlan.flights || []).reduce((sum, flight) => sum + (flight.players || []).length, 0);
+      for (let revealCount = 0; revealCount <= totalPlayers; revealCount += 1) {
+        steps.push({ type: "reveal", roundPlan, revealCount, chapter });
+      }
+    });
+    [
+      "Die Pergamente sinken. Der Rat schweigt. Selbst Golfum sagt kurz nichts.",
+      "Die Flights der ersten drei Kapitel sind besiegelt.",
+      "Was am Schicksalsberg geschieht, entscheidet allein die Tabelle.",
+    ].forEach((text) => steps.push({ type: "outro", title: "Der Rat hat gesprochen", text, waitLabel: "Die Chronik wird geschlossen ...", chapter: 3 }));
+    return steps;
+  }
+
+  function startFlightCeremony(drawOverride = null) {
+    const nextDraw = drawOverride || flightDraw;
+    if (!nextDraw?.rounds?.length) {
+      setError("Keine gespeicherte Flight-Ziehung gefunden. Bitte zuerst im Admin-Bereich „Flights neu bestimmen“ ausführen.");
+      return;
+    }
+    if (drawOverride) setFlightDraw(drawOverride);
+    setError("");
+    setFlightSummaryOpen(false);
+    setFlightCeremonyCompleted(false);
+    setFlightCeremonyStepIndex(0);
+    setFlightCeremonyRunning(true);
+  }
+
+  async function startFlightCeremonyAsAdmin() {
+    if (lockPasswordInput !== ADMIN_PASSWORD) { setError("Passwort ist falsch."); return; }
+    if (splashEntering) return;
+    setSplashEntering(true);
+    const data = await loadData({ silent: true });
+    setSplashEntering(false);
+    const nextDraw = data?.flight_draw || data?.flightDraw || flightDraw;
+    if (!nextDraw?.rounds?.length) {
+      setError("Keine gespeicherte Flight-Ziehung gefunden. Bitte zuerst im Admin-Bereich „Flights neu bestimmen“ ausführen.");
+      return;
+    }
+    setIsAdminUnlocked(true);
+    setLockUnlockOpen(false);
+    setLockPasswordInput("");
+    startFlightCeremony(nextDraw);
+  }
+
+  function renderCountdownGrid(countdown, compact = false) {
+    return (
+      <div className={cls("grid grid-cols-4 gap-1.5 rounded-2xl border border-amber-500/25 bg-black/35 p-2 text-center", compact && "p-1.5")}> 
+        {[ ["Tage", countdown.days], ["Std", String(countdown.hours).padStart(2, "0")], ["Min", String(countdown.minutes).padStart(2, "0")], ["Sek", String(countdown.seconds).padStart(2, "0")] ].map(([label, value]) => (
+          <div key={label}>
+            <div className={cls("font-serif font-black text-amber-200", compact ? "text-lg" : "text-xl")}>{value}</div>
+            <div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">{label}</div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  function renderFlightPlayerCard(playerId, index = 0) {
+    const player = withFallbackAlias((allPlayers?.length ? allPlayers : fallbackPlayers).find((item) => String(item.id) === String(playerId)) || { id: playerId });
+    return (
+      <motion.div key={playerId} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.34, delay: index * 0.04 }} className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)]">
+        <div className="font-serif text-xl font-black leading-tight text-amber-100">{player.alias_name || player.character_name || playerId}</div>
+        <div className="text-[10px] uppercase tracking-[0.16em] text-amber-100/50">{player.character_name || player.display_name || playerId}</div>
+      </motion.div>
+    );
+  }
+
+  function renderFlightCards(roundPlan, revealCount = Infinity) {
+    let remaining = Number(revealCount);
+    return (
+      <div className="mt-3 space-y-2">
+        {(roundPlan?.flights || []).map((flight) => {
+          const visibleCount = Math.max(0, Math.min((flight.players || []).length, remaining));
+          remaining -= (flight.players || []).length;
+          const shownPlayers = (flight.players || []).slice(0, visibleCount);
+          return (
+            <div key={`${roundPlan.round_id}-${flight.flight_number}`} className="rounded-2xl border border-amber-500/35 bg-stone-950/65 p-3 text-left shadow-xl shadow-black/30">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="font-serif text-lg font-black text-amber-200">Flight {flight.flight_number}</div>
+                <div className="text-xs text-amber-100/55">{shownPlayers.length}/{(flight.players || []).length}</div>
+              </div>
+              {shownPlayers.length ? <div className="grid gap-1.5">{shownPlayers.map((playerId, index) => renderFlightPlayerCard(playerId, index))}</div> : <div className="rounded-xl border border-amber-700/25 bg-black/25 px-3 py-2 text-sm text-amber-100/60">Das Pergament bleibt noch verschlossen ...</div>}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  function renderFlightCeremonyStage() {
+    const timeline = buildFlightCeremonyTimeline(flightDraw);
+    const step = timeline[Math.min(flightCeremonyStepIndex, Math.max(0, timeline.length - 1))];
+    if (!step) return null;
+    return (
+      <div className="absolute inset-0 flex items-center justify-center px-3 py-5">
+        <div className="max-h-full w-full max-w-md overflow-auto rounded-3xl border border-amber-400/55 bg-stone-950/82 p-4 text-center text-amber-50 shadow-2xl shadow-black/80 backdrop-blur-md [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="text-[10px] uppercase tracking-[0.28em] text-amber-300/75">Der Rat von Bruchtal</div>
+          {step.type === "reveal" ? (
+            <>
+              <motion.div key={`${step.roundPlan?.round_id}-${step.revealCount}-title`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-2 font-serif text-2xl font-black text-amber-200">{step.roundPlan?.round_name || "Runde"}</motion.div>
+              {renderFlightCards(step.roundPlan, step.revealCount)}
+              <div className="mt-3 text-xs uppercase tracking-[0.2em] text-amber-100/55">Kapitel {step.chapter} von 3</div>
+            </>
+          ) : (
+            <motion.div key={`${step.type}-${flightCeremonyStepIndex}`} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="mt-5 rounded-3xl border border-amber-500/35 bg-black/30 p-5 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)]">
+              <div className="font-serif text-2xl font-black text-amber-200">{step.title}</div>
+              <div className="mt-4 text-lg font-semibold leading-relaxed text-amber-50">{step.text}</div>
+              <div className="mt-5 text-xs uppercase tracking-[0.2em] text-amber-100/55">{step.waitLabel}</div>
+            </motion.div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function renderFlightDrawSummary() {
+    const drawRounds = (flightDraw?.rounds || []).filter((roundPlan) => ["r1", "r2", "r3"].includes(String(roundPlan.round_id || "")));
+    if (!drawRounds.length) return null;
+    return (
+      <div className="mt-3 space-y-3 text-left">
+        {drawRounds.map((roundPlan) => (
+          <div key={roundPlan.round_id} className="rounded-2xl border border-amber-700/35 bg-black/25 p-3">
+            <div className="font-serif text-lg font-black text-amber-200">{roundPlan.round_name || roundPlan.round_id}</div>
+            <div className="mt-2 space-y-2">{(roundPlan.flights || []).map((flight) => <div key={`${roundPlan.round_id}-${flight.flight_number}`} className="rounded-2xl border border-amber-700/30 bg-stone-950/55 p-2"><div className="mb-2 font-serif text-base font-black text-amber-200">Flight {flight.flight_number}</div><div className="grid gap-1.5">{(flight.players || []).map((playerId, index) => renderFlightPlayerCard(playerId, index))}</div></div>)}</div>
+          </div>
+        ))}
+        <div className="rounded-2xl border border-amber-500/25 bg-black/25 p-3 text-sm text-amber-100/75">Die Flights der ersten drei Kapitel sind besiegelt. Was am Schicksalsberg geschieht, entscheidet allein die Tabelle.</div>
+      </div>
+    );
+  }
+
+  function renderLockedFlightDrawPanel() {
+    const hasDraw = Boolean(flightDraw?.rounds?.length);
+    return (
+      <div className="rounded-3xl border border-amber-500/35 bg-black/55 p-4 text-center text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm">
+        <div className="text-[10px] uppercase tracking-[0.28em] text-amber-300/75">Der Rat von Bruchtal</div>
+        <div className="mt-1 font-serif text-2xl font-black text-amber-200">Flight-Ziehung der Pergamente</div>
+        <div className="mx-auto mt-3 max-w-[230px] rounded-2xl border border-amber-400/40 bg-amber-500/10 p-3 shadow-[inset_0_1px_0_rgba(251,191,36,0.14)]">
+          <div className="text-xs uppercase tracking-[0.18em] text-amber-100/65">Flight-Ziehung</div>
+          <div className="mt-1 font-serif text-2xl font-black text-amber-200">21.05.26</div>
+          <div className="font-serif text-xl font-black text-amber-100">20:00 Uhr</div>
+          <div className="mt-1 rounded-full bg-black/30 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-amber-300">Hier live</div>
+        </div>
+        <p className="mt-3 text-sm text-amber-100/75">Bitte öffnet die App 1–2 Minuten vorher, damit die Pergamente rechtzeitig geladen sind.</p>
+        {!flightDrawUnlocked ? (
+          <div className="mt-3 rounded-2xl border border-amber-700/35 bg-black/25 p-3">
+            <div className="font-serif text-lg font-black text-amber-200">Die Pergamente sind noch versiegelt.</div>
+            <p className="mt-1 text-sm text-amber-100/70">Die Pforten sind noch verschlossen. Gandalf selbst würde jetzt sagen: „Du kommst hier noch nicht rein.“</p>
+            <div className="mt-3">{renderCountdownGrid(flightDrawCountdown, true)}</div>
+          </div>
+        ) : !flightCeremonyCompleted ? (
+          <div className="mt-3 rounded-2xl border border-amber-700/35 bg-black/25 p-3">
+            <div className="font-serif text-lg font-black text-amber-200">{hasDraw ? "Die Pergamente öffnen sich von selbst." : "Die Pergamente öffnen sich ..."}</div>
+            {!hasDraw ? <p className="mt-2 rounded-xl border border-red-500/40 bg-red-950/35 p-2 text-sm text-red-100">Keine gespeicherte Flight-Ziehung gefunden. Bitte zuerst im Admin-Bereich „Flights neu bestimmen“ ausführen.</p> : null}
+          </div>
+        ) : (
+          <div className="mt-3 rounded-2xl border border-amber-700/35 bg-black/25 p-3">
+            <button type="button" onClick={() => setFlightSummaryOpen((value) => !value)} className="flex w-full items-center justify-between rounded-2xl border border-amber-500/40 bg-amber-600/80 px-4 py-2.5 font-bold text-amber-50 shadow-lg shadow-black/25">
+              <span className="font-serif text-lg">Flights</span>
+              <span className="text-sm uppercase tracking-[0.16em]">{flightSummaryOpen ? "schließen" : "öffnen"}</span>
+            </button>
+            {flightSummaryOpen ? renderFlightDrawSummary() : null}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderSplashOverlay() {
+    if (!((showSplash || appLocked) && !lockAdminBypass)) return null;
+    return (
+      <div className="fixed inset-0 z-[100] bg-black">
+        <div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/lord-bg.webp')" }} />
+        <div className="absolute inset-0 bg-black/35" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.04),rgba(0,0,0,0.45)_40%,rgba(0,0,0,0.88)_100%)]" />
+        {flightCeremonyRunning ? renderFlightCeremonyStage() : appLocked ? (
+          <div className="absolute inset-x-3 top-5 bottom-5 mx-auto flex max-w-md flex-col justify-end gap-3 overflow-auto pb-[env(safe-area-inset-bottom)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {renderLockedFlightDrawPanel()}
+            <div className="rounded-3xl border border-amber-500/35 bg-black/55 p-4 text-center text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm">
+              <div className="font-serif text-xl font-black text-amber-200">Der Rat ist noch nicht einberufen.</div>
+              <div className="mt-2 text-sm text-amber-100/80">Im Weimarer Land werden Stimmen gesenkt, alte Karten entrollt und verdächtig ernste Blicke ausgetauscht. Die Gefährten werden bald gerufen.</div>
+              <div className="mt-4">{renderCountdownGrid(lockCountdown)}</div>
+              <div className="mt-3 rounded-2xl border border-amber-700/30 bg-black/35 p-3 text-sm text-amber-100/75">Die Pforten sind noch verschlossen. Gandalf selbst würde jetzt sagen: „Du kommst hier noch nicht rein.“</div>
+              {error ? <div className="mt-3 rounded-2xl border border-amber-500/35 bg-amber-950/60 p-3 text-sm text-amber-100">{error}</div> : null}
+            </div>
+          </div>
+        ) : (
+          <div className="absolute inset-x-0 bottom-8 flex justify-center px-6 pb-[env(safe-area-inset-bottom)]">
+            <button type="button" disabled={splashEntering} onClick={enterRoundFromSplash} className="w-full max-w-xs rounded-2xl border border-amber-300/55 bg-black/55 px-5 py-2.5 font-serif text-lg font-black tracking-wide text-amber-200 shadow-2xl shadow-black/70 backdrop-blur-sm active:scale-[0.98] disabled:opacity-60">{splashEntering ? "Datenbank wird geladen ..." : "Die Saga beginnt"}</button>
+          </div>
+        )}
+        {appLocked ? <button type="button" onClick={() => setLockUnlockOpen(true)} className="absolute bottom-3 left-3 h-8 w-8 rounded-full text-[10px] text-amber-100/10" aria-label="Admin-Zugang">•</button> : null}
+        {appLocked && lockUnlockOpen ? (
+          <div className="absolute inset-x-4 bottom-8 mx-auto max-w-xs rounded-2xl border border-amber-700/35 bg-black/80 p-3 text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm">
+            <div className="mb-2 text-xs uppercase tracking-[0.18em] text-amber-300/70">Admin</div>
+            <input type="password" value={lockPasswordInput} onChange={(e) => setLockPasswordInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") startFlightCeremonyAsAdmin(); }} placeholder="Passwort" className="mb-2 w-full rounded-xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" autoFocus />
+            <div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => { setLockUnlockOpen(false); setLockPasswordInput(""); }} className="rounded-xl bg-stone-800 py-2 text-sm font-bold text-amber-100">Abbrechen</button><button type="button" disabled={splashEntering} onClick={startFlightCeremonyAsAdmin} className="rounded-xl bg-amber-600 py-2 text-sm font-bold text-amber-50 disabled:opacity-60">{splashEntering ? "Lade ..." : "Zeremonienmeister"}</button></div>
+            <button type="button" disabled={splashEntering} onClick={enterLockedAppAsAdmin} className="mt-2 w-full rounded-xl border border-amber-500/35 bg-black/35 py-2 text-sm font-bold text-amber-100 disabled:opacity-60">Direkt in die App</button>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-black text-amber-50">
       <div className="fixed inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/lord-bg.webp')" }} />
       <div className="fixed inset-0 bg-black/45" />
       <div className="fixed inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.06),rgba(0,0,0,0.58)_38%,rgba(0,0,0,0.86)_100%)]" />
-      {((showSplash || appLocked) && !lockAdminBypass) ? <div className="fixed inset-0 z-[100] bg-black"><div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/lord-bg.webp')" }} /><div className="absolute inset-0 bg-black/25" />{!appLocked ? <div className="absolute inset-x-0 bottom-8 flex justify-center px-6 pb-[env(safe-area-inset-bottom)]"><button type="button" disabled={splashEntering} onClick={enterRoundFromSplash} className="w-full max-w-xs rounded-2xl border border-amber-300/55 bg-black/55 px-5 py-2.5 font-serif text-lg font-black tracking-wide text-amber-200 shadow-2xl shadow-black/70 backdrop-blur-sm active:scale-[0.98] disabled:opacity-60">{splashEntering ? "Datenbank wird geladen ..." : "Runde betreten"}</button></div> : <div className="absolute inset-x-4 bottom-10 mx-auto max-w-sm rounded-3xl border border-amber-500/35 bg-black/55 p-4 text-center text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm"><div className="font-serif text-xl font-black text-amber-200">Der Rat ist noch nicht einberufen.</div><div className="mt-2 text-sm text-amber-100/80">Im Weimarer Land werden Stimmen gesenkt, alte Karten entrollt und verdächtig ernste Blicke ausgetauscht. Die Gefährten werden bald gerufen.</div><div className="mt-4 grid grid-cols-4 gap-1.5 rounded-2xl border border-amber-500/25 bg-black/35 p-2 text-center"><div><div className="font-serif text-xl font-black text-amber-200">{lockCountdown.days}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Tage</div></div><div><div className="font-serif text-xl font-black text-amber-200">{String(lockCountdown.hours).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Std</div></div><div><div className="font-serif text-xl font-black text-amber-200">{String(lockCountdown.minutes).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Min</div></div><div><div className="font-serif text-xl font-black text-amber-200">{String(lockCountdown.seconds).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Sek</div></div></div></div>}{appLocked ? <button type="button" onClick={() => setLockUnlockOpen(true)} className="absolute bottom-3 left-3 h-8 w-8 rounded-full text-[10px] text-amber-100/10" aria-label="Admin-Zugang">•</button> : null}{appLocked && lockUnlockOpen ? <div className="absolute inset-x-4 bottom-8 mx-auto max-w-xs rounded-2xl border border-amber-700/35 bg-black/70 p-3 text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm"><div className="mb-2 text-xs uppercase tracking-[0.18em] text-amber-300/70">Admin</div><input type="password" value={lockPasswordInput} onChange={(e) => setLockPasswordInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") enterLockedAppAsAdmin(); }} placeholder="Passwort" className="mb-2 w-full rounded-xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" autoFocus /><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => { setLockUnlockOpen(false); setLockPasswordInput(""); }} className="rounded-xl bg-stone-800 py-2 text-sm font-bold text-amber-100">Abbrechen</button><button type="button" disabled={splashEntering} onClick={enterLockedAppAsAdmin} className="rounded-xl bg-amber-600 py-2 text-sm font-bold text-amber-50 disabled:opacity-60">{splashEntering ? "Lade ..." : "Admin rein"}</button></div></div> : null}</div> : null}
+      {renderSplashOverlay()}
       <main className="relative z-10 mx-auto max-w-md px-2 py-1.5">
         {renderHeader()}
         {renderStatusMessages()}
