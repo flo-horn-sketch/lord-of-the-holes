@@ -1517,20 +1517,68 @@ function LordOfTheHolesApp() {
 
   function addPendingScore(score) {
     if (!isValidScorePayload(score)) return;
-    setPendingScores((current) => {
-      const key = getScoreIdentityKey(score);
-      const nextPendingScores = [...current.filter((item) => getScoreIdentityKey(item) !== key), normalizeScoreRecord(score)];
-      pendingScoresRef.current = nextPendingScores;
-      writeLocalJson("lordOfTheHoles.pendingScores", nextPendingScores);
-      return nextPendingScores;
+    const normalizedScore = normalizeScoreRecord(score);
+    const key = getScoreIdentityKey(normalizedScore);
+    const nextPendingScores = [...pendingScoresRef.current.filter((item) => getScoreIdentityKey(item) !== key), normalizedScore];
+    pendingScoresRef.current = nextPendingScores;
+    writeLocalJson("lordOfTheHoles.pendingScores", nextPendingScores);
+    setPendingScores(nextPendingScores);
+  }
+
+  function queueScoreForSync(score, overrides = {}) {
+    if (!isValidScorePayload(score)) return null;
+    const nextScore = normalizeScoreRecord({
+      ...score,
+      ...overrides,
+      updated_at: new Date().toISOString(),
     });
+    addPendingScore(nextScore);
+    const sameScore = (item) => getScoreIdentityKey(item) === getScoreIdentityKey(nextScore);
+    const updateList = (current) => current.some(sameScore) ? current.map((item) => sameScore(item) ? nextScore : item) : [...current, nextScore];
+    setScores(updateList);
+    setAllScores(updateList);
+    return nextScore;
+  }
+
+  function queueCurrentHoleScoresForSync() {
+    const roundId = String(displayedActiveRound?.round_id || "").trim();
+    const holeNumber = Number(activeHole || 0);
+    const scorerId = String(myPlayerId || "").trim();
+    if (!roundId || !holeNumber || !scorerId) return [];
+    const queuedScores = [];
+    if (officialScoreForActiveHole && officialScoreForActiveHole.strokes !== "" && officialScoreForActiveHole.strokes != null) {
+      const queued = queueScoreForSync(officialScoreForActiveHole, {
+        round_id: roundId,
+        player_id: String(scoredPlayerId || officialScoreForActiveHole.player_id || "").trim(),
+        hole_number: holeNumber,
+        scorer_player_id: scorerId,
+      });
+      if (queued) queuedScores.push(queued);
+    }
+    if (controlScoreForActiveHole && controlScoreForActiveHole.strokes !== "" && controlScoreForActiveHole.strokes != null) {
+      const queued = queueScoreForSync(controlScoreForActiveHole, {
+        round_id: roundId,
+        player_id: scorerId,
+        hole_number: holeNumber,
+        scorer_player_id: scorerId,
+      });
+      if (queued) queuedScores.push(queued);
+    }
+    return queuedScores;
   }
 
   function removePendingScore(score) {
     setPendingScores((current) => {
       const targetKey = getScoreIdentityKey(score);
-      const targetTimestamp = getScoreTimestamp(score);
-      const nextPendingScores = current.filter((item) => getScoreIdentityKey(item) !== targetKey || getScoreTimestamp(item) > targetTimestamp);
+      const targetUpdatedAt = String(score?.updated_at || "");
+      const nextPendingScores = current.filter((item) => {
+        const sameKey = getScoreIdentityKey(item) === targetKey;
+        const sameVersion = String(item?.updated_at || "") === targetUpdatedAt;
+        // Nur exakt den Score entfernen, der erfolgreich gespeichert wurde.
+        // Wenn der Nutzer während eines Hintergrund-Uploads zurückgeht und denselben Score ändert,
+        // bleibt die neuere lokale Version in pendingScores erhalten.
+        return !(sameKey && sameVersion);
+      });
       pendingScoresRef.current = nextPendingScores;
       writeLocalJson("lordOfTheHoles.pendingScores", nextPendingScores);
       return nextPendingScores;
@@ -1595,6 +1643,7 @@ function LordOfTheHolesApp() {
       return;
     }
     setScoreHintMessage("");
+    queueCurrentHoleScoresForSync();
     const syncCount = pendingScoresRef.current.filter(isValidScorePayload).length;
     if (syncCount > 0) setScoreSyncCount(syncCount);
     setSaving(true);
@@ -1624,6 +1673,7 @@ function LordOfTheHolesApp() {
       return;
     }
     setScoreHintMessage("");
+    queueCurrentHoleScoresForSync();
     const syncCount = pendingScoresRef.current.filter(isValidScorePayload).length;
     setActiveHole((h) => Math.min(18, h + 1));
     if (syncCount > 0) setScoreSyncCount(syncCount);
