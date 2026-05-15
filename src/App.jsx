@@ -1714,7 +1714,7 @@ function LordOfTheHolesApp() {
     if (!validScores.length) return true;
 
     try {
-      await callSheetApi({ action: "upsertScores", scores: validScores });
+      const result = await callSheetApi({ action: "upsertScores", scores: validScores });
       validScores.forEach((score) => {
         removePendingScore(score);
         removeLocalScoreDraft(score);
@@ -1723,22 +1723,10 @@ function LordOfTheHolesApp() {
       setError("");
       return true;
     } catch (err) {
-      const message = String(err?.message || err || "").toLowerCase();
-      const batchUnsupported = message.includes("unknown") || message.includes("unbekannt") || message.includes("upsertscores") || message.includes("action");
-      if (!batchUnsupported && isTemporarySheetLockError(err)) {
-        await waitForRetry(900);
-        try {
-          await callSheetApi({ action: "upsertScores", scores: validScores });
-          validScores.forEach((score) => {
-            removePendingScore(score);
-            removeLocalScoreDraft(score);
-          });
-          setConnectionStatus("online");
-          setError("");
-          return true;
-        } catch {}
-      }
-      return null;
+      const message = err?.message || "Batch-Synchronisierung fehlgeschlagen.";
+      setConnectionStatus("offline");
+      setError(`Batch-Synchronisierung fehlgeschlagen: ${message}`);
+      return false;
     }
   }
 
@@ -1754,14 +1742,12 @@ function LordOfTheHolesApp() {
     const batchResult = await savePendingScoresBatch(livePendingScores);
     if (batchResult === true) return true;
 
-    // Sicherheitsnetz: Wenn der Batch noch nicht sauber greift, dürfen Scores nicht hängen bleiben.
-    // Deshalb gibt es wieder einen Legacy-Fallback. Normalfall bleibt Batch; Einzeluploads sind nur Notfall.
-    let allSaved = true;
-    for (const pendingScore of [...pendingScoresRef.current].filter(isValidScorePayload)) {
-      const saved = await savePendingScore(pendingScore);
-      if (!saved) allSaved = false;
-    }
-    return allSaved;
+    // Kein Einzel-Fallback mehr: Das Apps Script unterstützt jetzt upsertScores.
+    // Wenn Batch fehlschlägt, bleiben alle Scores lokal gespeichert und werden beim nächsten Versuch
+    // wieder gesammelt übertragen. Dadurch entstehen keine vielen einzelnen Sheet-Locks mehr.
+    setConnectionStatus("offline");
+    setError("Batch-Synchronisierung fehlgeschlagen. Scores bleiben lokal gespeichert und werden erneut gesammelt übertragen.");
+    return false;
   }
 
   async function saveScore(patch) {
