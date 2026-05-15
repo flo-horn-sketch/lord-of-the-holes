@@ -1050,6 +1050,14 @@ function LordOfTheHolesApp() {
   const [roundSummaryDismissedKeys, setRoundSummaryDismissedKeys] = useState(() => readLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", []));
   const [flightDraw, setFlightDraw] = useState(() => readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null));
   const [flightRevealRunning, setFlightRevealRunning] = useState(false);
+  const [flightRevealRoundIndex, setFlightRevealRoundIndex] = useState(0);
+  const [flightRevealCount, setFlightRevealCount] = useState(0);
+  const [flightRevealIntroStep, setFlightRevealIntroStep] = useState(0);
+  const [flightRevealOutroStep, setFlightRevealOutroStep] = useState(0);
+  const [flightSummaryOpen, setFlightSummaryOpen] = useState(false);
+  const [flightDrawCeremonyCompleted, setFlightDrawCeremonyCompleted] = useState(false);
+  const [flightAutoRevealStarted, setFlightAutoRevealStarted] = useState(false);
+  const [expandedFlightKeys, setExpandedFlightKeys] = useState({});
   const [flightDrawSaving, setFlightDrawSaving] = useState(false);
   const [localHandicaps, setLocalHandicaps] = useState({});
   const introAudioRef = useRef(null);
