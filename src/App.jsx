@@ -1280,7 +1280,8 @@ function LordOfTheHolesApp() {
   }, [players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId, flightDraw]);
   useEffect(() => { introAudioRef.current = new Audio("/intro-sound.mp3"); introAudioRef.current.preload = "auto"; introAudioRef.current.loop = false; }, []);
   useEffect(() => { if (!autoSync) return undefined; loadData({ silent: true }); const timer = setInterval(() => loadData({ silent: true }), 30000); return () => clearInterval(timer); }, [autoSync]);
-  useEffect(() => { if (!autoSync || !pendingScores.length) return undefined; const timer = setInterval(() => flushPendingScores(), 10000); return () => clearInterval(timer); }, [autoSync, pendingScores]);
+  // Scores werden bewusst nicht mehr laufend synchronisiert.
+  // Jede Eingabe wird lokal gespeichert und erst beim Klick auf "nächstes Loch" zur Datenbank übertragen.
   useEffect(() => {
     if (!selectedActiveRoundId) return;
     const selectedRoundScores = allScores.filter((score) => String(score.round_id || "") === String(selectedActiveRoundId));
@@ -1565,13 +1566,35 @@ function LordOfTheHolesApp() {
     try { next = optimisticUpdate(nextPatch); }
     catch (err) { setError(err.message || "Score kann noch nicht gespeichert werden."); return; }
     addPendingScore(next);
-    setSaving(true);
-    try { await callSheetApi({ action: "upsertScore", score: next }); removePendingScore(next); setConnectionStatus("online"); setError(""); }
-    catch { addPendingScore(next); setConnectionStatus("offline"); setError("Score lokal gesichert. Wird automatisch synchronisiert, sobald die Datenbank erreichbar ist."); }
-    finally { setSaving(false); }
+    setError("");
   }
 
-  function goToNextHole() {
+  async function completeCurrentRound() {
+    if (!hasRequiredScoresForNext) {
+      const missingItems = [];
+      if (!officialScoreForActiveHole || officialScoreForActiveHole.strokes === "" || officialScoreForActiveHole.strokes == null) missingItems.push(`Score für ${getPlayerLabel(scoredPlayer) || "Spieler"}`);
+      if (!officialScoreForActiveHole || officialScoreForActiveHole.putts_count === "" || officialScoreForActiveHole.putts_count == null) missingItems.push(`Putts für ${getPlayerLabel(scoredPlayer) || "Spieler"}`);
+      if (!controlScoreForActiveHole || controlScoreForActiveHole.strokes === "" || controlScoreForActiveHole.strokes == null) missingItems.push("mein Score");
+      if (!controlScoreForActiveHole || controlScoreForActiveHole.putts_count === "" || controlScoreForActiveHole.putts_count == null) missingItems.push("meine Putts");
+      setScoreHintMessage(`Erst ${missingItems.join(", ")} eintragen, dann Runde abschließen.`);
+      window.setTimeout(() => setScoreHintMessage(""), 2400);
+      return;
+    }
+    setScoreHintMessage("");
+    setSaving(true);
+    const allSaved = await flushPendingScores();
+    setSaving(false);
+    if (allSaved) {
+      setConnectionStatus("online");
+      setError("");
+      setSetupSavedMessage(`${displayedActiveRound?.round_name || "Runde"} abgeschlossen. Alle offenen Scores wurden synchronisiert.`);
+    } else {
+      setScoreHintMessage("Runde konnte noch nicht vollständig synchronisiert werden. Offene Scores bleiben lokal gespeichert.");
+      window.setTimeout(() => setScoreHintMessage(""), 3200);
+    }
+  }
+
+  async function goToNextHole() {
     if (activeHole === 18) return;
     if (!hasRequiredScoresForNext) {
       const missingItems = [];
@@ -1585,6 +1608,12 @@ function LordOfTheHolesApp() {
     }
     setScoreHintMessage("");
     setActiveHole((h) => Math.min(18, h + 1));
+    flushPendingScores().then((allSaved) => {
+      if (allSaved) {
+        setConnectionStatus("online");
+        setError("");
+      }
+    });
   }
 
   async function createRoundBackup() {
@@ -1983,7 +2012,7 @@ function LordOfTheHolesApp() {
                 <div className="mb-3"><PuttStepper value={currentScore.putts_count} disabled={!canEnterScores || currentEffectiveStrokes <= 1} max={maxPuttsForCurrentScore} onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })} /></div>
                 <div className="mb-3 rounded-2xl border border-[rgb(var(--score-accent)/0.30)] bg-black/25 p-2"><div className="flex items-center justify-between gap-2"><div><div className="text-xs font-semibold text-amber-100">Lady</div><div className="text-[10px] text-amber-100/65">Markiert eine Lady.</div></div><input type="checkbox" disabled={!canEnterScores} checked={normalizeBoolean(currentScore.lady)} onChange={(e) => saveScore({ lady: e.target.checked })} className="h-6 w-6 accent-amber-500 disabled:opacity-40" /></div></div>
                 {scoreHintMessage ? <div className="mb-2 rounded-xl border border-amber-500/40 bg-amber-950/50 p-1.5 text-center text-xs font-semibold text-amber-100">{scoreHintMessage}</div> : null}
-                <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 py-3 text-base font-bold text-amber-100">Zurück</Button><Button disabled={activeHole === 18 || !canEnterScores} onClick={goToNextHole} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>Loch {Math.min(18, Number(activeHole || 1) + 1)}</Button></div>
+                <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 py-3 text-base font-bold text-amber-100">Zurück</Button>{activeHole === 18 ? <Button disabled={!canEnterScores || saving} onClick={completeCurrentRound} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-emerald-700" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>{saving ? "Synchronisiere ..." : "Runde abschließen"}</Button> : <Button disabled={!canEnterScores || saving} onClick={goToNextHole} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>{`Loch ${Math.min(18, Number(activeHole || 1) + 1)}`}</Button>}</div>
               </div>
             )}
           </CardContent>
