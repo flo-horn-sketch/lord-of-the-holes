@@ -1757,10 +1757,9 @@ function LordOfTheHolesApp() {
     if (batchResult === true) return true;
 
     // Kein Einzel-Fallback mehr: Das Apps Script unterstützt jetzt upsertScores.
-    // Wenn Batch fehlschlägt, bleiben alle Scores lokal gespeichert und werden beim nächsten Versuch
-    // wieder gesammelt übertragen. Dadurch entstehen keine vielen einzelnen Sheet-Locks mehr.
+    // Die genaue Fehlermeldung wird bereits in savePendingScoresBatch gesetzt.
+    // Nicht hier mit einer generischen Meldung überschreiben, sonst sieht man den echten Apps-Script-Fehler nicht.
     setConnectionStatus("offline");
-    setError("Batch-Synchronisierung fehlgeschlagen. Scores bleiben lokal gespeichert und werden erneut gesammelt übertragen.");
     return false;
   }
 
