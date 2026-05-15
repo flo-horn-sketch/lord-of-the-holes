@@ -1585,9 +1585,11 @@ function LordOfTheHolesApp() {
     const allSaved = await flushPendingScores();
     setSaving(false);
     if (allSaved) {
+      setConnectionStatus("online");
+      setError("");
       setSetupSavedMessage(`${displayedActiveRound?.round_name || "Runde"} abgeschlossen. Alle offenen Scores wurden synchronisiert.`);
     } else {
-      setScoreHintMessage("Runde lokal abgeschlossen. Offene Scores werden synchronisiert, sobald die Datenbank erreichbar ist.");
+      setScoreHintMessage("Runde konnte noch nicht vollständig synchronisiert werden. Offene Scores bleiben lokal gespeichert.");
       window.setTimeout(() => setScoreHintMessage(""), 3200);
     }
   }
@@ -1605,10 +1607,13 @@ function LordOfTheHolesApp() {
       return;
     }
     setScoreHintMessage("");
-    setSaving(true);
-    await flushPendingScores();
-    setSaving(false);
     setActiveHole((h) => Math.min(18, h + 1));
+    flushPendingScores().then((allSaved) => {
+      if (allSaved) {
+        setConnectionStatus("online");
+        setError("");
+      }
+    });
   }
 
   async function createRoundBackup() {
@@ -2007,7 +2012,7 @@ function LordOfTheHolesApp() {
                 <div className="mb-3"><PuttStepper value={currentScore.putts_count} disabled={!canEnterScores || currentEffectiveStrokes <= 1} max={maxPuttsForCurrentScore} onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })} /></div>
                 <div className="mb-3 rounded-2xl border border-[rgb(var(--score-accent)/0.30)] bg-black/25 p-2"><div className="flex items-center justify-between gap-2"><div><div className="text-xs font-semibold text-amber-100">Lady</div><div className="text-[10px] text-amber-100/65">Markiert eine Lady.</div></div><input type="checkbox" disabled={!canEnterScores} checked={normalizeBoolean(currentScore.lady)} onChange={(e) => saveScore({ lady: e.target.checked })} className="h-6 w-6 accent-amber-500 disabled:opacity-40" /></div></div>
                 {scoreHintMessage ? <div className="mb-2 rounded-xl border border-amber-500/40 bg-amber-950/50 p-1.5 text-center text-xs font-semibold text-amber-100">{scoreHintMessage}</div> : null}
-                <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 py-3 text-base font-bold text-amber-100">Zurück</Button>{activeHole === 18 ? <Button disabled={!canEnterScores || saving} onClick={completeCurrentRound} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-emerald-700" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>{saving ? "Speichere ..." : "Runde abschließen"}</Button> : <Button disabled={!canEnterScores || saving} onClick={goToNextHole} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>{saving ? "Speichere ..." : `Loch ${Math.min(18, Number(activeHole || 1) + 1)}`}</Button>}</div>
+                <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 py-3 text-base font-bold text-amber-100">Zurück</Button>{activeHole === 18 ? <Button disabled={!canEnterScores || saving} onClick={completeCurrentRound} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-emerald-700" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>{saving ? "Synchronisiere ..." : "Runde abschließen"}</Button> : <Button disabled={!canEnterScores || saving} onClick={goToNextHole} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>{`Loch ${Math.min(18, Number(activeHole || 1) + 1)}`}</Button>}</div>
               </div>
             )}
           </CardContent>
