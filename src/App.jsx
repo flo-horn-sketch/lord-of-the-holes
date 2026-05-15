@@ -1713,19 +1713,34 @@ function LordOfTheHolesApp() {
     const validScores = (scoresToSave || []).filter(isValidScorePayload);
     if (!validScores.length) return true;
 
+    const batchSize = 4;
+    const chunks = [];
+    for (let index = 0; index < validScores.length; index += batchSize) {
+      chunks.push(validScores.slice(index, index + batchSize));
+    }
+
+    let savedCount = 0;
+
     try {
-      const result = await callSheetApi({ action: "upsertScores", scores: validScores });
-      validScores.forEach((score) => {
-        removePendingScore(score);
-        removeLocalScoreDraft(score);
-      });
+      for (const chunk of chunks) {
+        const result = await callSheetApi({ action: "upsertScores", scores: chunk });
+        if (!result || result.ok === false) {
+          throw new Error(result?.error || "Batch wurde von der Datenbank abgelehnt.");
+        }
+        chunk.forEach((score) => {
+          removePendingScore(score);
+          removeLocalScoreDraft(score);
+        });
+        savedCount += chunk.length;
+      }
+
       setConnectionStatus("online");
       setError("");
       return true;
     } catch (err) {
       const message = err?.message || "Batch-Synchronisierung fehlgeschlagen.";
       setConnectionStatus("offline");
-      setError(`Batch-Synchronisierung fehlgeschlagen: ${message}`);
+      setError(`Batch-Synchronisierung fehlgeschlagen nach ${savedCount}/${validScores.length} Scores: ${message}`);
       return false;
     }
   }
