@@ -146,6 +146,14 @@ function writeLocalJson(key, value) {
   } catch {}
 }
 
+function clearLocalScoreStorage() {
+  try {
+    window.localStorage.removeItem("lordOfTheHoles.pendingScores");
+    window.localStorage.removeItem("lordOfTheHoles.localScoreDrafts");
+    window.localStorage.removeItem("lordOfTheHoles.cachedState");
+  } catch {}
+}
+
 function cleanHandicapInput(value) {
   const normalized = String(value ?? "").replace(",", ".").replace(/[^0-9.-]/g, "");
   const firstMinus = normalized.startsWith("-") ? "-" : "";
@@ -531,6 +539,10 @@ function mergeScoresPreservingPending(sheetScores = [], pendingScores = [], loca
     map.set(getScoreIdentityKey(score), normalizeScoreRecord(score));
   });
   return Array.from(map.values());
+}
+
+function hasLocalScoreState(pendingScores = [], localDrafts = []) {
+  return (pendingScores || []).some(isValidScorePayload) || (localDrafts || []).some(isValidScorePayload);
 }
 
 function getOfficialScores(scores) {
@@ -1444,8 +1456,9 @@ function LordOfTheHolesApp() {
         setAllScores(emptyScores);
         setPendingScores(emptyScores);
         pendingScoresRef.current = emptyScores;
-        writeLocalJson("lordOfTheHoles.pendingScores", emptyScores);
-        writeLocalJson("lordOfTheHoles.cachedState", null);
+        setLocalScoreDrafts(emptyScores);
+        localScoreDraftsRef.current = emptyScores;
+        clearLocalScoreStorage();
         writeLocalJson("lordOfTheHoles.scoresResetAt", nextScoresResetAt);
         setScoresResetAt(nextScoresResetAt);
         setActiveHole(1);
@@ -1845,8 +1858,9 @@ function LordOfTheHolesApp() {
       setAllScores(emptyScores);
       setPendingScores(emptyScores);
       pendingScoresRef.current = emptyScores;
-      writeLocalJson("lordOfTheHoles.pendingScores", emptyScores);
-      writeLocalJson("lordOfTheHoles.cachedState", null);
+      setLocalScoreDrafts(emptyScores);
+      localScoreDraftsRef.current = emptyScores;
+      clearLocalScoreStorage();
       if (result?.scores_reset_at || result?.scoresResetAt) {
         const resetAt = String(result.scores_reset_at || result.scoresResetAt);
         setScoresResetAt(resetAt);
@@ -1903,6 +1917,10 @@ function LordOfTheHolesApp() {
     setScoredPlayerByRound({});
     setPendingScores([]);
     pendingScoresRef.current = [];
+    setLocalScoreDrafts([]);
+    localScoreDraftsRef.current = [];
+    setScores([]);
+    setAllScores([]);
     setWinnerPopupDismissedKey("");
     setRoundHonorDismissedKeys([]);
     setRoundSummaryDismissedKeys([]);
