@@ -673,7 +673,8 @@ function buildPlayerStats(players, holes, scores) {
     const total = playerScores.reduce((sum, s) => sum + Number(s.strokes || 0), 0);
     const parPlayed = playerScores.reduce((sum, s) => sum + Number((holes || []).find((h) => Number(h.hole_number) === Number(s.hole_number))?.par || 0), 0);
     const threePutts = playerScores.filter((s) => normalizeBoolean(s.over_two_putts) && Number(s.putts_count) === 3).length;
-    const fourPlusPutts = playerScores.filter((s) => normalizeBoolean(s.over_two_putts) && Number(s.putts_count) >= 4).length;
+    const fourPutts = playerScores.filter((s) => normalizeBoolean(s.over_two_putts) && Number(s.putts_count) === 4).length;
+    const fivePlusPutts = playerScores.filter((s) => normalizeBoolean(s.over_two_putts) && Number(s.putts_count) >= 5).length;
     const netStableford = playerScores.reduce((sum, s) => {
       const hole = (holes || []).find((h) => Number(h.hole_number) === Number(s.hole_number));
       return sum + getScoreStablefordPoints(s, hole?.par, getShotsOnHole(p.course_hcp, hole?.hcp));
@@ -689,7 +690,7 @@ function buildPlayerStats(players, holes, scores) {
     const hcpAdjustedTotal = total - hcpShotsUsed;
     const hcpAdjustedToPar = hcpAdjustedTotal - parPlayed;
     const ladyCount = playerScores.filter((s) => normalizeBoolean(s.lady)).length;
-    return { ...withFallbackAlias(p), played, total, toPar: total - parPlayed, hcpShotsUsed, hcpAdjustedTotal, hcpAdjustedToPar, overTwoPutts: threePutts + fourPlusPutts, threePutts, fourPlusPutts, puttPenaltyEuro: threePutts * 2 + fourPlusPutts * 4, ladyCount, netStableford, grossStableford };
+    return { ...withFallbackAlias(p), played, total, toPar: total - parPlayed, hcpShotsUsed, hcpAdjustedTotal, hcpAdjustedToPar, overTwoPutts: threePutts + fourPutts + fivePlusPutts, threePutts, fourPutts, fivePlusPutts, fourPlusPutts: fourPutts + fivePlusPutts, puttPenaltyEuro: threePutts * 2 + fourPutts * 4 + fivePlusPutts * 10, ladyCount, netStableford, grossStableford };
   });
 }
 
@@ -759,7 +760,7 @@ function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", sta
 function PuttStepper({ value, disabled = false, max = 6, onChange }) {
   const hasValue = value !== "" && value != null;
   const selected = hasValue ? Number(value || 0) : Math.min(2, Number(max || 0));
-  const snakeLabel = selected >= 4 ? "4+ · 4 €" : selected === 3 ? "3 · 2 €" : "keine Snake";
+  const snakeLabel = selected >= 5 ? "5+ · 10 €" : selected === 4 ? "4 · 4 €" : selected === 3 ? "3 · 2 €" : "keine Snake";
   return <TouchStepper label="Putts" value={value === 0 ? 0 : value || ""} min={0} max={Math.max(0, Number(max || 0))} emptyLabel={String(Math.min(2, Math.max(0, Number(max || 0))))} defaultValue={Math.min(2, Math.max(0, Number(max || 0)))} status={snakeLabel} disabled={disabled} onChange={onChange} />;
 }
 
@@ -820,8 +821,9 @@ function getCourseShortName(courseId) {
 
 function getPuttBuckets(playerScores) {
   const threePutts = playerScores.filter((score) => normalizeBoolean(score.over_two_putts) && Number(score.putts_count) === 3).length;
-  const fourPlusPutts = playerScores.filter((score) => normalizeBoolean(score.over_two_putts) && Number(score.putts_count) >= 4).length;
-  return { threePutts, fourPlusPutts, overTwoPutts: threePutts + fourPlusPutts };
+  const fourPutts = playerScores.filter((score) => normalizeBoolean(score.over_two_putts) && Number(score.putts_count) === 4).length;
+  const fivePlusPutts = playerScores.filter((score) => normalizeBoolean(score.over_two_putts) && Number(score.putts_count) >= 5).length;
+  return { threePutts, fourPutts, fivePlusPutts, fourPlusPutts: fourPutts + fivePlusPutts, overTwoPutts: threePutts + fourPutts + fivePlusPutts };
 }
 
 function getScoreDiffToPar(score, hole) {
@@ -856,12 +858,12 @@ function buildFunPlayerStats(players, holes, scores) {
     const greenAttempts = enrichedScores.filter((item) => item.score.putts_count !== "" && item.score.putts_count != null && !normalizeBoolean(item.score.picked_up));
     const greenInRegulation = greenAttempts.filter((item) => Number(item.score.strokes || 0) - Number(item.score.putts_count || 0) <= Number(item.hole.par || 0) - 2).length;
     const underRegulation = greenAttempts.filter((item) => Number(item.score.strokes || 0) - Number(item.score.putts_count || 0) <= Number(item.hole.par || 0) - 3).length;
-    const { threePutts, fourPlusPutts } = getPuttBuckets(playerScores);
+    const { threePutts, fourPutts, fivePlusPutts, fourPlusPutts } = getPuttBuckets(playerScores);
     const grossStableford = enrichedScores.reduce((sum, item) => sum + getScoreStablefordPoints(item.score, item.hole.par, 0), 0);
     const netStableford = enrichedScores.reduce((sum, item) => sum + getScoreStablefordPoints(item.score, item.hole.par, getShotsOnHole(player.course_hcp, item.hole.hcp)), 0);
     const hcpBonus = netStableford - grossStableford;
     const hcpShotsUsed = enrichedScores.reduce((sum, item) => sum + getShotsOnHole(player.course_hcp, item.hole.hcp), 0);
-    return { ...withFallbackAlias(player), played: enrichedScores.length, birdies, eaglesOrBetter, pars, parOrBetter, doubleBogeyPlus, triplePlus, pickedUpCount, ladyCount, greenAttempts: greenAttempts.length, greenInRegulation, underRegulation, threePutts, fourPlusPutts, puttPenaltyEuro: threePutts * 2 + fourPlusPutts * 4, frontTotal, backTotal, frontToPar, backToPar, backMinusFront, grossStableford, netStableford, hcpBonus, hcpShotsUsed, pointsPerHcpShot: hcpShotsUsed ? Number((netStableford / hcpShotsUsed).toFixed(2)) : 0 };
+    return { ...withFallbackAlias(player), played: enrichedScores.length, birdies, eaglesOrBetter, pars, parOrBetter, doubleBogeyPlus, triplePlus, pickedUpCount, ladyCount, greenAttempts: greenAttempts.length, greenInRegulation, underRegulation, threePutts, fourPutts, fivePlusPutts, fourPlusPutts, puttPenaltyEuro: threePutts * 2 + fourPutts * 4 + fivePlusPutts * 10, frontTotal, backTotal, frontToPar, backToPar, backMinusFront, grossStableford, netStableford, hcpBonus, hcpShotsUsed, pointsPerHcpShot: hcpShotsUsed ? Number((netStableford / hcpShotsUsed).toFixed(2)) : 0 };
   });
 }
 
@@ -976,7 +978,7 @@ function MiddleEarthTables({ players, holes, scores, mismatches }) {
     <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm landscape:rounded-xl">
       <CardContent className="p-2">
         <div className="mb-2"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Mittelerde</p><h2 className="font-serif text-lg text-amber-200">Die Chroniken der Runde</h2><p className="mt-1 text-sm text-amber-100/65">Fun-Tabellen aus den Scores der aktuellen Runde.</p></div>
-        <FunTable title="Shelobs Putt-Kammer" subtitle="Snake-König der Runde" players={snakeLords} columns={[{ label: "3P", render: (p) => p.threePutts }, { label: "4+P", render: (p) => p.fourPlusPutts }, { label: "€", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} />
+        <FunTable title="Shelobs Putt-Kammer" subtitle="Snake-König der Runde" players={snakeLords} columns={[{ label: "3P", render: (p) => p.threePutts }, { label: "4P", render: (p) => p.fourPutts }, { label: "5+P", render: (p) => p.fivePlusPutts }, { label: "€", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} />
         <FunTable title="Galadriels Spiegel" subtitle="Lady-Liga" players={ladies} columns={[{ label: "Ladys", render: (p) => p.ladyCount, emphasize: true }, { label: "Quote", render: (p) => p.played ? `${Math.round((p.ladyCount / p.played) * 100)} %` : "–" }]} />
         <FunTable title="Die weißen Fahnen von Minas Tirith" subtitle="Gestrichene Löcher" players={whiteFlags} columns={[{ label: "X", render: (p) => p.pickedUpCount, emphasize: true }, { label: "Quote", render: (p) => p.played ? `${Math.round((p.pickedUpCount / p.played) * 100)} %` : "–" }]} />
         <FunTable title="Die Ents der Fairways" subtitle="Par oder besser" players={parMachines} columns={[{ label: "Par+", render: (p) => p.parOrBetter, emphasize: true }, { label: "Pars", render: (p) => p.pars }, { label: "Birdie+", render: (p) => p.birdies + p.eaglesOrBetter }]} />
@@ -2306,7 +2308,7 @@ function LordOfTheHolesApp() {
             <CardContent className="p-3 text-sm text-amber-100"><div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Tabellen Runde</div><div className="mt-1 font-serif text-lg text-amber-200">{tableRound?.round_name || "Runde"}</div><div className="text-amber-100/65">{tableCourse?.course_name || "Kurs"}</div><div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">{availableRounds.map((round) => <button key={round.round_id} type="button" onClick={() => setRoundTableRoundId(round.round_id)} className={cls("rounded-xl border px-2 py-2 text-xs font-bold", String(tableRound?.round_id) === String(round.round_id) ? "border-amber-400/60 bg-amber-600 text-amber-50" : "border-amber-700/35 bg-black/25 text-amber-100")}>{round.round_name || round.round_id}</button>)}</div></CardContent>
           </Card>
           <Card className="mb-2 rounded-2xl border border-amber-500/30 bg-[linear-gradient(180deg,rgba(48,35,22,0.86),rgba(18,13,9,0.82))] shadow-[inset_0_1px_0_rgba(251,191,36,0.10),0_18px_46px_rgba(0,0,0,0.38)] backdrop-blur-sm">
-            <CardContent className="p-3"><div className="mb-2"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Leaderboard</p></div><LeaderboardTable title="Strokes HCP adjusted" players={sortHcpAdjustedStrokePlay(tableStats)} columns={[{ label: "+/−", render: (p) => formatToPar(p.hcpAdjustedToPar, p.played), emphasize: true }, { label: "Netto", render: (p) => p.played ? p.hcpAdjustedTotal : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Strokes" players={sortStrokePlay(tableStats)} columns={[{ label: "+/−", render: (p) => formatToPar(p.toPar, p.played), emphasize: true }, { label: "Schläge", render: (p) => p.played ? p.total : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Netto Stableford" players={sortStableford(tableStats, "netStableford")} columns={[{ label: "Punkte", render: (p) => p.netStableford, emphasize: true }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Brutto Punkte" players={sortStableford(tableStats, "grossStableford")} columns={[{ label: "Punkte", render: (p) => p.grossStableford, emphasize: true }, { label: "Schläge", render: (p) => p.played ? p.total : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Putt-Kasse" players={[...tableStats].sort((a, b) => Number(b.puttPenaltyEuro || 0) - Number(a.puttPenaltyEuro || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0))} columns={[{ label: "3 Putts", render: (p) => `${p.threePutts} × 2 €` }, { label: "4+ Putts", render: (p) => `${p.fourPlusPutts} × 4 €` }, { label: "Gesamt", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} /></CardContent>
+            <CardContent className="p-3"><div className="mb-2"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Leaderboard</p></div><LeaderboardTable title="Strokes HCP adjusted" players={sortHcpAdjustedStrokePlay(tableStats)} columns={[{ label: "+/−", render: (p) => formatToPar(p.hcpAdjustedToPar, p.played), emphasize: true }, { label: "Netto", render: (p) => p.played ? p.hcpAdjustedTotal : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Strokes" players={sortStrokePlay(tableStats)} columns={[{ label: "+/−", render: (p) => formatToPar(p.toPar, p.played), emphasize: true }, { label: "Schläge", render: (p) => p.played ? p.total : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Netto Stableford" players={sortStableford(tableStats, "netStableford")} columns={[{ label: "Punkte", render: (p) => p.netStableford, emphasize: true }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Brutto Punkte" players={sortStableford(tableStats, "grossStableford")} columns={[{ label: "Punkte", render: (p) => p.grossStableford, emphasize: true }, { label: "Schläge", render: (p) => p.played ? p.total : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Putt-Kasse" players={[...tableStats].sort((a, b) => Number(b.puttPenaltyEuro || 0) - Number(a.puttPenaltyEuro || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0))} columns={[{ label: "3 Putts", render: (p) => `${p.threePutts} × 2 €` }, { label: "4 Putts", render: (p) => `${p.fourPutts} × 4 €` }, { label: "5+ Putts", render: (p) => `${p.fivePlusPutts} × 10 €` }, { label: "Gesamt", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} /></CardContent>
           </Card>
         </div>
       </motion.section>
