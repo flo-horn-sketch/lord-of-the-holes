@@ -48,7 +48,7 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
-const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbyQ3o2tDYmi2B2zuUYLsc9ULEDzpWV52L1u8xsnHPxpx_6-bZynbGp0PRyKt-2gxA/exec";
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbxZozKrwIl9_pSWpFPLgpc00NG5XcVk-vuQNIbaFaJgRkVXeSIegdz5djh3CcUgj799/exec";
 const ADMIN_PASSWORD = "weimar";
 const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T10:00:00+02:00");
 const FLIGHT_DRAW_TARGET = new Date("2026-05-21T20:00:00+02:00");
@@ -1030,9 +1030,11 @@ function LordOfTheHolesApp() {
     const filteredPlayers = myPlayerId ? visiblePlayers.filter((p) => String(p.id) !== String(myPlayerId)) : visiblePlayers;
     return filteredPlayers.length ? filteredPlayers : visiblePlayers;
   }, [visiblePlayers, myPlayerId]);
+  const automaticScoredPlayerBase = assignedScoredPlayerId ? visiblePlayers.find((p) => String(p.id) === String(assignedScoredPlayerId)) : null;
+  const isFlightDrawRound = ["r1", "r2", "r3"].includes(String(displayedActiveRound?.round_id || ""));
   const playersWithCurrentHandicaps = useMemo(() => getPlayersForCourse(visiblePlayers, displayCourseId, courses), [visiblePlayers, displayCourseId, courses]);
   const activeHoleData = holes.find((h) => Number(h.hole_number) === Number(activeHole)) || holes[Number(activeHole) - 1] || fallbackHoles.find((h) => h.course_id === displayCourseId && h.hole_number === Number(activeHole)) || fallbackHoles[0];
-  const scoredPlayerBase = scoredPlayerId ? scoreablePlayers.find((p) => String(p.id) === String(scoredPlayerId)) : null;
+  const scoredPlayerBase = scoredPlayerId ? visiblePlayers.find((p) => String(p.id) === String(scoredPlayerId)) : null;
   const scoredPlayer = scoredPlayerBase ? getPlayerForCourse(scoredPlayerBase, displayCourseId, courses) : null;
   const myCurrentPlayerBase = myPlayerId ? (visiblePlayers.find((player) => String(player.id) === String(myPlayerId)) || allPlayers.find((player) => String(player.id) === String(myPlayerId))) : null;
   const myCurrentPlayer = myPlayerId ? getPlayerForCourse(myCurrentPlayerBase, displayCourseId, courses) : null;
@@ -1047,7 +1049,7 @@ function LordOfTheHolesApp() {
     if (isScorerEntryMode) return String(s.player_id) === String(entryPlayerId) && isScorerControlScore(s);
     return String(s.player_id) === String(entryPlayerId) && !isScorerControlScore(s);
   }) || { strokes: "", picked_up: false, over_two_putts: false, putts_count: "", lady: false }, [scores, entryPlayerId, activeHole, displayedActiveRound?.round_id, isScorerEntryMode]);
-  const canEnterScores = Boolean(displayedActiveRound?.round_id && myPlayerId && scoredPlayerId && entryPlayerId && entryPlayer && Number(activeHole) > 0);
+  const canEnterScores = Boolean(displayedActiveRound?.round_id && myPlayerId && (!isFlightDrawRound || assignedScoredPlayerId) && scoredPlayerId && entryPlayerId && entryPlayer && Number(activeHole) > 0);
   const currentEffectiveStrokes = normalizeBoolean(currentScore.picked_up) ? Number(pickedUpStrokes || 0) : Number(currentScore.strokes || 0);
   const maxPuttsForCurrentScore = currentEffectiveStrokes > 1 ? currentEffectiveStrokes - 1 : 0;
   const officialScoreForActiveHole = useMemo(() => findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", scoredPlayerId, activeHole, false), [scores, displayedActiveRound?.round_id, scoredPlayerId, activeHole]);
@@ -1188,8 +1190,8 @@ function LordOfTheHolesApp() {
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", roundSummaryDismissedKeys); }, [roundSummaryDismissedKeys]);
   useEffect(() => { writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, flightDraw); }, [flightDraw]);
   useEffect(() => {
-    writeLocalJson("lordOfTheHoles.cachedState", { players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId, cachedAt: new Date().toISOString() });
-  }, [players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId]);
+    writeLocalJson("lordOfTheHoles.cachedState", { players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId, flightDraw, cachedAt: new Date().toISOString() });
+  }, [players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId, flightDraw]);
   useEffect(() => { introAudioRef.current = new Audio("/intro-sound.mp3"); introAudioRef.current.preload = "auto"; introAudioRef.current.loop = false; }, []);
   useEffect(() => { if (!autoSync) return undefined; loadData({ silent: true }); const timer = setInterval(() => loadData({ silent: true }), 30000); return () => clearInterval(timer); }, [autoSync]);
   useEffect(() => { if (!autoSync || !pendingScores.length) return undefined; const timer = setInterval(() => flushPendingScores(), 10000); return () => clearInterval(timer); }, [autoSync, pendingScores]);
@@ -1217,14 +1219,34 @@ function LordOfTheHolesApp() {
   useEffect(() => {
     const roundId = String(displayedActiveRound?.round_id || "");
     if (!roundId || !myPlayerId || showSplash || (appLocked && !lockAdminBypass)) return;
-    const storedPlayerId = String(scoredPlayerByRound?.[roundId] || "");
-    const storedPlayerIsValid = Boolean(storedPlayerId && scoreablePlayers.some((player) => String(player.id) === String(storedPlayerId)));
+
     if (lastLoadedRoundRef.current !== roundId) {
       lastLoadedRoundRef.current = roundId;
       setScoreEntryMode("player");
     }
-    if (storedPlayerIsValid && String(scoredPlayerId || "") !== String(storedPlayerId)) setScoredPlayerId(storedPlayerId);
-  }, [displayedActiveRound?.round_id, myPlayerId, scoreablePlayers, scoredPlayerByRound, scoredPlayerId, showSplash, appLocked, lockAdminBypass]);
+
+    if (isFlightDrawRound) {
+      if (assignedScoredPlayerId) {
+        if (String(scoredPlayerId || "") !== String(assignedScoredPlayerId)) {
+          setScoredPlayerId(assignedScoredPlayerId);
+          saveLocalScoredPlayerForRound(roundId, assignedScoredPlayerId);
+        }
+        return;
+      }
+
+      if (scoredPlayerId) {
+        setScoredPlayerId("");
+        removeLocalScoredPlayerForRound(roundId);
+      }
+      return;
+    }
+
+    const storedPlayerId = String(scoredPlayerByRound?.[roundId] || "");
+    const storedPlayerIsValid = Boolean(storedPlayerId && scoreablePlayers.some((player) => String(player.id) === String(storedPlayerId)));
+    if (storedPlayerIsValid && String(scoredPlayerId || "") !== String(storedPlayerId)) {
+      setScoredPlayerId(storedPlayerId);
+    }
+  }, [displayedActiveRound?.round_id, myPlayerId, assignedScoredPlayerId, scoredPlayerId, showSplash, appLocked, lockAdminBypass]);
 
   async function callSheetApi(payload) {
     const url = new URL(GOOGLE_SHEETS_API_URL);
@@ -1280,6 +1302,21 @@ function LordOfTheHolesApp() {
       } else if (nextDeviceAssignmentsResetAt && nextDeviceAssignmentsResetAt !== deviceAssignmentsResetAt) {
         setDeviceAssignmentsResetAt(nextDeviceAssignmentsResetAt);
       }
+      const serverFlightDraw = data.flight_draw || data.flightDraw || null;
+      const serverSentFlightDraw = Object.prototype.hasOwnProperty.call(data, "flight_draw") || Object.prototype.hasOwnProperty.call(data, "flightDraw");
+      const localStoredFlightDraw = readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null);
+      if (serverFlightDraw?.rounds?.length) {
+        const currentDraw = flightDraw || localStoredFlightDraw;
+        if (!areFlightDrawsEqual(currentDraw, serverFlightDraw)) {
+          setFlightDraw(serverFlightDraw);
+          writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, serverFlightDraw);
+        } else if (!flightDraw) {
+          setFlightDraw(localStoredFlightDraw || serverFlightDraw);
+        }
+      } else if (serverSentFlightDraw && localStoredFlightDraw) {
+        setFlightDraw(localStoredFlightDraw);
+      }
+
       const nextAllPlayers = (data.players?.length ? data.players : fallbackPlayers).map(withFallbackAlias);
       const nextRounds = data.rounds?.length ? data.rounds : fallbackRounds;
       const nextCourses = data.courses?.length ? data.courses : fallbackCourses;
@@ -1394,7 +1431,7 @@ function LordOfTheHolesApp() {
       nextPatch.over_two_putts = Number(nextPatch.putts_count || 0) >= 3;
     }
     if (!canEnterScores) {
-      setScoreHintMessage("Erst Runde, Spieler und Zähler auswählen.");
+      setScoreHintMessage(isFlightDrawRound ? "Erst Handy-Besitzer wählen und gespeicherte Flight-Ziehung laden. Der zu zählende Spieler wird automatisch zugeordnet." : "Erst Handy-Besitzer und zu zählenden Spieler auswählen.");
       window.setTimeout(() => setScoreHintMessage(""), 1800);
       return;
     }
@@ -1770,10 +1807,19 @@ function LordOfTheHolesApp() {
               </div>
             ) : <div className="mb-2 rounded-xl border border-amber-700/30 bg-black/25 p-1.5 text-[10px] text-amber-100/75">Wähle zuerst im Start-Popup deinen Spieler aus.</div>}
             {myPlayerId && !scoredPlayerId ? (
-              <div className="mb-2 rounded-2xl border border-amber-500/45 bg-stone-950/75 p-2 shadow-xl shadow-black/30 backdrop-blur-sm">
-                <div className="mb-2 text-center"><div className="text-[10px] uppercase tracking-[0.2em] text-amber-300/75">Neue Zähl-Zuordnung</div><div className="font-serif text-lg font-black text-amber-200">Wen zählst du?</div><div className="mt-1 text-xs text-amber-100/65">Wähle erst einen Spieler für diese Runde. Danach öffnet sich die Score-Eingabe.</div></div>
-                <div className="grid grid-cols-2 gap-2">{scoreablePlayers.map((player) => <button key={player.id} type="button" onClick={() => { setScoredPlayerId(player.id); saveLocalScoredPlayerForRound(displayedActiveRound?.round_id || "", player.id); }} className="rounded-2xl bg-stone-800 px-2 py-3 font-serif text-sm font-bold text-amber-100 active:scale-[0.98]">{getPlayerLabel(player)}</button>)}</div>
-              </div>
+              isFlightDrawRound ? (
+                <div className="mb-2 rounded-2xl border border-amber-500/45 bg-stone-950/75 p-3 text-center shadow-xl shadow-black/30 backdrop-blur-sm">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300/75">Automatische Zähler-Zuordnung</div>
+                  <div className="mt-1 font-serif text-lg font-black text-amber-200">Noch keine Zuordnung aus der Flight-Ziehung.</div>
+                  <div className="mt-1 text-xs text-amber-100/65">Dieses Handy gehört {getPlayerLabel(myCurrentPlayer) || "dem gewählten Spieler"}. Der zu zählende Spieler wird automatisch aus der gespeicherten Flight-Ziehung gesetzt; eine manuelle Auswahl ist nur am Finaltag möglich.</div>
+                  {myFlightFromDraw ? <div className="mt-2 rounded-xl bg-amber-500/10 p-2 text-xs text-amber-100/70">Du bist in Flight {myFlightFromDraw.flight_number} eingeteilt.</div> : null}
+                </div>
+              ) : (
+                <div className="mb-2 rounded-2xl border border-amber-500/45 bg-stone-950/75 p-2 shadow-xl shadow-black/30 backdrop-blur-sm">
+                  <div className="mb-2 text-center"><div className="text-[10px] uppercase tracking-[0.2em] text-amber-300/75">Finaltag-Zählung</div><div className="font-serif text-lg font-black text-amber-200">Wen zählst du?</div><div className="mt-1 text-xs text-amber-100/65">Für Runde 4 gibt es keine Flight-Ziehung. Wähle den zu zählenden Spieler manuell aus.</div></div>
+                  <div className="grid grid-cols-2 gap-2">{scoreablePlayers.map((player) => <button key={player.id} type="button" onClick={() => { setScoredPlayerId(player.id); saveLocalScoredPlayerForRound(displayedActiveRound?.round_id || "", player.id); }} className="rounded-2xl bg-stone-800 px-2 py-3 font-serif text-sm font-bold text-amber-100 active:scale-[0.98]">{getPlayerLabel(player)}</button>)}</div>
+                </div>
+              )
             ) : (
               <div className={cls("rounded-3xl transition-colors", scoringTintClass, hasScoreMismatch && "rounded-3xl ring-1 ring-red-500/40")}>
                 {myCurrentPlayer ? (
@@ -1846,10 +1892,22 @@ function LordOfTheHolesApp() {
             </div>
             <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
               <label className="mb-1 block text-sm text-amber-100/80">Spieler für die aktive Runde</label>
-              <select value={scoredPlayerId} onChange={(e) => { const nextPlayerId = e.target.value; setScoredPlayerId(nextPlayerId); if (displayedActiveRound?.round_id) { if (nextPlayerId) saveLocalScoredPlayerForRound(displayedActiveRound.round_id, nextPlayerId); else removeLocalScoredPlayerForRound(displayedActiveRound.round_id); } }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50">
-                <option value="">Spieler auswählen</option>
-                {scoreablePlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}
-              </select>
+              {isFlightDrawRound ? (
+                <>
+                  <div className="rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50">
+                    {assignedScoredPlayerId ? getPlayerLabel(automaticScoredPlayerBase || scoredPlayer) : "Noch keine Zuordnung aus der Flight-Ziehung"}
+                  </div>
+                  <p className="mt-1 text-xs text-amber-100/60">Die Zuordnung ist in Runde 1–3 gesperrt und kommt automatisch aus der gespeicherten Flight-Ziehung.</p>
+                </>
+              ) : (
+                <>
+                  <select value={scoredPlayerId} onChange={(e) => { const nextPlayerId = e.target.value; setScoredPlayerId(nextPlayerId); if (displayedActiveRound?.round_id) { if (nextPlayerId) saveLocalScoredPlayerForRound(displayedActiveRound.round_id, nextPlayerId); else removeLocalScoredPlayerForRound(displayedActiveRound.round_id); } }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50">
+                    <option value="">Spieler auswählen</option>
+                    {scoreablePlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}
+                  </select>
+                  <p className="mt-1 text-xs text-amber-100/60">Am Finaltag wird manuell ausgewählt, weil keine Flight-Ziehung hinterlegt ist.</p>
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
