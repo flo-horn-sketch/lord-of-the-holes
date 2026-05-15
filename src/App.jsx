@@ -492,9 +492,10 @@ function mergeScoresPreservingPending(sheetScores = [], pendingScores = []) {
   });
   pendingScores.forEach((score) => {
     if (!isValidScorePayload(score)) return;
-    const key = getScoreIdentityKey(score);
-    const existing = map.get(key);
-    if (!existing || getScoreTimestamp(score) >= getScoreTimestamp(existing)) map.set(key, normalizeScoreRecord(score));
+    // Lokale/offline Scores haben immer Vorrang vor Sheet-Werten.
+    // Keine Timestamp-Abwägung gegen die Datenbank: Wenn ein Pending-Score existiert,
+    // bleibt genau dieser Wert sichtbar, bis er erfolgreich synchronisiert wurde.
+    map.set(getScoreIdentityKey(score), normalizeScoreRecord(score));
   });
   return Array.from(map.values());
 }
