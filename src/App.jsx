@@ -48,7 +48,7 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
-const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbwxiKHnBwAG_qJX1t4VTui65A7Fdn6MVSj0VAk__FXf0gtfPnRXrq-x33aAMv3K2HZR/exec";
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbw711Bujn_z8zGgOAmlbbz29q-OZ6XGHnLVzENw57-VOgB0zyJNjcChg_tryl-zFTuV/exec";
 const ADMIN_PASSWORD = "weimar";
 const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T10:00:00+02:00");
 const FLIGHT_DRAW_TARGET = new Date("2026-05-21T20:00:00+02:00");
@@ -1659,10 +1659,73 @@ function LordOfTheHolesApp() {
     });
   }
 
+  function isTemporarySheetLockError(err) {
+    const message = String(err?.message || err || "").toLowerCase();
+    return message.includes("exklusiv") || message.includes("lock") || message.includes("timeout") || message.includes("zeitüberschreitung") || message.includes("another operation") || message.includes("try again");
+  }
+
+  function waitForRetry(ms) {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
+  }
+
   async function savePendingScore(score) {
     if (!isValidScorePayload(score)) { removePendingScore(score); return true; }
-    try { await callSheetApi({ action: "upsertScore", score }); removePendingScore(score); removeLocalScoreDraft(score); setConnectionStatus("online"); setError(""); return true; }
-    catch (err) { setConnectionStatus("offline"); setError(err.message || "Score ist lokal gesichert und wird später synchronisiert."); return false; }
+    const retryDelays = [0, 700, 1600];
+    let lastError = null;
+
+    for (let attempt = 0; attempt < retryDelays.length; attempt += 1) {
+      if (retryDelays[attempt] > 0) await waitForRetry(retryDelays[attempt]);
+      try {
+        await callSheetApi({ action: "upsertScore", score });
+        removePendingScore(score);
+        removeLocalScoreDraft(score);
+        setConnectionStatus("online");
+        setError("");
+        return true;
+      } catch (err) {
+        lastError = err;
+        if (!isTemporarySheetLockError(err)) break;
+      }
+    }
+
+    setConnectionStatus("offline");
+    setError(isTemporarySheetLockError(lastError)
+      ? "Score bleibt lokal gespeichert. Die Datenbank ist gerade durch einen anderen Vorgang gesperrt und wird später erneut synchronisiert."
+      : lastError?.message || "Score ist lokal gesichert und wird später synchronisiert.");
+    return false;
+  }
+
+  async function savePendingScoresBatch(scoresToSave = []) {
+    const validScores = (scoresToSave || []).filter(isValidScorePayload);
+    if (!validScores.length) return true;
+
+    try {
+      await callSheetApi({ action: "upsertScores", scores: validScores });
+      validScores.forEach((score) => {
+        removePendingScore(score);
+        removeLocalScoreDraft(score);
+      });
+      setConnectionStatus("online");
+      setError("");
+      return true;
+    } catch (err) {
+      const message = String(err?.message || err || "").toLowerCase();
+      const batchUnsupported = message.includes("unknown") || message.includes("unbekannt") || message.includes("upsertscores") || message.includes("action");
+      if (!batchUnsupported && isTemporarySheetLockError(err)) {
+        await waitForRetry(900);
+        try {
+          await callSheetApi({ action: "upsertScores", scores: validScores });
+          validScores.forEach((score) => {
+            removePendingScore(score);
+            removeLocalScoreDraft(score);
+          });
+          setConnectionStatus("online");
+          setError("");
+          return true;
+        } catch {}
+      }
+      return null;
+    }
   }
 
   async function flushPendingScores() {
@@ -1673,8 +1736,12 @@ function LordOfTheHolesApp() {
       writeLocalJson("lordOfTheHoles.pendingScores", livePendingScores);
     }
     if (!livePendingScores.length) return true;
+
+    const batchResult = await savePendingScoresBatch(livePendingScores);
+    if (batchResult === true) return true;
+
     let allSaved = true;
-    for (const pendingScore of livePendingScores) {
+    for (const pendingScore of [...pendingScoresRef.current].filter(isValidScorePayload)) {
       const saved = await savePendingScore(pendingScore);
       if (!saved) allSaved = false;
     }
