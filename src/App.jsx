@@ -307,52 +307,84 @@ function getAssignedScoredPlayerIdFromDraw(flightDraw, roundId, scorerPlayerId) 
 
   const normalizeId = (value) => String(value || "").trim().toLowerCase();
   const scorerKey = normalizeId(normalizedScorerId);
+  const roundKey = normalizeId(normalizedRoundId);
 
   const getAssignmentScorerId = (assignment) => String(
     assignment?.scorer_player_id ||
     assignment?.scorerPlayerId ||
     assignment?.scorer_id ||
     assignment?.scorerId ||
+    assignment?.counter_player_id ||
+    assignment?.counterPlayerId ||
+    assignment?.zaehler_player_id ||
+    assignment?.zaehlerPlayerId ||
+    assignment?.zähler_player_id ||
+    assignment?.zählerPlayerId ||
+    assignment?.scorer ||
+    assignment?.counter ||
+    assignment?.zaehler ||
+    assignment?.zähler ||
     ""
   ).trim();
 
   const getAssignmentScoredPlayerId = (assignment) => String(
     assignment?.player_id ||
+    assignment?.playerId ||
     assignment?.scored_player_id ||
     assignment?.scoredPlayerId ||
     assignment?.assigned_player_id ||
     assignment?.assignedPlayerId ||
+    assignment?.counted_player_id ||
+    assignment?.countedPlayerId ||
+    assignment?.target_player_id ||
+    assignment?.targetPlayerId ||
+    assignment?.scored ||
+    assignment?.assigned ||
+    assignment?.counted ||
+    assignment?.target ||
     ""
   ).trim();
 
-  const rowSources = [];
-  if (Array.isArray(flightDraw)) rowSources.push(flightDraw);
-  if (Array.isArray(flightDraw?.rows)) rowSources.push(flightDraw.rows);
-  if (Array.isArray(flightDraw?.flight_draw_rows)) rowSources.push(flightDraw.flight_draw_rows);
-  if (Array.isArray(flightDraw?.flightDrawRows)) rowSources.push(flightDraw.flightDrawRows);
-  if (Array.isArray(flightDraw?.scorerAssignments)) rowSources.push(flightDraw.scorerAssignments);
-  if (Array.isArray(flightDraw?.scorer_assignments)) rowSources.push(flightDraw.scorer_assignments);
+  const collectRows = (draw) => {
+    const rows = [];
+    if (Array.isArray(draw)) rows.push(...draw);
+    if (Array.isArray(draw?.rows)) rows.push(...draw.rows);
+    if (Array.isArray(draw?.flight_draw_rows)) rows.push(...draw.flight_draw_rows);
+    if (Array.isArray(draw?.flightDrawRows)) rows.push(...draw.flightDrawRows);
+    if (Array.isArray(draw?.scorerAssignments)) rows.push(...draw.scorerAssignments);
+    if (Array.isArray(draw?.scorer_assignments)) rows.push(...draw.scorer_assignments);
+    if (Array.isArray(draw?.assignments)) rows.push(...draw.assignments);
+    if (Array.isArray(draw?.zaehler_assignments)) rows.push(...draw.zaehler_assignments);
+    if (Array.isArray(draw?.zähler_assignments)) rows.push(...draw.zähler_assignments);
 
-  for (const rows of rowSources) {
-    const row = rows.find((item) =>
-      String(item.round_id || item.roundId || "").trim() === normalizedRoundId &&
-      normalizeId(getAssignmentScorerId(item)) === scorerKey
-    );
-    const scoredPlayerId = getAssignmentScoredPlayerId(row);
-    if (scoredPlayerId) return scoredPlayerId;
-  }
+    (draw?.rounds || []).forEach((roundPlan) => {
+      (roundPlan?.flights || []).forEach((flight) => {
+        [
+          ...(Array.isArray(flight.scorers) ? flight.scorers : []),
+          ...(Array.isArray(flight.assignments) ? flight.assignments : []),
+          ...(Array.isArray(flight.scorerAssignments) ? flight.scorerAssignments : []),
+          ...(Array.isArray(flight.scorer_assignments) ? flight.scorer_assignments : []),
+          ...(Array.isArray(flight.zaehler_assignments) ? flight.zaehler_assignments : []),
+          ...(Array.isArray(flight.zähler_assignments) ? flight.zähler_assignments : []),
+        ].forEach((assignment) => rows.push({
+          ...assignment,
+          round_id: assignment?.round_id || assignment?.roundId || roundPlan.round_id || roundPlan.roundId,
+          round_name: assignment?.round_name || assignment?.roundName || roundPlan.round_name || roundPlan.roundName,
+          flight_number: assignment?.flight_number || assignment?.flightNumber || flight.flight_number || flight.flightNumber,
+        }));
+      });
+    });
+    return rows;
+  };
 
-  if (flightDraw?.rounds?.length) {
-    const roundPlan = flightDraw.rounds.find((round) => String(round.round_id || round.roundId || "").trim() === normalizedRoundId);
-    if (!roundPlan?.flights?.length) return "";
-    for (const flight of roundPlan.flights) {
-      const assignment = (flight.scorers || flight.assignments || []).find((item) => normalizeId(getAssignmentScorerId(item)) === scorerKey);
-      const scoredPlayerId = getAssignmentScoredPlayerId(assignment);
-      if (scoredPlayerId) return scoredPlayerId;
-    }
-  }
+  const rows = collectRows(flightDraw);
+  const row = rows.find((item) =>
+    normalizeId(item.round_id || item.roundId || "") === roundKey &&
+    normalizeId(getAssignmentScorerId(item)) === scorerKey &&
+    getAssignmentScoredPlayerId(item)
+  );
 
-  return "";
+  return getAssignmentScoredPlayerId(row);
 }
 
 function getPlayerFlightFromDraw(flightDraw, roundId, playerId) {
@@ -2062,6 +2094,20 @@ function LordOfTheHolesApp() {
                 <p className="mt-1 text-xs text-amber-100/60">Hier kannst du korrigieren, wem dieses Handy gehört. Der zu zählende Spieler kommt automatisch aus der Flight-/Datenbank-Zuordnung.</p>
               )}
             </div>
+            {!isFlightDrawRound ? (
+              <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
+                <label className="mb-1 block text-sm text-amber-100/80">Zu zählender Spieler am Finaltag</label>
+                <select value={scoredPlayerId} disabled={pendingScores.length > 0} onChange={(e) => { const nextPlayerId = e.target.value; setScoredPlayerId(nextPlayerId); if (displayedActiveRound?.round_id) { if (nextPlayerId) saveLocalScoredPlayerForRound(displayedActiveRound.round_id, nextPlayerId); else removeLocalScoredPlayerForRound(displayedActiveRound.round_id); } }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:cursor-not-allowed disabled:opacity-50">
+                  <option value="">Spieler auswählen</option>
+                  {scoreablePlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}
+                </select>
+                {pendingScores.length > 0 ? (
+                  <p className="mt-1 rounded-xl border border-red-500/35 bg-red-950/35 p-2 text-xs font-semibold text-red-100">Zu zählender Spieler kann erst gewechselt werden, wenn alle offenen Scores synchronisiert wurden.</p>
+                ) : (
+                  <p className="mt-1 text-xs text-amber-100/60">Nur am Finaltag manuell. Runde 1–3 kommen automatisch aus der gespeicherten Flight-Ziehung.</p>
+                )}
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       </motion.section>
