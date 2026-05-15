@@ -2154,12 +2154,13 @@ function LordOfTheHolesApp() {
     if (value === "archive") setView("archive");
     if (value === "fun") setView("fun");
     if (value === "flights") setView("flights");
+    if (value === "rules") setView("rules");
     if (value === "settings") setView("handicaps");
     if (value === "admin") setView("admin");
   }
 
   function renderHeader() {
-    const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "flights" ? "Flights" : mainMenu === "admin" ? "Admin" : "Einstellungen";
+    const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "flights" ? "Flights" : mainMenu === "rules" ? "Regeln" : mainMenu === "admin" ? "Admin" : "Einstellungen";
     return (
       <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-1 pt-1">
         <div className="relative flex h-8 items-center justify-center">
@@ -2170,7 +2171,7 @@ function LordOfTheHolesApp() {
           <button type="button" onClick={() => setMenuOpen((value) => !value)} className="ml-auto rounded-xl border border-amber-500/35 bg-[linear-gradient(180deg,rgba(48,35,22,0.82),rgba(12,10,9,0.82))] px-2.5 py-1 text-base leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.12),0_8px_18px_rgba(0,0,0,0.35)] backdrop-blur-sm transition active:scale-[0.96]" aria-label="Menü öffnen">☰</button>
           {menuOpen ? (
             <div className="absolute right-0 top-[34px] z-30 w-64 overflow-hidden rounded-2xl border border-amber-700/40 bg-stone-950/95 text-left shadow-2xl shadow-black/70 backdrop-blur">
-              {[["current", "Scoring"], ["roundTables", "Tabellen Runde"], ["tournament", "Turnier"], ["archive", "Scorekarten"], ["fun", "Mittelerde"], ["flights", "Flights"], ["settings", "Einstellungen"], ["admin", "Admin"]].map(([value, label]) => (
+              {[["current", "Scoring"], ["roundTables", "Tabellen Runde"], ["tournament", "Turnier"], ["archive", "Scorekarten"], ["fun", "Mittelerde"], ["flights", "Flights"], ["rules", "Regeln"], ["settings", "Einstellungen"], ["admin", "Admin"]].map(([value, label]) => (
                 <button
                   key={value}
                   type="button"
@@ -2547,6 +2548,186 @@ function LordOfTheHolesApp() {
     return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3"><div className="landscape:mx-auto landscape:max-w-none landscape:pb-6"><MiddleEarthTables players={playersWithCurrentHandicaps} holes={holes} scores={officialScores} mismatches={roundMismatches} /></div></motion.section>;
   }
 
+  function renderRulesView() {
+    const ruleSections = [
+      {
+        eyebrow: "I",
+        title: "Die Handicaps der Gefährten",
+        subtitle: "Einmal gesetzt, für das ganze Turnier besiegelt.",
+        tone: "amber",
+        items: [
+          { label: "Grundsatz", text: "Es gelten die offiziellen DGV-Handicaps beziehungsweise die durch die Turnierleitung bestätigten Werte." },
+          { label: "Nachweis", text: "Spieler ohne verlässliche Turnierhistorie müssen relevante Runden oder Ersatzrunden offenlegen." },
+          { label: "Macht der Leitung", text: "Die Turnierleitung darf Handicaps anpassen, wenn nur so ein fairer Wettstreit möglich ist." },
+          { label: "Siegel", text: "Nach Turnierbeginn bleiben die Handicaps unverändert. Kein Feilschen am Lagerfeuer." },
+        ],
+      },
+      {
+        eyebrow: "II",
+        title: "Die vier Kapitel des Majors",
+        subtitle: "Drei Prüfungen, ein Cut und der finale Weg zum Schicksalsberg.",
+        tone: "emerald",
+        items: [
+          { label: "Tag 1", text: "Netto-Team: Die Nettopunkte beider Teampartner werden addiert. Das stärkste Bündnis gewinnt." },
+          { label: "Tag 2", text: "Best Ball Netto Team: Pro Loch zählt das beste Nettoergebnis des Teams." },
+          { label: "Tag 3", text: "Best Ball Match Play: Das bessere Nettoergebnis gewinnt das Loch; geteilte Löcher werden entsprechend geteilt." },
+          { label: "Tag 4", text: "Einzel-Netto: Die Top 3 nach den ersten drei Tagen spielen um die Krone, die übrigen um die Plätze 4 bis 6." },
+        ],
+      },
+      {
+        eyebrow: "III",
+        title: "Die Ziehung der Bündnisse",
+        subtitle: "Die Pergamente kennen keine Freunde, nur Paarungen.",
+        tone: "amber",
+        items: [
+          { label: "Auslosung", text: "Mannschaften werden nach den Tagesrunden per Zufallsprinzip ausgelost." },
+          { label: "Wiederholung verboten", text: "Kein Team darf sich wiederholen. Alte Allianzen müssen ruhen, neue Dramen dürfen entstehen." },
+        ],
+      },
+      {
+        eyebrow: "IV",
+        title: "Shelobs Putt-Kammer",
+        subtitle: "Wer dreimal puttet, füttert die Spinne.",
+        tone: "red",
+        items: [
+          { label: "3 Putts", text: "2 Euro wandern in die Snake-Kasse." },
+          { label: "4 Putts", text: "4 Euro. Schmerzhaft, aber noch gesellschaftsfähig." },
+          { label: "5+ Putts", text: "10 Euro. Ab hier hört man Mordor leise lachen." },
+          { label: "Snake-Pott", text: "Die Kasse geht an den Turniersieger." },
+          { label: "Netto-Strich", text: "Bei 0 Nettopunkten ist ein Kurzer fällig. Zusätzlich gilt Achim's Rule: Kniebeuge-Hock-Strecksprung mit Händen am Boden." },
+        ],
+      },
+      {
+        eyebrow: "V",
+        title: "Herren von Gondor und Schildträger",
+        subtitle: "Ruhm oben, Dienst unten — so will es die Charta.",
+        tone: "sky",
+        items: [
+          { label: "Berufung", text: "Die Schlusslichter der Tageswertung dienen den Bestplatzierten als Butler beziehungsweise Schildträger." },
+          { label: "Dienstzeit", text: "Der Dienst beginnt nach Rundenende und endet vor dem ersten Abschlag des nächsten Tages." },
+          { label: "Pflichten", text: "Schläger putzen, Rangebälle organisieren, Bag bereitstellen, Frühstückstisch sichern, Drinks ordern und für das Wohl des Masters sorgen." },
+          { label: "Sanktionen", text: "Ungehorsam, schmutzige Schläger oder verweigerte Dienste können durch die Gründerväter geahndet werden." },
+        ],
+      },
+      {
+        eyebrow: "VI",
+        title: "Nearest to the Pin",
+        subtitle: "Nur wer das Grün findet, darf vom Ruhm sprechen.",
+        tone: "emerald",
+        items: [
+          { label: "Festlegung", text: "Die NttP-Löcher werden vor dem ersten Abschlag bestimmt." },
+          { label: "Wertung", text: "Der Ball muss auf dem Grün liegen. Vorgrün zählt nicht, Hoffnung auch nicht." },
+          { label: "Signature Hole", text: "Das Signature Hole bringt dem Gewinner einen Stroke Abzug für den Finaltag." },
+          { label: "Einsatz", text: "Bei gewähltem NttP erhält der Gewinner 5 Euro von seinen Flight-Partnern." },
+        ],
+      },
+      {
+        eyebrow: "VII",
+        title: "Longest Drive",
+        subtitle: "Weit ist gut. Fairway ist Pflicht.",
+        tone: "amber",
+        items: [
+          { label: "Festlegung", text: "Das Longest-Drive-Loch wird vor dem ersten Abschlag bestimmt." },
+          { label: "Wertung", text: "Der Ball muss auf dem Fairway liegen. Waldhelden werden nicht belohnt." },
+          { label: "Einsatz", text: "Der Gewinner erhält je 5 Euro von seinen Flight-Partnern." },
+        ],
+      },
+      {
+        eyebrow: "VIII",
+        title: "Ruhm, Greenfee und bittere Rechnungen",
+        subtitle: "Der Ring ist teuer. Noch teurer ist Platz 6.",
+        tone: "red",
+        items: [
+          { label: "Teamwertung", text: "Siegermannschaft: 100 Euro. Platz 2: 0 Euro. Platz 3: minus 100 Euro." },
+          { label: "Gesamtsieger", text: "Platz 1 erhält die teuerste Greenfee, den Pokal und den Snake-Pott." },
+          { label: "Podium", text: "Platz 2 erhält 50 Prozent der Greenfee von Tag 4. Platz 3 geht leer, aber würdevoll." },
+          { label: "Platz 4–6", text: "Die hinteren Plätze tragen anteilige Beträge nach Platzierung." },
+          { label: "Brutto", text: "Der Bruttosieger über den gesamten Turnierverlauf erhält den Championshipring." },
+        ],
+      },
+      {
+        eyebrow: "IX",
+        title: "Die alten Gesetze des Spiels",
+        subtitle: "Keine Geschenke. Keine Ausreden. Keine fliegenden Schläger.",
+        tone: "stone",
+        items: [
+          { label: "Keine Geschenke", text: "Putts und Schläge werden nicht geschenkt. Der Ball muss ins Loch — so alt ist die Magie." },
+          { label: "DGV", text: "Es gelten die Spielregeln gemäß DGV-Ordnung." },
+          { label: "Etikette", text: "Fluchen, Beleidigungen, Schlägerwurf oder Beschädigungen können Geldstrafen auslösen." },
+          { label: "Offiziell", text: "Da das Turnier offiziell und RPR-relevant ist, werden Regelverstöße entsprechend geahndet." },
+        ],
+      },
+    ];
+
+    const toneClass = (tone) => {
+      if (tone === "emerald") return "border-emerald-500/35 bg-emerald-950/18 text-emerald-100";
+      if (tone === "red") return "border-red-500/35 bg-red-950/18 text-red-100";
+      if (tone === "sky") return "border-sky-500/35 bg-sky-950/18 text-sky-100";
+      if (tone === "stone") return "border-stone-400/25 bg-stone-950/30 text-stone-100";
+      return "border-amber-500/35 bg-amber-500/10 text-amber-100";
+    };
+
+    const badgeClass = (tone) => {
+      if (tone === "emerald") return "border-emerald-400/40 bg-emerald-500/12 text-emerald-100";
+      if (tone === "red") return "border-red-400/40 bg-red-500/12 text-red-100";
+      if (tone === "sky") return "border-sky-400/40 bg-sky-500/12 text-sky-100";
+      if (tone === "stone") return "border-stone-400/30 bg-stone-500/10 text-stone-100";
+      return "border-amber-400/45 bg-amber-500/14 text-amber-100";
+    };
+
+    return (
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
+        <div className="landscape:mx-auto landscape:max-w-3xl landscape:pb-6">
+          <Card className="mb-3 overflow-hidden rounded-3xl border border-amber-400/40 bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.20),transparent_42%),linear-gradient(180deg,rgba(48,35,22,0.92),rgba(12,10,9,0.88))] shadow-[inset_0_1px_0_rgba(251,191,36,0.16),0_22px_52px_rgba(0,0,0,0.48)] backdrop-blur-sm">
+            <CardContent className="p-4 text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-amber-300/50 bg-black/30 text-2xl shadow-[0_0_24px_rgba(245,158,11,0.16)]">📜</div>
+              <p className="text-[10px] uppercase tracking-[0.28em] text-amber-300/75">Die Charta</p>
+              <h2 className="mt-1 font-serif text-2xl font-black leading-tight text-amber-200">Regeln von Lord of the Holes</h2>
+              <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-amber-100/72">Was hier steht, ist nicht einfach Regelwerk. Es ist Pergament, Gesetz und gelegentlich eine sehr teure Erinnerung daran, gerade zu putten.</p>
+              <div className="mt-3 grid grid-cols-3 gap-1.5 text-[10px] uppercase tracking-[0.14em] text-amber-100/70">
+                <div className="rounded-xl border border-amber-500/25 bg-black/20 px-2 py-1.5">Official</div>
+                <div className="rounded-xl border border-amber-500/25 bg-black/20 px-2 py-1.5">DGV</div>
+                <div className="rounded-xl border border-amber-500/25 bg-black/20 px-2 py-1.5">No Gimmes</div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="space-y-3">
+            {ruleSections.map((section) => (
+              <Card key={section.title} className="overflow-hidden rounded-3xl border border-amber-700/34 bg-[linear-gradient(180deg,rgba(32,23,15,0.88),rgba(12,10,9,0.78))] shadow-[inset_0_1px_0_rgba(251,191,36,0.10),0_16px_38px_rgba(0,0,0,0.36)] backdrop-blur-sm">
+                <CardContent className="p-3">
+                  <div className="mb-3 flex items-start gap-3">
+                    <div className={cls("flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border font-serif text-base font-black shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]", badgeClass(section.tone))}>{section.eyebrow}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-serif text-lg font-black leading-tight text-amber-200">{section.title}</div>
+                      <div className="mt-0.5 text-xs leading-snug text-amber-100/58">{section.subtitle}</div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {section.items.map((item) => (
+                      <div key={`${section.title}-${item.label}`} className={cls("rounded-2xl border px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]", toneClass(section.tone))}>
+                        <div className="mb-0.5 text-[10px] font-black uppercase tracking-[0.18em] opacity-70">{item.label}</div>
+                        <div className="text-sm leading-relaxed text-amber-50/86">{item.text}</div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <Card className="mt-3 rounded-3xl border border-amber-500/35 bg-black/32 shadow-xl backdrop-blur-sm">
+            <CardContent className="p-3 text-center">
+              <div className="font-serif text-lg font-black text-amber-200">Euer #lordoftheholes Team</div>
+              <p className="mt-1 text-xs leading-relaxed text-amber-100/65">Wer die Charta kennt, spielt besser. Wer sie ignoriert, zahlt meistens schneller.</p>
+            </CardContent>
+          </Card>
+        </div>
+      </motion.section>
+    );
+  }
+
   function renderActiveView() {
     if (loading) return <Card className="rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm"><CardContent className="flex items-center gap-2 p-3 text-amber-100">⟳ Lade Datenbank ...</CardContent></Card>;
     if (view === "admin") return renderAdminView();
@@ -2556,6 +2737,7 @@ function LordOfTheHolesApp() {
     if (view === "archive") return renderArchiveView();
     if (view === "fun") return renderFunView();
     if (view === "flights") return renderFlightsView();
+    if (view === "rules") return renderRulesView();
     return renderScoreView();
   }
 
