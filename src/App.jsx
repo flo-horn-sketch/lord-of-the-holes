@@ -1519,7 +1519,11 @@ function LordOfTheHolesApp() {
     if (!isValidScorePayload(score)) return;
     const normalizedScore = normalizeScoreRecord(score);
     const key = getScoreIdentityKey(normalizedScore);
-    const nextPendingScores = [...pendingScoresRef.current.filter((item) => getScoreIdentityKey(item) !== key), normalizedScore];
+    const currentPendingScores = Array.isArray(pendingScoresRef.current) ? pendingScoresRef.current : [];
+    const nextPendingScores = [
+      ...currentPendingScores.filter((item) => getScoreIdentityKey(item) !== key),
+      normalizedScore,
+    ];
     pendingScoresRef.current = nextPendingScores;
     writeLocalJson("lordOfTheHoles.pendingScores", nextPendingScores);
     setPendingScores(nextPendingScores);
@@ -1532,11 +1536,11 @@ function LordOfTheHolesApp() {
       ...overrides,
       updated_at: new Date().toISOString(),
     });
+
+    // Simpler Offline-Speicher: pro Score-Identität genau ein Eintrag.
+    // Wenn dasselbe Loch später erneut mit "nächstes Loch" bestätigt wird,
+    // überschreibt dieser neue sichtbare Stand den alten Pending-Stand.
     addPendingScore(nextScore);
-    const sameScore = (item) => getScoreIdentityKey(item) === getScoreIdentityKey(nextScore);
-    const updateList = (current) => current.some(sameScore) ? current.map((item) => sameScore(item) ? nextScore : item) : [...current, nextScore];
-    setScores(updateList);
-    setAllScores(updateList);
     return nextScore;
   }
 
@@ -1624,10 +1628,10 @@ function LordOfTheHolesApp() {
       window.setTimeout(() => setScoreHintMessage(""), 1800);
       return;
     }
-    let next;
-    try { next = optimisticUpdate(nextPatch); }
+    try { optimisticUpdate(nextPatch); }
     catch (err) { setError(err.message || "Score kann noch nicht gespeichert werden."); return; }
-    addPendingScore(next);
+    // Wichtig: Der Offline-/Pending-Speicher wird NICHT bei jeder Eingabe beschrieben.
+    // Er wird erst beim Klick auf "nächstes Loch" oder "Runde abschließen" mit dem sichtbaren Lochstand befüllt.
     setError("");
   }
 
