@@ -1733,6 +1733,16 @@ function LordOfTheHolesApp() {
   const flightDrawUnlocked = lockCountdownNow.getTime() >= FLIGHT_DRAW_TARGET.getTime();
 
   useEffect(() => {
+    loadData({ silent: true });
+
+    const interval = window.setInterval(() => {
+      loadData({ silent: true });
+    }, 30000);
+
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
     if (!selectedActiveRoundId) return;
     const selectedRoundScores = allScores.filter((score) => String(score.round_id || "") === String(selectedActiveRoundId));
     const selectedPendingScores = pendingScoresRef.current.filter((score) => String(score.round_id || "") === String(selectedActiveRoundId));
@@ -2396,8 +2406,7 @@ function LordOfTheHolesApp() {
       applyLocalCacheClear(resetAt, "Kompletter Reset wurde für alle Geräte ausgelöst. Flight-Ziehung wird neu bestimmt ...");
 
       const freshDraw = buildFlightDraw(allPlayers, rounds);
-      const drawResult = $1
-      await savePersistentTeamDraw(callSheetApi, playersWithCurrentHandicaps);
+      const drawResult = await callSheetApi({ action: "saveFlightDraw", draw: freshDraw, test: false });
       const savedDraw = drawResult?.flight_draw || drawResult?.flightDraw || freshDraw;
       setFlightDraw(savedDraw);
       writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, savedDraw);
