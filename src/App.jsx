@@ -48,7 +48,7 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
-const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbw711Bujn_z8zGgOAmlbbz29q-OZ6XGHnLVzENw57-VOgB0zyJNjcChg_tryl-zFTuV/exec";
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbzjSuJso_4UTwB6260LFsvdEnIdotXXnMJnqaavYYb1n2P8MX6FVozsaDBVe1ubThM/exec";
 const ADMIN_PASSWORD = "weimar";
 const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T10:00:00+02:00");
 const FLIGHT_DRAW_TARGET = new Date("2026-05-21T20:00:00+02:00");
@@ -1754,12 +1754,14 @@ function LordOfTheHolesApp() {
     const batchResult = await savePendingScoresBatch(livePendingScores);
     if (batchResult === true) return true;
 
-    // Kein Einzel-Fallback mehr: Viele einzelne upsertScore-Requests erzeugen Sheet-Locks
-    // und führen zu Zeitüberschreitungen. Wenn der Batch fehlschlägt, bleiben alle Scores
-    // lokal in pendingScores/localScoreDrafts und werden beim nächsten Sync erneut als Batch versucht.
-    setConnectionStatus("offline");
-    setError("Batch-Synchronisierung fehlgeschlagen. Scores bleiben lokal gespeichert und werden beim nächsten Versuch gesammelt übertragen.");
-    return false;
+    // Sicherheitsnetz: Wenn der Batch noch nicht sauber greift, dürfen Scores nicht hängen bleiben.
+    // Deshalb gibt es wieder einen Legacy-Fallback. Normalfall bleibt Batch; Einzeluploads sind nur Notfall.
+    let allSaved = true;
+    for (const pendingScore of [...pendingScoresRef.current].filter(isValidScorePayload)) {
+      const saved = await savePendingScore(pendingScore);
+      if (!saved) allSaved = false;
+    }
+    return allSaved;
   }
 
   async function saveScore(patch) {
