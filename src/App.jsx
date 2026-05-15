@@ -1052,7 +1052,7 @@ function LordOfTheHolesApp() {
   const [flightDrawSaving, setFlightDrawSaving] = useState(false);
   const [flightCeremonyRunning, setFlightCeremonyRunning] = useState(false);
   const [flightCeremonyStepIndex, setFlightCeremonyStepIndex] = useState(0);
-  const [flightCeremonyCompleted, setFlightCeremonyCompleted] = useState(() => readLocalJson("lordOfTheHoles.flightCeremonyCompleted", false));
+  const [flightCeremonyCompleted, setFlightCeremonyCompleted] = useState(false);
   const [flightSummaryOpen, setFlightSummaryOpen] = useState(() => readLocalJson("lordOfTheHoles.flightSummaryOpen", false));
   const [localHandicaps, setLocalHandicaps] = useState({});
   const introAudioRef = useRef(null);
@@ -2382,15 +2382,15 @@ function LordOfTheHolesApp() {
             <div className="font-serif text-lg font-black text-amber-200">{hasDraw ? "Die Pergamente öffnen sich von selbst." : "Die Pergamente öffnen sich ..."}</div>
             {!hasDraw ? <p className="mt-2 rounded-xl border border-red-500/40 bg-red-950/35 p-2 text-sm text-red-100">Keine gespeicherte Flight-Ziehung gefunden. Bitte zuerst im Admin-Bereich „Flights neu bestimmen“ ausführen.</p> : null}
           </div>
-        ) : (
+        ) : flightCeremonyCompleted && !flightCeremonyRunning ? (
           <div className="mt-3 rounded-2xl border border-amber-700/35 bg-black/25 p-3">
             <button type="button" onClick={() => setFlightSummaryOpen((value) => !value)} className="flex w-full items-center justify-between rounded-2xl border border-amber-500/40 bg-amber-600/80 px-4 py-2.5 font-bold text-amber-50 shadow-lg shadow-black/25">
               <span className="font-serif text-lg">{flightSummaryOpen ? "Flights schließen" : "Flights öffnen"}</span>
               <span className="text-sm uppercase tracking-[0.16em]">{flightSummaryOpen ? "schließen" : "öffnen"}</span>
             </button>
-            {flightSummaryOpen ? renderFlightDrawSummary() : null}
+            {flightSummaryOpen ? <div className="mt-2 max-h-[34vh] overflow-auto pr-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{renderFlightDrawSummary()}</div> : null}
           </div>
-        )}
+        ) : null}
       </div>
     );
   }
@@ -2403,7 +2403,7 @@ function LordOfTheHolesApp() {
         <div className="absolute inset-0 bg-black/35" />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.04),rgba(0,0,0,0.45)_40%,rgba(0,0,0,0.88)_100%)]" />
         {flightCeremonyRunning ? renderFlightCeremonyStage() : appLocked ? (
-          <div className="absolute inset-x-3 top-[33vh] bottom-4 mx-auto flex max-w-md flex-col justify-end gap-2 overflow-auto pb-[env(safe-area-inset-bottom)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="absolute inset-x-3 top-[33vh] bottom-4 mx-auto flex max-w-md flex-col justify-end gap-2 overflow-hidden pb-[env(safe-area-inset-bottom)]">
             {renderLockedFlightDrawPanel()}
             <div className="rounded-3xl border border-amber-500/35 bg-black/55 p-3 text-center text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm">
               <div className="font-serif text-lg font-black text-amber-200">Der Rat ist noch nicht einberufen.</div>
