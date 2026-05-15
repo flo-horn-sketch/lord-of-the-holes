@@ -2367,23 +2367,17 @@ function LordOfTheHolesApp() {
   function renderLockedFlightDrawPanel() {
     const hasDraw = Boolean(flightDraw?.rounds?.length);
     return (
-      <div className="rounded-3xl border border-amber-500/35 bg-black/55 p-4 text-center text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm">
-        <div className="text-[10px] uppercase tracking-[0.28em] text-amber-300/75">DER RAT VON BRUCHTAL</div>
-        <div className="mt-1 font-serif text-2xl font-black text-amber-200">Flight-Ziehung der Pergamente</div>
-        <div className="mx-auto mt-3 max-w-[230px] rounded-2xl border border-amber-400/40 bg-amber-500/10 p-3 shadow-[inset_0_1px_0_rgba(251,191,36,0.14)]">
-          <div className="text-xs uppercase tracking-[0.18em] text-amber-100/65">Flight-Ziehung</div>
-          <div className="mt-1 font-serif text-2xl font-black text-amber-200">21.05.26</div>
-          <div className="font-serif text-xl font-black text-amber-100">20:00 Uhr</div>
-          <div className="mt-1 rounded-full bg-black/30 px-3 py-1 text-xs font-bold uppercase tracking-[0.18em] text-amber-300">Hier live</div>
+      <div className="rounded-3xl border border-amber-500/35 bg-black/55 p-3 text-center text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm">
+        <div className="text-[9px] uppercase tracking-[0.28em] text-amber-300/75">DER RAT VON BRUCHTAL</div>
+        <div className="mt-0.5 font-serif text-xl font-black text-amber-200">Flight-Ziehung der Pergamente</div>
+        <div className="mx-auto mt-2 max-w-[210px] rounded-2xl border border-amber-400/40 bg-amber-500/10 p-2 shadow-[inset_0_1px_0_rgba(251,191,36,0.14)]">
+          <div className="text-[10px] uppercase tracking-[0.18em] text-amber-100/65">Flight-Ziehung</div>
+          <div className="mt-0.5 font-serif text-xl font-black text-amber-200">21.05.26</div>
+          <div className="font-serif text-lg font-black text-amber-100">20:00 Uhr</div>
+          <div className="mt-1 rounded-full bg-black/30 px-3 py-0.5 text-[10px] font-bold uppercase tracking-[0.18em] text-amber-300">Hier live</div>
         </div>
-        <p className="mt-3 text-sm text-amber-100/75">Bitte öffnet die App 1–2 Minuten vorher, damit die Pergamente rechtzeitig geladen sind.</p>
-        {!flightDrawUnlocked ? (
-          <div className="mt-3 rounded-2xl border border-amber-700/35 bg-black/25 p-3">
-            <div className="font-serif text-lg font-black text-amber-200">Die Pergamente sind noch versiegelt.</div>
-            <p className="mt-1 text-sm text-amber-100/70">Die Pforten sind noch verschlossen. Gandalf selbst würde jetzt sagen: „Du kommst hier noch nicht rein.“</p>
-            <div className="mt-3">{renderCountdownGrid(flightDrawCountdown, true)}</div>
-          </div>
-        ) : !flightCeremonyCompleted ? (
+        <p className="mt-2 text-xs text-amber-100/75">Bitte öffnet die App 1–2 Minuten vorher, damit die Pergamente rechtzeitig geladen sind.</p>
+        {flightDrawUnlocked && !flightCeremonyCompleted ? (
           <div className="mt-3 rounded-2xl border border-amber-700/35 bg-black/25 p-3">
             <div className="font-serif text-lg font-black text-amber-200">{hasDraw ? "Die Pergamente öffnen sich von selbst." : "Die Pergamente öffnen sich ..."}</div>
             {!hasDraw ? <p className="mt-2 rounded-xl border border-red-500/40 bg-red-950/35 p-2 text-sm text-red-100">Keine gespeicherte Flight-Ziehung gefunden. Bitte zuerst im Admin-Bereich „Flights neu bestimmen“ ausführen.</p> : null}
@@ -2409,13 +2403,13 @@ function LordOfTheHolesApp() {
         <div className="absolute inset-0 bg-black/35" />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.04),rgba(0,0,0,0.45)_40%,rgba(0,0,0,0.88)_100%)]" />
         {flightCeremonyRunning ? renderFlightCeremonyStage() : appLocked ? (
-          <div className="absolute inset-x-3 top-5 bottom-5 mx-auto flex max-w-md flex-col justify-end gap-3 overflow-auto pb-[env(safe-area-inset-bottom)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="absolute inset-x-3 top-[33vh] bottom-4 mx-auto flex max-w-md flex-col justify-end gap-2 overflow-auto pb-[env(safe-area-inset-bottom)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {renderLockedFlightDrawPanel()}
-            <div className="rounded-3xl border border-amber-500/35 bg-black/55 p-4 text-center text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm">
-              <div className="font-serif text-xl font-black text-amber-200">Der Rat ist noch nicht einberufen.</div>
-              <div className="mt-2 text-sm text-amber-100/80">Im Weimarer Land werden Stimmen gesenkt, alte Karten entrollt und verdächtig ernste Blicke ausgetauscht. Die Gefährten werden bald gerufen.</div>
-              <div className="mt-4">{renderCountdownGrid(lockCountdown)}</div>
-              <div className="mt-3 rounded-2xl border border-amber-700/30 bg-black/35 p-3 text-sm text-amber-100/75">Die Pforten sind noch verschlossen. Gandalf selbst würde jetzt sagen: „Du kommst hier noch nicht rein.“</div>
+            <div className="rounded-3xl border border-amber-500/35 bg-black/55 p-3 text-center text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm">
+              <div className="font-serif text-lg font-black text-amber-200">Der Rat ist noch nicht einberufen.</div>
+              <div className="mt-1.5 text-xs text-amber-100/80">Im Weimarer Land werden Stimmen gesenkt, alte Karten entrollt und verdächtig ernste Blicke ausgetauscht. Die Gefährten werden bald gerufen.</div>
+              <div className="mt-2">{renderCountdownGrid(lockCountdown, true)}</div>
+              <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/35 p-2 text-xs text-amber-100/75">Die Pforten sind noch verschlossen. Gandalf selbst würde jetzt sagen: „Du kommst hier noch nicht rein.“</div>
               {error ? <div className="mt-3 rounded-2xl border border-amber-500/35 bg-amber-950/60 p-3 text-sm text-amber-100">{error}</div> : null}
             </div>
           </div>
