@@ -960,6 +960,57 @@ function FunTable({ title, subtitle = "", players, columns, nameLabel = "Name" }
   );
 }
 
+function buildPersistentTeamDraw(players = []) {
+  const eligiblePlayers = (players || []).filter((player) => String(player.id || "") !== "");
+  if (eligiblePlayers.length < 2) return null;
+
+  const pairKey = (a, b) => [String(a), String(b)].sort().join("|");
+  const makeTeamsFromOrder = (order) => {
+    const teams = [];
+    for (let index = 0; index < order.length; index += 2) teams.push(order.slice(index, index + 2));
+    return teams;
+  };
+  const createRoundTeams = (forbiddenPairs = new Set()) => {
+    const ids = eligiblePlayers.map((player) => String(player.id));
+    const isValid = (teams) => teams.every((team) => team.length < 2 || !forbiddenPairs.has(pairKey(team[0], team[1])));
+
+    for (let attempt = 0; attempt < 1600; attempt += 1) {
+      const shuffled = [...ids].sort(() => Math.random() - 0.5);
+      const teams = makeTeamsFromOrder(shuffled);
+      if (isValid(teams)) return teams;
+    }
+
+    return makeTeamsFromOrder(ids);
+  };
+
+  const forbiddenPairs = new Set();
+  const round2Teams = createRoundTeams(forbiddenPairs);
+  round2Teams.forEach((team) => { if (team.length >= 2) forbiddenPairs.add(pairKey(team[0], team[1])); });
+  const round3Teams = createRoundTeams(forbiddenPairs);
+
+  return {
+    draw_key: `teams-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    rounds: [
+      { round_id: "r2", round_name: "Runde 2 · Durch die Minen von Moria", teams: round2Teams },
+      { round_id: "r3", round_name: "Runde 3 · Vor den Toren Mordors", teams: round3Teams },
+    ],
+  };
+}
+
+async function savePersistentTeamDraw(callSheetApi, players = []) {
+  if (!callSheetApi) return null;
+  const teamDraw = buildPersistentTeamDraw(players);
+  if (!teamDraw) return null;
+  const result = await callSheetApi({ action: "saveTeamDraw", team_draw: teamDraw, teamDraw });
+  if (!result || result.ok === false) throw new Error(result?.error || "Teamauslosung konnte nicht gespeichert werden.");
+  const savedTeamDraw = result.team_draw || result.teamDraw || teamDraw;
+  writeLocalJson("lordOfTheHoles.teamDraw.r2r3", savedTeamDraw);
+  writeLocalJson("lordOfTheHoles.teamDraw.r2r3.revealedRounds", {});
+  return savedTeamDraw;
+}
+
 function TeamDrawView({ players, callSheetApi }) {
   const storageKey = "lordOfTheHoles.teamDraw.r2r3";
   const [teamDraw, setTeamDraw] = useState(() => readLocalJson(storageKey, null));
@@ -2345,7 +2396,8 @@ function LordOfTheHolesApp() {
       applyLocalCacheClear(resetAt, "Kompletter Reset wurde für alle Geräte ausgelöst. Flight-Ziehung wird neu bestimmt ...");
 
       const freshDraw = buildFlightDraw(allPlayers, rounds);
-      const drawResult = await callSheetApi({ action: "saveFlightDraw", draw: freshDraw, test: false });
+      const drawResult = $1
+      await savePersistentTeamDraw(callSheetApi, playersWithCurrentHandicaps);
       const savedDraw = drawResult?.flight_draw || drawResult?.flightDraw || freshDraw;
       setFlightDraw(savedDraw);
       writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, savedDraw);
