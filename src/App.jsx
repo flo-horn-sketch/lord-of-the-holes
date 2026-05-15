@@ -1766,16 +1766,11 @@ function LordOfTheHolesApp() {
     }
   }
 
-  async function enterLockedAppAsAdmin() {
+  function enterLockedAppAsAdmin() {
     if (lockPasswordInput !== ADMIN_PASSWORD) { setError("Passwort ist falsch."); return; }
-    if (splashEntering) return;
-    setSplashEntering(true);
-    const data = await loadData({ silent: true });
-    setSplashEntering(false);
-    if (!data) return;
     const storedMyPlayerId = readLocalJson("lordOfTheHoles.myPlayerId", "");
-    const knownPlayersAfterLoad = [...((data.activePlayers?.length ? data.activePlayers : data.players) || []), ...(allPlayers || [])];
-    const hasKnownDeviceOwner = Boolean((myPlayerId || storedMyPlayerId) && knownPlayersAfterLoad.some((player) => String(player.id) === String(myPlayerId || storedMyPlayerId)));
+    const knownPlayers = [...(visiblePlayers || []), ...(allPlayers || [])];
+    const hasKnownDeviceOwner = Boolean((myPlayerId || storedMyPlayerId) && knownPlayers.some((player) => String(player.id) === String(myPlayerId || storedMyPlayerId)));
     if (!hasKnownDeviceOwner) setForceMyPlayerPromptOpen(true);
     setLockAdminBypass(true);
     setIsAdminUnlocked(true);
@@ -2250,7 +2245,7 @@ function LordOfTheHolesApp() {
     drawRounds.forEach((roundPlan, roundIndex) => {
       const chapter = roundIndex + 1;
       (introTexts[String(roundPlan.round_id)] || []).forEach((text) => {
-        steps.push({ type: "text", title: "Flight-Ziehung der Pergamente", text, waitLabel: "Die Gemeinschaft wartet ...", chapter });
+        steps.push({ type: "text", title: "Flightziehung - Das Öffnen der Pergamente", text, waitLabel: "Die Gemeinschaft wartet ...", chapter });
       });
       const totalPlayers = (roundPlan.flights || []).reduce((sum, flight) => sum + (flight.players || []).length, 0);
       for (let revealCount = 0; revealCount <= totalPlayers; revealCount += 1) {
@@ -2408,7 +2403,7 @@ function LordOfTheHolesApp() {
     return (
       <div className="rounded-3xl border border-amber-500/35 bg-black/55 p-3 text-center text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm">
         <div className="text-[9px] uppercase tracking-[0.28em] text-amber-300/75">DER RAT VON BRUCHTAL</div>
-        <div className="mt-0.5 font-serif text-xl font-black text-amber-200">Flight-Ziehung der Pergamente</div>
+        <div className="mt-0.5 font-serif text-xl font-black text-amber-200">Flightziehung - Das Öffnen der Pergamente</div>
         <div className="mx-auto mt-2 max-w-[210px] rounded-2xl border border-amber-400/40 bg-amber-500/10 p-2 shadow-[inset_0_1px_0_rgba(251,191,36,0.14)]">
           <div className="text-[10px] uppercase tracking-[0.18em] text-amber-100/65">Flight-Ziehung</div>
           <div className="mt-0.5 font-serif text-xl font-black text-amber-200">21.05.26</div>
@@ -2467,7 +2462,7 @@ function LordOfTheHolesApp() {
             <div className="mb-2 text-xs uppercase tracking-[0.18em] text-amber-300/70">Admin</div>
             <input type="password" value={lockPasswordInput} onChange={(e) => setLockPasswordInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") startFlightCeremonyAsAdmin(); }} placeholder="Passwort" className="mb-2 w-full rounded-xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" autoFocus />
             <div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => { setLockUnlockOpen(false); setLockPasswordInput(""); }} className="rounded-xl bg-stone-800 py-2 text-sm font-bold text-amber-100">Abbrechen</button><button type="button" onClick={startFlightCeremonyAsAdmin} className="rounded-xl bg-amber-600 py-2 text-sm font-bold text-amber-50 active:scale-[0.98]">Zeremonienmeister</button></div>
-            <button type="button" disabled={splashEntering} onClick={enterLockedAppAsAdmin} className="mt-2 w-full rounded-xl border border-amber-500/35 bg-black/35 py-2 text-sm font-bold text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.08)] disabled:opacity-60">Direkt in die App</button>
+            <button type="button" onClick={enterLockedAppAsAdmin} className="mt-2 w-full rounded-xl border border-amber-500/35 bg-black/35 py-2 text-sm font-bold text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.08)] active:scale-[0.98]">Direkt in die App</button>
           </div>
         ) : null}
       </div>
