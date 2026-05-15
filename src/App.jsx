@@ -1761,6 +1761,278 @@ function LordOfTheHolesApp() {
     if (value === "admin") setView("admin");
   }
 
+  function clearLocalDeviceCacheAfterFullReset(fullResetAt = "") {
+    try {
+      const markerKey = "lordOfTheHoles.fullResetSeenAt";
+      const preserveMarker = String(fullResetAt || new Date().toISOString());
+
+      Object.keys(window.localStorage || {}).forEach((key) => {
+        if (key.startsWith("lordOfTheHoles")) window.localStorage.removeItem(key);
+      });
+
+      window.localStorage.setItem(markerKey, JSON.stringify(preserveMarker));
+
+      if (window.sessionStorage) {
+        Object.keys(window.sessionStorage).forEach((key) => {
+          if (key.startsWith("lordOfTheHoles")) window.sessionStorage.removeItem(key);
+        });
+      }
+    } catch (err) {
+      console.warn("Lokaler Cache konnte nicht vollständig gelöscht werden:", err);
+    }
+
+    setPendingScores([]);
+    pendingScoresRef.current = [];
+
+    setDirtyScoreKeys({});
+    dirtyScoreKeysRef.current = {};
+    syncingScoreKeysRef.current = {};
+    writeLocalJson("lordOfTheHoles.dirtyScoreKeys", {});
+
+    setScores([]);
+    setAllScores([]);
+    scoresRef.current = [];
+    allScoresRef.current = [];
+
+    setMyPlayerId("");
+    setScoredPlayerId("");
+    setScoredPlayerByRound({});
+    setScoreEntryMode("player");
+    setActiveHole(1);
+
+    setWinnerPopupDismissedKey("");
+    setRoundHonorDismissedKeys([]);
+    setRoundSummaryDismissedKeys([]);
+    setScorecardRoundId("");
+    setRoundTableRoundId("");
+
+    setFlightDraw(null);
+    setFlightRevealRunning(false);
+    setFlightSummaryOpen(false);
+    setFlightDrawCeremonyCompleted(false);
+    setFlightAutoRevealStarted(false);
+    setFlightRevealRoundIndex(0);
+    setFlightRevealCount(0);
+    setFlightRevealIntroStep(0);
+    setFlightRevealOutroStep(0);
+    setExpandedFlightKeys({});
+  }
+
+  function applyFullResetFromServer(fullResetAt) {
+    if (!fullResetAt) return;
+
+    const markerKey = "lordOfTheHoles.fullResetSeenAt";
+    const seenAt = readLocalJson(markerKey, "");
+
+    if (String(seenAt || "") === String(fullResetAt || "")) return;
+
+    clearLocalDeviceCacheAfterFullReset(fullResetAt);
+  }
+
+  async function enterLockedAppAsAdmin() {
+    if (lockPasswordInput !== ADMIN_PASSWORD) {
+      setError("Passwort ist falsch.");
+      return;
+    }
+
+    if (splashEntering || flightDrawSaving) return;
+
+    const storedDraw = flightDraw || readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null);
+
+    if (!storedDraw?.rounds?.length) {
+      setError("Keine gespeicherte Flight-Ziehung gefunden. Bitte zuerst im Admin-Bereich „Flights neu bestimmen“ ausführen.");
+      loadData({ silent: true });
+      return;
+    }
+
+    setIsAdminUnlocked(true);
+    setLockAdminBypass(false);
+    setShowSplash(true);
+    setLockUnlockOpen(false);
+    setLockPasswordInput("");
+
+    setFlightDraw(storedDraw);
+    setFlightRevealRoundIndex(0);
+    setFlightRevealCount(0);
+    setFlightRevealIntroStep(0);
+    setFlightRevealOutroStep(0);
+    setExpandedFlightKeys({});
+    setFlightDrawCeremonyCompleted(false);
+    setFlightSummaryOpen(false);
+    setFlightRevealRunning(true);
+    setError("");
+
+    loadData({ silent: true });
+  }
+
+  async function enterAppWithoutFlightDraw() {
+    if (lockPasswordInput !== ADMIN_PASSWORD && !isAdminUnlocked) {
+      setError("Passwort ist falsch.");
+      return;
+    }
+
+    if (splashEntering || flightDrawSaving) return;
+
+    setSplashEntering(true);
+    await loadData({ silent: true });
+    setSplashEntering(false);
+
+    setIsAdminUnlocked(true);
+    setLockAdminBypass(true);
+    setShowSplash(false);
+    setLockUnlockOpen(false);
+    setLockPasswordInput("");
+    setFlightRevealRunning(false);
+    setError("");
+  }
+
+  async function openFlightDrawPergaments({
+    automatic = false,
+    forceLocalTest = false,
+    replaceExisting = false,
+    saveTestToSheet = false,
+    startReveal = true,
+    allowBeforeTarget = false,
+  } = {}) {
+    if (!automatic && !isAdminUnlocked) {
+      setError("Nur der Zeremonienmeister kann die Pergamente öffnen.");
+      return;
+    }
+
+    if (!flightDrawAvailable && !automatic && !forceLocalTest && !allowBeforeTarget) {
+      setError("Die Pergamente sind noch versiegelt.");
+      return;
+    }
+
+    if (flightDraw && !replaceExisting) {
+      setFlightRevealRoundIndex(0);
+      setFlightRevealCount(0);
+      setFlightRevealIntroStep(0);
+      setFlightRevealOutroStep(0);
+      setExpandedFlightKeys({});
+      setFlightRevealRunning(true);
+      return;
+    }
+
+    const draw = buildFlightDraw(allPlayers, rounds);
+    setFlightDrawSaving(true);
+    setError("");
+
+    try {
+      const saveResult = await Promise.race([
+        callSheetApi({ action: "saveFlightDraw", draw, test: Boolean(forceLocalTest || saveTestToSheet) }),
+        new Promise((_, reject) => window.setTimeout(() => reject(new Error("saveFlightDraw hat zu lange gedauert. Bitte Apps Script Deployment und Berechtigungen prüfen.")), 15000)),
+      ]);
+
+      const savedDraw = saveResult?.flight_draw || saveResult?.flightDraw || draw;
+
+      if (replaceExisting) {
+        window.localStorage.removeItem(FLIGHT_DRAW_STORAGE_KEY);
+      }
+
+      setFlightDraw(savedDraw);
+      writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, savedDraw);
+      setConnectionStatus("online");
+      setSetupSavedMessage(forceLocalTest || saveTestToSheet ? "Die Test-Ziehung der Pergamente wurde im Sheet gespeichert." : "Die Flight-Ziehung wurde neu bestimmt und im Sheet gespeichert.");
+
+      setFlightRevealRoundIndex(0);
+      setFlightRevealCount(0);
+      setFlightRevealIntroStep(0);
+      setFlightRevealOutroStep(0);
+      setExpandedFlightKeys({});
+      setFlightDrawCeremonyCompleted(false);
+      setFlightAutoRevealStarted(false);
+      setFlightSummaryOpen(false);
+      setFlightRevealRunning(Boolean(startReveal));
+
+      await loadData({ silent: true });
+    } catch (err) {
+      setConnectionStatus("offline");
+      setFlightRevealRunning(false);
+      setError(`${err.message || "saveFlightDraw konnte nicht gespeichert werden."} Die Zeremonie startet erst, wenn die Ziehung erfolgreich im Sheet gespeichert wurde.`);
+    } finally {
+      setFlightDrawSaving(false);
+    }
+  }
+
+  async function resetFlightDrawAfterFullReset() {
+    window.localStorage.removeItem(FLIGHT_DRAW_STORAGE_KEY);
+    setFlightDraw(null);
+    setFlightRevealRunning(false);
+    setFlightAutoRevealStarted(false);
+    setFlightDrawCeremonyCompleted(false);
+    setFlightSummaryOpen(false);
+    setFlightRevealRoundIndex(0);
+    setFlightRevealCount(0);
+    setFlightRevealIntroStep(0);
+    setFlightRevealOutroStep(0);
+    setExpandedFlightKeys({});
+
+    try {
+      await callSheetApi({ action: "clearFlightDraw" });
+    } catch (err) {
+      console.warn("clearFlightDraw fehlt vermutlich noch im Apps Script:", err);
+    }
+  }
+
+  async function redrawFlightsFromAdmin() {
+    await openFlightDrawPergaments({
+      automatic: false,
+      allowBeforeTarget: true,
+      replaceExisting: true,
+      saveTestToSheet: false,
+      startReveal: false,
+    });
+  }
+
+  async function startRoundWithFullResetAndFlightDraw() {
+    if (!isAdminUnlocked || flightDrawSaving) return;
+
+    setSetupSavedMessage("");
+    setError("");
+    setFlightDrawSaving(true);
+
+    try {
+      const resetResult = await callSheetApi({ action: "clearResetMarkersAndFullReset" });
+      const resetAt = String(resetResult?.full_reset_at || resetResult?.fullResetAt || new Date().toISOString());
+
+      clearLocalDeviceCacheAfterFullReset(resetAt);
+
+      setFullResetAt(resetAt);
+      writeLocalJson("lordOfTheHoles.fullResetAt", resetAt);
+
+      if (resetResult?.backup_sheet_name) {
+        setBackupSavedMessage(`Backup erstellt: ${resetResult.backup_sheet_name}`);
+      }
+
+      const draw = buildFlightDraw(allPlayers, rounds);
+      const saveResult = await callSheetApi({ action: "saveFlightDraw", draw, test: false });
+      const savedDraw = saveResult?.flight_draw || saveResult?.flightDraw || draw;
+
+      setFlightDraw(savedDraw);
+      writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, savedDraw);
+      setFlightRevealRunning(false);
+      setFlightSummaryOpen(false);
+      setFlightDrawCeremonyCompleted(false);
+      setFlightAutoRevealStarted(false);
+      setFlightRevealRoundIndex(0);
+      setFlightRevealCount(0);
+      setFlightRevealIntroStep(0);
+      setFlightRevealOutroStep(0);
+      setExpandedFlightKeys({});
+      setConnectionStatus("online");
+      setError("");
+      setSetupSavedMessage("Runde vorbereitet: Full Reset für alle ausgeführt, alte Caches gelöscht und neue Flights im Sheet gespeichert. Runde und Kurs kannst du manuell im Admin setzen.");
+
+      await loadData({ silent: true });
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Rundenstart konnte nicht vorbereitet werden.");
+    } finally {
+      setFlightDrawSaving(false);
+    }
+  }
+
   function renderFlightDrawPanel() {
     const playerMap = new Map((allPlayers?.length ? allPlayers : fallbackPlayers).map((player) => [String(player.id), withFallbackAlias(player)]));
     if (flightDraw && flightRevealRunning && currentRevealRound) {
