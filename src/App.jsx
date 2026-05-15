@@ -48,7 +48,7 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
-const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbxZozKrwIl9_pSWpFPLgpc00NG5XcVk-vuQNIbaFaJgRkVXeSIegdz5djh3CcUgj799/exec";
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbwxiKHnBwAG_qJX1t4VTui65A7Fdn6MVSj0VAk__FXf0gtfPnRXrq-x33aAMv3K2HZR/exec";
 const ADMIN_PASSWORD = "weimar";
 const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T10:00:00+02:00");
 const FLIGHT_DRAW_TARGET = new Date("2026-05-21T20:00:00+02:00");
@@ -301,9 +301,12 @@ function areFlightDrawsEqual(a, b) {
 }
 
 function getAssignedScoredPlayerIdFromDraw(flightDraw, roundId, scorerPlayerId) {
-  const normalizedRoundId = String(roundId || "");
-  const normalizedScorerId = String(scorerPlayerId || "");
+  const normalizedRoundId = String(roundId || "").trim();
+  const normalizedScorerId = String(scorerPlayerId || "").trim();
   if (!flightDraw || !normalizedRoundId || !normalizedScorerId) return "";
+
+  const normalizeId = (value) => String(value || "").trim().toLowerCase();
+  const scorerKey = normalizeId(normalizedScorerId);
 
   const getAssignmentScorerId = (assignment) => String(
     assignment?.scorer_player_id ||
@@ -322,25 +325,34 @@ function getAssignedScoredPlayerIdFromDraw(flightDraw, roundId, scorerPlayerId) 
     ""
   ).trim();
 
-  // Normales React-Objekt aus Apps Script/localStorage: flightDraw.rounds[].flights[].scorers[]
+  const rowSources = [];
+  if (Array.isArray(flightDraw)) rowSources.push(flightDraw);
+  if (Array.isArray(flightDraw?.rows)) rowSources.push(flightDraw.rows);
+  if (Array.isArray(flightDraw?.flight_draw_rows)) rowSources.push(flightDraw.flight_draw_rows);
+  if (Array.isArray(flightDraw?.flightDrawRows)) rowSources.push(flightDraw.flightDrawRows);
+  if (Array.isArray(flightDraw?.scorerAssignments)) rowSources.push(flightDraw.scorerAssignments);
+  if (Array.isArray(flightDraw?.scorer_assignments)) rowSources.push(flightDraw.scorer_assignments);
+
+  for (const rows of rowSources) {
+    const row = rows.find((item) =>
+      String(item.round_id || item.roundId || "").trim() === normalizedRoundId &&
+      normalizeId(getAssignmentScorerId(item)) === scorerKey
+    );
+    const scoredPlayerId = getAssignmentScoredPlayerId(row);
+    if (scoredPlayerId) return scoredPlayerId;
+  }
+
   if (flightDraw?.rounds?.length) {
-    const roundPlan = flightDraw.rounds.find((round) => String(round.round_id || round.roundId || "") === normalizedRoundId);
+    const roundPlan = flightDraw.rounds.find((round) => String(round.round_id || round.roundId || "").trim() === normalizedRoundId);
     if (!roundPlan?.flights?.length) return "";
     for (const flight of roundPlan.flights) {
-      const assignment = (flight.scorers || flight.assignments || []).find((item) => getAssignmentScorerId(item) === normalizedScorerId);
+      const assignment = (flight.scorers || flight.assignments || []).find((item) => normalizeId(getAssignmentScorerId(item)) === scorerKey);
       const scoredPlayerId = getAssignmentScoredPlayerId(assignment);
       if (scoredPlayerId) return scoredPlayerId;
     }
-    return "";
   }
 
-  // Fallback, falls irgendwann direkt tabellarische FlightDraw-/ScorerAssignment-Zeilen im Client landen.
-  const rows = Array.isArray(flightDraw) ? flightDraw : flightDraw.rows || flightDraw.flight_draw_rows || flightDraw.scorerAssignments || flightDraw.scorer_assignments || [];
-  const row = rows.find((item) =>
-    String(item.round_id || item.roundId || "") === normalizedRoundId &&
-    getAssignmentScorerId(item) === normalizedScorerId
-  );
-  return getAssignmentScoredPlayerId(row);
+  return "";
 }
 
 function getPlayerFlightFromDraw(flightDraw, roundId, playerId) {
@@ -1327,17 +1339,12 @@ function LordOfTheHolesApp() {
       }
       const serverFlightDraw = data.flight_draw || data.flightDraw || null;
       const serverSentFlightDraw = Object.prototype.hasOwnProperty.call(data, "flight_draw") || Object.prototype.hasOwnProperty.call(data, "flightDraw");
-      const localStoredFlightDraw = readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null);
-      if (serverFlightDraw?.rounds?.length) {
-        const currentDraw = flightDraw || localStoredFlightDraw;
-        if (!areFlightDrawsEqual(currentDraw, serverFlightDraw)) {
-          setFlightDraw(serverFlightDraw);
-          writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, serverFlightDraw);
-        } else if (!flightDraw) {
-          setFlightDraw(localStoredFlightDraw || serverFlightDraw);
-        }
-      } else if (serverSentFlightDraw && localStoredFlightDraw) {
-        setFlightDraw(localStoredFlightDraw);
+      if (serverFlightDraw && (serverFlightDraw.rounds?.length || serverFlightDraw.rows?.length || serverFlightDraw.flight_draw_rows?.length || serverFlightDraw.flightDrawRows?.length || Array.isArray(serverFlightDraw))) {
+        setFlightDraw(serverFlightDraw);
+        writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, serverFlightDraw);
+      } else if (serverSentFlightDraw) {
+        setFlightDraw(null);
+        window.localStorage.removeItem(FLIGHT_DRAW_STORAGE_KEY);
       }
 
       const nextAllPlayers = (data.players?.length ? data.players : fallbackPlayers).map(withFallbackAlias);
