@@ -1049,6 +1049,7 @@ function LordOfTheHolesApp() {
   const [roundTableRoundId, setRoundTableRoundId] = useState(() => readLocalJson("lordOfTheHoles.roundTableRoundId", ""));
   const [roundSummaryDismissedKeys, setRoundSummaryDismissedKeys] = useState(() => readLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", []));
   const [flightDraw, setFlightDraw] = useState(() => readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null));
+  const [flightRevealRunning, setFlightRevealRunning] = useState(false);
   const [flightDrawSaving, setFlightDrawSaving] = useState(false);
   const [localHandicaps, setLocalHandicaps] = useState({});
   const introAudioRef = useRef(null);
