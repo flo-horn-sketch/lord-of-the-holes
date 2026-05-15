@@ -1096,8 +1096,9 @@ function LordOfTheHolesApp() {
   const displayCourseId = displayedActiveRound?.course_id || selectedCourseId || "goethe";
   const activeCourse = (courses.length ? courses : fallbackCourses).find((course) => String(course.course_id) === String(displayCourseId));
   const visiblePlayers = useMemo(() => getRoundPlayers(displayedActiveRound?.round_id, allPlayers, roundPlayers), [displayedActiveRound?.round_id, allPlayers, roundPlayers]);
-  const assignedScoredPlayerId = useMemo(() => getAssignedScoredPlayerIdFromDraw(flightDraw, displayedActiveRound?.round_id || "", myPlayerId), [flightDraw, displayedActiveRound?.round_id, myPlayerId]);
-  const myFlightFromDraw = useMemo(() => getPlayerFlightFromDraw(flightDraw, displayedActiveRound?.round_id || "", myPlayerId), [flightDraw, displayedActiveRound?.round_id, myPlayerId]);
+  const effectiveFlightDraw = flightDraw || readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null);
+  const assignedScoredPlayerId = useMemo(() => getAssignedScoredPlayerIdFromDraw(effectiveFlightDraw, displayedActiveRound?.round_id || "", myPlayerId), [effectiveFlightDraw, displayedActiveRound?.round_id, myPlayerId]);
+  const myFlightFromDraw = useMemo(() => getPlayerFlightFromDraw(effectiveFlightDraw, displayedActiveRound?.round_id || "", myPlayerId), [effectiveFlightDraw, displayedActiveRound?.round_id, myPlayerId]);
   const scoreablePlayers = useMemo(() => {
     const filteredPlayers = myPlayerId ? visiblePlayers.filter((p) => String(p.id) !== String(myPlayerId)) : visiblePlayers;
     return filteredPlayers.length ? filteredPlayers : visiblePlayers;
@@ -1329,6 +1330,24 @@ function LordOfTheHolesApp() {
     if (Number(activeHole) < 1 || Number(activeHole) > 18) setActiveHole(1);
   }, [myPlayerId, scoreEntryMode, activeHole]);
   useEffect(() => {
+    const storedDraw = readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null);
+    if (!flightDraw?.rounds?.length && (storedDraw?.rounds?.length || storedDraw?.rows?.length || storedDraw?.flight_draw_rows?.length || storedDraw?.flightDrawRows?.length || Array.isArray(storedDraw))) {
+      setFlightDraw(storedDraw);
+    }
+  }, [flightDraw]);
+  useEffect(() => {
+    const roundId = String(displayedActiveRound?.round_id || "");
+    if (!roundId || !myPlayerId || !["r1", "r2", "r3"].includes(roundId)) return;
+    const draw = effectiveFlightDraw || readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null);
+    const nextAssignedPlayerId = getAssignedScoredPlayerIdFromDraw(draw, roundId, myPlayerId);
+    if (!nextAssignedPlayerId) return;
+    if (String(scoredPlayerId || "") !== String(nextAssignedPlayerId)) {
+      setScoredPlayerId(nextAssignedPlayerId);
+      saveLocalScoredPlayerForRound(roundId, nextAssignedPlayerId);
+      setScoreEntryMode("player");
+    }
+  }, [displayedActiveRound?.round_id, myPlayerId, effectiveFlightDraw, scoredPlayerId]);
+  useEffect(() => {
     const roundId = String(displayedActiveRound?.round_id || "");
     if (!roundId || !myPlayerId || showSplash || (appLocked && !lockAdminBypass)) return;
 
@@ -1416,7 +1435,9 @@ function LordOfTheHolesApp() {
       }
       const serverFlightDraw = data.flight_draw || data.flightDraw || null;
       const serverSentFlightDraw = Object.prototype.hasOwnProperty.call(data, "flight_draw") || Object.prototype.hasOwnProperty.call(data, "flightDraw");
-      if (serverFlightDraw && (serverFlightDraw.rounds?.length || serverFlightDraw.rows?.length || serverFlightDraw.flight_draw_rows?.length || serverFlightDraw.flightDrawRows?.length || Array.isArray(serverFlightDraw))) {
+      const serverFlightDrawIsValid = Boolean(serverFlightDraw && (serverFlightDraw.rounds?.length || serverFlightDraw.rows?.length || serverFlightDraw.flight_draw_rows?.length || serverFlightDraw.flightDrawRows?.length || Array.isArray(serverFlightDraw)));
+      const nextLoadedFlightDraw = serverFlightDrawIsValid ? serverFlightDraw : flightDraw || readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null);
+      if (serverFlightDrawIsValid) {
         setFlightDraw(serverFlightDraw);
         writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, serverFlightDraw);
       } else if (serverSentFlightDraw) {
@@ -1442,7 +1463,16 @@ function LordOfTheHolesApp() {
       setSelectedCourseId(nextActiveRound?.course_id || "");
       setSelectedActiveRoundId(nextRoundId);
       if (String(previousRoundId || "") !== String(nextRoundId || "") || roundChanged) {
-        setScoredPlayerId("");
+        const nextAssignedPlayerId = ["r1", "r2", "r3"].includes(String(nextRoundId))
+          ? getAssignedScoredPlayerIdFromDraw(nextLoadedFlightDraw, nextRoundId, myPlayerId || readLocalJson("lordOfTheHoles.myPlayerId", ""))
+          : "";
+        if (nextAssignedPlayerId) {
+          setScoredPlayerId(nextAssignedPlayerId);
+          saveLocalScoredPlayerForRound(nextRoundId, nextAssignedPlayerId);
+        } else {
+          setScoredPlayerId("");
+          removeLocalScoredPlayerForRound(nextRoundId);
+        }
         setScoreEntryMode("player");
         lastLoadedRoundRef.current = "";
       }
