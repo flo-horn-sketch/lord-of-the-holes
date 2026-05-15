@@ -1202,7 +1202,8 @@ function LordOfTheHolesApp() {
   const showFinalWinnerPopup = Boolean(finalWinnerCelebration && finalWinnerPopupKey !== winnerPopupDismissedKey);
   const showRoundHonorPopup = Boolean(displayedRoundHonorCelebration && !showFinalWinnerPopup && !roundSummaryPopup);
   const identityFlowActive = !showSplash && (!appLocked || lockAdminBypass);
-  const showDevicePlayerGate = Boolean(identityFlowActive && (!myPlayerId || forceMyPlayerPromptOpen));
+  const myPlayerIsKnown = Boolean(myPlayerId && ([...(visiblePlayers || []), ...(allPlayers || [])].some((player) => String(player.id) === String(myPlayerId))));
+  const showDevicePlayerGate = Boolean(identityFlowActive && (!myPlayerIsKnown || forceMyPlayerPromptOpen));
   const lockCountdown = useMemo(() => {
     const diffMs = Math.max(0, LOCK_COUNTDOWN_TARGET.getTime() - lockCountdownNow.getTime());
     const totalSeconds = Math.floor(diffMs / 1000);
@@ -1772,7 +1773,10 @@ function LordOfTheHolesApp() {
     const data = await loadData({ silent: true });
     setSplashEntering(false);
     if (!data) return;
-    if (!myPlayerId && !readLocalJson("lordOfTheHoles.myPlayerId", "")) setForceMyPlayerPromptOpen(true);
+    const storedMyPlayerId = readLocalJson("lordOfTheHoles.myPlayerId", "");
+    const knownPlayersAfterLoad = [...((data.activePlayers?.length ? data.activePlayers : data.players) || []), ...(allPlayers || [])];
+    const hasKnownDeviceOwner = Boolean((myPlayerId || storedMyPlayerId) && knownPlayersAfterLoad.some((player) => String(player.id) === String(myPlayerId || storedMyPlayerId)));
+    if (!hasKnownDeviceOwner) setForceMyPlayerPromptOpen(true);
     setLockAdminBypass(true);
     setIsAdminUnlocked(true);
     setMainMenu("current");
@@ -2355,7 +2359,6 @@ function LordOfTheHolesApp() {
               <AnimatePresence mode="wait">
                 <motion.div key={`${step.type}-${flightCeremonyStepIndex}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 1.15, ease: "easeInOut" }}>
                   <div className="mt-4 text-lg font-semibold leading-relaxed text-amber-50">{step.text}</div>
-                  <div className="mt-5 text-xs uppercase tracking-[0.2em] text-amber-100/55">{step.waitLabel}</div>
                 </motion.div>
               </AnimatePresence>
             </div>
