@@ -233,6 +233,8 @@ async function resetFlightDrawAfterFullReset() {
   }
 
   function renderFlightDrawPanel() {
+
+  function renderFlightDrawPanel() {
     const playerMap = new Map((allPlayers?.length ? allPlayers : fallbackPlayers).map((player) => [String(player.id), withFallbackAlias(player)]));
     if (flightDraw && flightRevealRunning && currentRevealRound) {
       const introDone = flightRevealIntroStep >= currentIntroLines.length;
