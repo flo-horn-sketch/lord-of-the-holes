@@ -305,19 +305,42 @@ function getAssignedScoredPlayerIdFromDraw(flightDraw, roundId, scorerPlayerId) 
   const normalizedScorerId = String(scorerPlayerId || "");
   if (!flightDraw || !normalizedRoundId || !normalizedScorerId) return "";
 
+  const getAssignmentScorerId = (assignment) => String(
+    assignment?.scorer_player_id ||
+    assignment?.scorerPlayerId ||
+    assignment?.scorer_id ||
+    assignment?.scorerId ||
+    ""
+  ).trim();
+
+  const getAssignmentScoredPlayerId = (assignment) => String(
+    assignment?.player_id ||
+    assignment?.scored_player_id ||
+    assignment?.scoredPlayerId ||
+    assignment?.assigned_player_id ||
+    assignment?.assignedPlayerId ||
+    ""
+  ).trim();
+
+  // Normales React-Objekt aus Apps Script/localStorage: flightDraw.rounds[].flights[].scorers[]
   if (flightDraw?.rounds?.length) {
-    const roundPlan = flightDraw.rounds.find((round) => String(round.round_id) === normalizedRoundId);
+    const roundPlan = flightDraw.rounds.find((round) => String(round.round_id || round.roundId || "") === normalizedRoundId);
     if (!roundPlan?.flights?.length) return "";
     for (const flight of roundPlan.flights) {
-      const assignment = (flight.scorers || []).find((item) => String(item.scorer_player_id) === normalizedScorerId);
-      if (assignment?.player_id) return String(assignment.player_id);
+      const assignment = (flight.scorers || flight.assignments || []).find((item) => getAssignmentScorerId(item) === normalizedScorerId);
+      const scoredPlayerId = getAssignmentScoredPlayerId(assignment);
+      if (scoredPlayerId) return scoredPlayerId;
     }
     return "";
   }
 
-  const rows = Array.isArray(flightDraw) ? flightDraw : flightDraw.rows || flightDraw.flight_draw_rows || [];
-  const row = rows.find((item) => String(item.round_id) === normalizedRoundId && String(item.scorer_player_id) === normalizedScorerId);
-  return row?.player_id ? String(row.player_id) : "";
+  // Fallback, falls irgendwann direkt tabellarische FlightDraw-/ScorerAssignment-Zeilen im Client landen.
+  const rows = Array.isArray(flightDraw) ? flightDraw : flightDraw.rows || flightDraw.flight_draw_rows || flightDraw.scorerAssignments || flightDraw.scorer_assignments || [];
+  const row = rows.find((item) =>
+    String(item.round_id || item.roundId || "") === normalizedRoundId &&
+    getAssignmentScorerId(item) === normalizedScorerId
+  );
+  return getAssignmentScoredPlayerId(row);
 }
 
 function getPlayerFlightFromDraw(flightDraw, roundId, playerId) {
@@ -1931,9 +1954,10 @@ function LordOfTheHolesApp() {
                             <div className="grid gap-1.5">
                               {(flight.scorers || []).map((assignment) => {
                                 const scorer = withFallbackAlias(playerMap.get(String(assignment.scorer_player_id)) || { id: assignment.scorer_player_id });
-                                const scored = withFallbackAlias(playerMap.get(String(assignment.player_id)) || { id: assignment.player_id });
+                                const scoredPlayerId = assignment.player_id || assignment.scored_player_id || assignment.scoredPlayerId;
+                                const scored = withFallbackAlias(playerMap.get(String(scoredPlayerId)) || { id: scoredPlayerId });
                                 return (
-                                  <div key={`${assignment.scorer_player_id}-${assignment.player_id}`} className="rounded-lg bg-black/25 px-2 py-1.5 text-xs text-sky-50/90">
+                                  <div key={`${assignment.scorer_player_id || assignment.scorerPlayerId}-${assignment.player_id || assignment.scored_player_id || assignment.scoredPlayerId}`} className="rounded-lg bg-black/25 px-2 py-1.5 text-xs text-sky-50/90">
                                     <b className="text-sky-100">{getPlayerLabel(scorer)}</b> zählt <b className="text-amber-100">{getPlayerLabel(scored)}</b>
                                   </div>
                                 );
