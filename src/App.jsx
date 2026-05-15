@@ -2406,7 +2406,7 @@ function LordOfTheHolesApp() {
       applyLocalCacheClear(resetAt, "Kompletter Reset wurde für alle Geräte ausgelöst. Flight-Ziehung wird neu bestimmt ...");
 
       const freshDraw = buildFlightDraw(allPlayers, rounds);
-      const drawResult = $1
+      const drawResult = await callSheetApi({ action: "saveFlightDraw", draw: nextFlightDraw, flight_draw: nextFlightDraw, flightDraw: nextFlightDraw });
       try {
         await savePersistentTeamDraw(callSheetApi, playersWithCurrentHandicaps);
       } catch (teamDrawError) {
