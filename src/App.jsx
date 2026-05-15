@@ -1936,6 +1936,13 @@ function LordOfTheHolesApp() {
   }
 
   function applyLocalCacheClear(resetAt = "", message = "Lokaler Cache auf diesem Gerät wurde gelöscht.") {
+    clearLocalScoreStorage();
+    setScores([]);
+    setAllScores([]);
+    setPendingScores([]);
+    pendingScoresRef.current = [];
+    setLocalScoreDrafts([]);
+    localScoreDraftsRef.current = [];
     try {
       Object.keys(window.localStorage || {}).forEach((key) => {
         if (String(key).startsWith("lordOfTheHoles.")) window.localStorage.removeItem(key);
@@ -1950,6 +1957,7 @@ function LordOfTheHolesApp() {
     localScoreDraftsRef.current = [];
     setScores([]);
     setAllScores([]);
+    clearLocalScoreStorage();
     setWinnerPopupDismissedKey("");
     setRoundHonorDismissedKeys([]);
     setRoundSummaryDismissedKeys([]);
