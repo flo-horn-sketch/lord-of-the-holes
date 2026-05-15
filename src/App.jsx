@@ -1752,6 +1752,133 @@ function LordOfTheHolesApp() {
     if (value === "admin") setView("admin");
   }
 
+  function renderFlightDrawPanel() {
+    const playerMap = new Map((allPlayers?.length ? allPlayers : fallbackPlayers).map((player) => [String(player.id), withFallbackAlias(player)]));
+    if (flightDraw && flightRevealRunning && currentRevealRound) {
+      const introDone = flightRevealIntroStep >= currentIntroLines.length;
+      const roundPlayersDone = introDone && flightRevealCount > currentRevealPlayers.length;
+      const finalOutroRunning = roundPlayersDone && flightRevealRoundIndex >= flightDraw.rounds.length - 1 && flightRevealOutroStep < flightRevealOutroLines.length;
+      const visiblePlayers = currentRevealPlayers.slice(0, Math.min(flightRevealCount, currentRevealPlayers.length));
+      return (
+        <div className="flex min-h-[78vh] flex-col justify-center rounded-3xl border border-amber-300/55 bg-black/75 p-4 text-center text-amber-50 shadow-2xl shadow-black/80 backdrop-blur-sm">
+          <style>{`@keyframes lotrSoftReveal { 0% { opacity: 0; transform: translateY(10px) scale(.985); filter: blur(3px); } 18% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } 78% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } 100% { opacity: .18; transform: translateY(-5px) scale(.995); filter: blur(2px); } } @keyframes lotrPlayerReveal { 0% { opacity: 0; transform: translateY(12px) scale(.96); filter: blur(4px); } 26% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } 100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } } .lotr-soft-reveal { animation: lotrSoftReveal 5.3s ease-in-out both; } .lotr-player-reveal { animation: lotrPlayerReveal 1.6s ease-out both; }`}</style>
+          <div className="text-[10px] uppercase tracking-[0.32em] text-amber-300/75">Der Rat von Bruchtal</div>
+          {!introDone || finalOutroRunning ? (
+            <div className="mx-auto mt-5 max-w-sm">
+              <div className="font-serif text-2xl font-black leading-tight text-amber-200">{finalOutroRunning ? "Der Rat hat gesprochen" : "Flight-Ziehung der Pergamente"}</div>
+              <div key={finalOutroRunning ? `outro-${flightRevealOutroStep}` : `intro-${flightRevealRoundIndex}-${flightRevealIntroStep}`} className="lotr-soft-reveal mt-6 rounded-3xl border border-amber-500/30 bg-stone-950/60 p-5 font-serif text-xl font-bold leading-snug text-amber-50 shadow-lg shadow-black/40">
+                {finalOutroRunning ? currentOutroLine : currentRevealLine}
+              </div>
+              <div className="mt-5 text-xs uppercase tracking-[0.22em] text-amber-100/45">{finalOutroRunning ? "Die Chronik wird geschlossen ..." : "Die Gemeinschaft wartet ..."}</div>
+            </div>
+          ) : (
+            <>
+              <div className="mt-2 font-serif text-2xl font-black leading-tight text-amber-200">{currentRevealRound.round_name}</div>
+              <div className="mt-5 grid gap-3 text-left">
+                {currentRevealRound.flights.map((flight) => {
+                  const flightVisiblePlayers = visiblePlayers.filter((entry) => entry.flight_number === flight.flight_number);
+                  return (
+                    <div key={`${currentRevealRound.round_id}-${flight.flight_number}`} className="rounded-3xl border border-amber-500/30 bg-stone-950/60 p-3 shadow-lg shadow-black/35">
+                      <div className="text-center font-serif text-lg font-black text-amber-200">Flight {flight.flight_number}</div>
+                      <div className="mt-3 grid gap-2">
+                        {flightVisiblePlayers.length ? flightVisiblePlayers.map((entry) => {
+                          const player = playerMap.get(String(entry.player_id));
+                          const normalized = withFallbackAlias(player || { id: entry.player_id });
+                          return (
+                            <div key={`${entry.flight_number}-${entry.player_id}`} className="lotr-player-reveal rounded-2xl border border-amber-400/30 bg-amber-500/15 px-3 py-3 text-center shadow-md shadow-black/30">
+                              <div className="font-serif text-3xl font-black leading-none text-amber-100">{normalized.alias_name || normalized.character_name || entry.player_id}</div>
+                              <div className="mt-1 text-xs uppercase tracking-[0.18em] text-amber-100/55">{normalized.character_name || normalized.display_name || entry.player_id}</div>
+                            </div>
+                          );
+                        }) : <div className="rounded-2xl border border-dashed border-amber-500/25 px-3 py-4 text-center text-sm text-amber-100/45">Das Pergament bleibt noch verschlossen ...</div>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-5 text-xs uppercase tracking-[0.22em] text-amber-100/55">Kapitel {flightRevealRoundIndex + 1} von {flightDraw.rounds.length}</div>
+            </>
+          )}
+        </div>
+      );
+    }
+    return (
+      <div className="rounded-3xl border border-amber-400/45 bg-black/62 p-2.5 text-left text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm">
+        <div className="text-center">
+          <div className="text-[10px] uppercase tracking-[0.28em] text-amber-300/80">Der Rat von Bruchtal</div>
+          <div className="mt-1 font-serif text-xl font-black text-amber-200">Flight-Ziehung der Pergamente</div>
+          <div className="mt-1.5 rounded-2xl border border-amber-400/35 bg-amber-500/10 p-2 text-center">
+            <div className="text-[10px] uppercase tracking-[0.24em] text-amber-300/80">Flight-Ziehung</div>
+            <div className="mt-1 font-serif text-xl font-black leading-none text-amber-200">21.05.26</div>
+            <div className="mt-0.5 font-serif text-lg font-black leading-none text-amber-100">20:00 Uhr</div>
+          </div>
+          <div className="mt-1.5 rounded-2xl border border-amber-400/30 bg-black/35 p-1.5 text-center">
+            <div className="font-serif text-lg font-black text-amber-100">Hier live</div>
+          </div>
+          <p className="mt-1.5 text-[11px] leading-snug text-amber-100/75">Bitte öffnet die App 1–2 Minuten vorher, damit die Pergamente rechtzeitig geladen sind.</p>
+        </div>
+        {!flightDraw ? (
+          <div className="mt-2 rounded-2xl border border-amber-500/25 bg-black/35 p-2 text-center">
+            {!flightDrawAvailable ? (
+              <>
+                <div className="font-serif text-base font-bold text-amber-200">Die Pergamente sind noch versiegelt.</div>
+                <div className="mt-1 text-xs text-amber-100/65">Die Pforten sind noch verschlossen. Gandalf selbst würde jetzt sagen: „Du kommst hier noch nicht rein.“</div>
+                <div className="mt-1.5 grid grid-cols-4 gap-1 rounded-2xl border border-amber-500/20 bg-black/30 p-1.5 text-center">
+                  <div><div className="font-serif text-base font-black text-amber-200">{flightDrawCountdown.days}</div><div className="text-[8px] uppercase tracking-[0.14em] text-amber-100/55">Tage</div></div>
+                  <div><div className="font-serif text-base font-black text-amber-200">{String(flightDrawCountdown.hours).padStart(2, "0")}</div><div className="text-[8px] uppercase tracking-[0.14em] text-amber-100/55">Std</div></div>
+                  <div><div className="font-serif text-base font-black text-amber-200">{String(flightDrawCountdown.minutes).padStart(2, "0")}</div><div className="text-[8px] uppercase tracking-[0.14em] text-amber-100/55">Min</div></div>
+                  <div><div className="font-serif text-base font-black text-amber-200">{String(flightDrawCountdown.seconds).padStart(2, "0")}</div><div className="text-[8px] uppercase tracking-[0.14em] text-amber-100/55">Sek</div></div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="font-serif text-base font-bold text-amber-200">{flightDrawSaving ? "Die Pergamente öffnen sich ..." : "Die Pergamente öffnen sich von selbst."}</div>
+                {isAdminUnlocked ? (
+                  <button type="button" disabled={flightDrawSaving} onClick={enterLockedAppAsAdmin} className="mt-3 w-full rounded-2xl border border-amber-300/50 bg-amber-600 px-4 py-2.5 font-serif text-base font-black text-amber-50 shadow-lg shadow-black/40 disabled:opacity-60">
+                    Zeremonie testen
+                  </button>
+                ) : null}
+              </>
+            )}
+          </div>
+        ) : !flightDrawCeremonyCompleted ? null : (
+          <div className="mt-3">
+            <button type="button" onClick={() => setFlightSummaryOpen((open) => !open)} className="flex w-full items-center justify-between rounded-2xl border border-amber-500/30 bg-stone-950/75 px-4 py-3 font-serif text-lg font-black text-amber-200 shadow-lg shadow-black/35">
+              <span>Flights</span>
+              <span className="text-xs uppercase tracking-[0.18em] text-amber-100/55">{flightSummaryOpen ? "schließen" : "öffnen"}</span>
+            </button>
+            {flightSummaryOpen ? <div className="mt-3 max-h-[54vh] overflow-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {flightDraw.rounds.map((roundPlan) => (
+                <div key={roundPlan.round_id} className="mb-3 rounded-2xl border border-amber-500/25 bg-black/30 p-3 last:mb-0">
+                  <div className="font-serif text-base font-black text-amber-200">{roundPlan.round_name}</div>
+                  <div className="mt-2 grid gap-2">
+                    {roundPlan.flights.map((flight) => (
+                      <div key={`${roundPlan.round_id}-${flight.flight_number}`} className="rounded-2xl border border-amber-700/30 bg-stone-950/55 p-2">
+                        <div className="mb-2 text-center font-serif text-sm font-bold text-amber-200">Flight {flight.flight_number}</div>
+                        <div className="grid gap-1.5">
+                          {flight.players.map((playerId) => {
+                            const player = withFallbackAlias(playerMap.get(String(playerId)) || { id: playerId });
+                            return (
+                              <div key={playerId} className="rounded-xl bg-amber-500/10 px-3 py-2 text-center">
+                                <div className="font-serif text-xl font-black text-amber-100">{player.alias_name || player.character_name || playerId}</div>
+                                <div className="text-[10px] uppercase tracking-[0.16em] text-amber-100/50">{player.character_name || player.display_name || playerId}</div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-3 text-center font-serif text-sm font-bold text-amber-100">Die Flights der ersten drei Kapitel sind besiegelt. Was am Schicksalsberg geschieht, entscheidet allein die Tabelle.</div>
+            </div> : null}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   function renderHeader() {
     const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "flights" ? "Flights" : mainMenu === "admin" ? "Admin" : "Einstellungen";
     return (
@@ -2167,7 +2294,7 @@ function LordOfTheHolesApp() {
       <div className="fixed inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/lord-bg.webp')" }} />
       <div className="fixed inset-0 bg-black/45" />
       <div className="fixed inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.06),rgba(0,0,0,0.58)_38%,rgba(0,0,0,0.86)_100%)]" />
-      {((showSplash || appLocked) && !lockAdminBypass) ? <div className="fixed inset-0 z-[100] bg-black"><div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/lord-bg.webp')" }} /><div className="absolute inset-0 bg-black/25" />{!appLocked ? <div className="absolute inset-x-0 bottom-8 flex justify-center px-6 pb-[env(safe-area-inset-bottom)]"><button type="button" disabled={splashEntering} onClick={enterRoundFromSplash} className="w-full max-w-xs rounded-2xl border border-amber-300/55 bg-black/55 px-5 py-2.5 font-serif text-lg font-black tracking-wide text-amber-200 shadow-2xl shadow-black/70 backdrop-blur-sm active:scale-[0.98] disabled:opacity-60">{splashEntering ? "Datenbank wird geladen ..." : "Runde betreten"}</button></div> : <div className="absolute inset-x-4 bottom-10 mx-auto max-w-sm rounded-3xl border border-amber-500/35 bg-black/55 p-4 text-center text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm"><div className="font-serif text-xl font-black text-amber-200">Der Rat ist noch nicht einberufen.</div><div className="mt-2 text-sm text-amber-100/80">Im Weimarer Land werden Stimmen gesenkt, alte Karten entrollt und verdächtig ernste Blicke ausgetauscht. Die Gefährten werden bald gerufen.</div><div className="mt-4 grid grid-cols-4 gap-1.5 rounded-2xl border border-amber-500/25 bg-black/35 p-2 text-center"><div><div className="font-serif text-xl font-black text-amber-200">{lockCountdown.days}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Tage</div></div><div><div className="font-serif text-xl font-black text-amber-200">{String(lockCountdown.hours).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Std</div></div><div><div className="font-serif text-xl font-black text-amber-200">{String(lockCountdown.minutes).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Min</div></div><div><div className="font-serif text-xl font-black text-amber-200">{String(lockCountdown.seconds).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Sek</div></div></div></div>}{appLocked ? <button type="button" onClick={() => setLockUnlockOpen(true)} className="absolute bottom-3 left-3 h-8 w-8 rounded-full text-[10px] text-amber-100/10" aria-label="Admin-Zugang">•</button> : null}{appLocked && lockUnlockOpen ? <div className="absolute inset-x-4 bottom-8 mx-auto max-w-xs rounded-2xl border border-amber-700/35 bg-black/70 p-3 text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm"><div className="mb-2 text-xs uppercase tracking-[0.18em] text-amber-300/70">Admin</div><input type="password" value={lockPasswordInput} onChange={(e) => setLockPasswordInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") enterLockedAppAsAdmin(); }} placeholder="Passwort" className="mb-2 w-full rounded-xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" autoFocus /><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => { setLockUnlockOpen(false); setLockPasswordInput(""); }} className="rounded-xl bg-stone-800 py-2 text-sm font-bold text-amber-100">Abbrechen</button><button type="button" disabled={splashEntering} onClick={enterLockedAppAsAdmin} className="rounded-xl bg-amber-600 py-2 text-sm font-bold text-amber-50 disabled:opacity-60">{splashEntering ? "Lade ..." : "Admin rein"}</button></div></div> : null}</div> : null}
+      {((showSplash || appLocked) && !lockAdminBypass) ? <div className="fixed inset-0 z-[100] bg-black"><div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/lord-bg.webp')" }} /><div className="absolute inset-0 bg-black/25" />{!appLocked ? <div className="absolute inset-x-0 bottom-8 flex justify-center px-6 pb-[env(safe-area-inset-bottom)]"><button type="button" disabled={splashEntering} onClick={enterRoundFromSplash} className="w-full max-w-xs rounded-2xl border border-amber-300/55 bg-black/55 px-5 py-2.5 font-serif text-lg font-black tracking-wide text-amber-200 shadow-2xl shadow-black/70 backdrop-blur-sm active:scale-[0.98] disabled:opacity-60">{splashEntering ? "Datenbank wird geladen ..." : "Die Saga beginnt"}</button></div> : flightRevealRunning ? <div className="absolute inset-x-3 bottom-5 top-5 mx-auto flex max-w-md items-center justify-center pb-[env(safe-area-inset-bottom)]"><div className="w-full">{renderFlightDrawPanel()}</div></div> : <div className="absolute inset-x-4 bottom-6 mx-auto max-w-sm pb-[env(safe-area-inset-bottom)]"><div className="mb-3">{renderFlightDrawPanel()}</div><div className="rounded-3xl border border-amber-500/35 bg-black/55 p-3 text-center text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm"><div className="font-serif text-lg font-black text-amber-200">Der Rat ist noch nicht einberufen.</div><div className="mt-1.5 text-xs leading-snug text-amber-100/80">Im Weimarer Land werden Stimmen gesenkt, alte Karten entrollt und verdächtig ernste Blicke ausgetauscht. Die Gefährten werden bald gerufen.</div><div className="mt-2.5 grid grid-cols-4 gap-1 rounded-2xl border border-amber-500/25 bg-black/35 p-1.5 text-center"><div><div className="font-serif text-lg font-black text-amber-200">{lockCountdown.days}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Tage</div></div><div><div className="font-serif text-lg font-black text-amber-200">{String(lockCountdown.hours).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Std</div></div><div><div className="font-serif text-lg font-black text-amber-200">{String(lockCountdown.minutes).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Min</div></div><div><div className="font-serif text-lg font-black text-amber-200">{String(lockCountdown.seconds).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Sek</div></div></div><div className="mt-2 rounded-2xl border border-amber-500/25 bg-black/30 px-2.5 py-1.5 font-serif text-xs font-bold text-amber-100">Die Pforten sind noch verschlossen. Gandalf selbst würde jetzt sagen: „Du kommst hier noch nicht rein.“</div></div></div>}{appLocked ? <button type="button" onClick={() => setLockUnlockOpen(true)} className="absolute bottom-3 left-3 h-8 w-8 rounded-full text-[10px] text-amber-100/10" aria-label="Admin-Zugang">•</button> : null}{appLocked && lockUnlockOpen ? <div className="absolute inset-x-4 bottom-8 mx-auto max-w-xs rounded-2xl border border-amber-700/35 bg-black/70 p-3 text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm"><div className="mb-2 text-xs uppercase tracking-[0.18em] text-amber-300/70">Admin</div><input type="password" value={lockPasswordInput} onChange={(e) => setLockPasswordInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") enterLockedAppAsAdmin(); }} placeholder="Passwort" className="mb-2 w-full rounded-xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" autoFocus /><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => { setLockUnlockOpen(false); setLockPasswordInput(""); }} className="rounded-xl bg-stone-800 py-2 text-sm font-bold text-amber-100">Abbrechen</button><button type="button" disabled={splashEntering} onClick={enterLockedAppAsAdmin} className="rounded-xl bg-amber-600 py-2 text-sm font-bold text-amber-50 disabled:opacity-60">{splashEntering || flightDrawSaving ? "Öffne ..." : "Zeremonienmeister"}</button></div><button type="button" disabled={splashEntering || flightDrawSaving} onClick={enterAppWithoutFlightDraw} className="mt-2 w-full rounded-xl border border-amber-500/35 bg-stone-950/85 py-2 text-sm font-bold text-amber-100 disabled:opacity-60">Direkt in die App</button></div> : null}</div> : null}
       <main className="relative z-10 mx-auto max-w-md px-2 py-1.5">
         {renderHeader()}
         {renderStatusMessages()}
