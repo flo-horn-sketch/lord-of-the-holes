@@ -1712,26 +1712,27 @@ function LordOfTheHolesApp() {
     const validScores = (scoresToSave || []).filter(isValidScorePayload);
     if (!validScores.length) return true;
 
-    const batchSize = 50;
-    const chunks = [];
-    for (let index = 0; index < validScores.length; index += batchSize) {
-      chunks.push(validScores.slice(index, index + batchSize));
-    }
-
-    let savedCount = 0;
-
     try {
-      for (const chunk of chunks) {
-        const result = await callSheetApi({ action: "upsertScores", scores: chunk });
-        if (!result || result.ok === false) {
-          throw new Error(result?.error || "Batch wurde von der Datenbank abgelehnt.");
-        }
-        chunk.forEach((score) => {
-          removePendingScore(score);
-          removeLocalScoreDraft(score);
-        });
-        savedCount += chunk.length;
+      const result = await callSheetApi({ action: "upsertScores", scores: validScores });
+      if (!result || result.ok === false) {
+        throw new Error(result?.error || "Batch wurde von der Datenbank abgelehnt.");
       }
+
+      const savedKeys = new Set(validScores.map(getScoreIdentityKey));
+
+      setPendingScores((current) => {
+        const nextPendingScores = (current || []).filter((score) => !savedKeys.has(getScoreIdentityKey(score)));
+        pendingScoresRef.current = nextPendingScores;
+        writeLocalJson("lordOfTheHoles.pendingScores", nextPendingScores);
+        return nextPendingScores;
+      });
+
+      setLocalScoreDrafts((current) => {
+        const nextDrafts = (current || []).filter((score) => !savedKeys.has(getScoreIdentityKey(score)));
+        localScoreDraftsRef.current = nextDrafts;
+        writeLocalJson("lordOfTheHoles.localScoreDrafts", nextDrafts);
+        return nextDrafts;
+      });
 
       setConnectionStatus("online");
       setError("");
@@ -1739,7 +1740,7 @@ function LordOfTheHolesApp() {
     } catch (err) {
       const message = err?.message || "Batch-Synchronisierung fehlgeschlagen.";
       setConnectionStatus("offline");
-      setError(`Batch-Synchronisierung fehlgeschlagen nach ${savedCount}/${validScores.length} Scores: ${message}`);
+      setError(`Batch-Synchronisierung fehlgeschlagen für ${validScores.length} Scores: ${message}`);
       return false;
     }
   }
