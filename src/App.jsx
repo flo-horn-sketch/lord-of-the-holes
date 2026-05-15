@@ -1717,12 +1717,13 @@ function LordOfTheHolesApp() {
     if (value === "tournament") setView("tournament");
     if (value === "archive") setView("archive");
     if (value === "fun") setView("fun");
+    if (value === "flights") setView("flights");
     if (value === "settings") setView("handicaps");
     if (value === "admin") setView("admin");
   }
 
   function renderHeader() {
-    const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "admin" ? "Admin" : "Einstellungen";
+    const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "flights" ? "Flights" : mainMenu === "admin" ? "Admin" : "Einstellungen";
     return (
       <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-1 pt-1">
         <div className="relative flex h-8 items-center justify-center">
@@ -1733,7 +1734,7 @@ function LordOfTheHolesApp() {
           <button type="button" onClick={() => setMenuOpen((value) => !value)} className="ml-auto rounded-xl border border-amber-500/35 bg-[linear-gradient(180deg,rgba(48,35,22,0.82),rgba(12,10,9,0.82))] px-2.5 py-1 text-base leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.12),0_8px_18px_rgba(0,0,0,0.35)] backdrop-blur-sm transition active:scale-[0.96]" aria-label="Menü öffnen">☰</button>
           {menuOpen ? (
             <div className="absolute right-0 top-[34px] z-30 w-64 overflow-hidden rounded-2xl border border-amber-700/40 bg-stone-950/95 text-left shadow-2xl shadow-black/70 backdrop-blur">
-              {[["current", "Scoring"], ["roundTables", "Tabellen Runde"], ["tournament", "Turnier"], ["archive", "Scorekarten"], ["fun", "Mittelerde"], ["settings", "Einstellungen"], ["admin", "Admin"]].map(([value, label]) => (
+              {[["current", "Scoring"], ["roundTables", "Tabellen Runde"], ["tournament", "Turnier"], ["archive", "Scorekarten"], ["fun", "Mittelerde"], ["flights", "Flights"], ["settings", "Einstellungen"], ["admin", "Admin"]].map(([value, label]) => (
                 <button
                   key={value}
                   type="button"
@@ -1871,6 +1872,83 @@ function LordOfTheHolesApp() {
             <CardContent className="p-3"><div className="mb-2"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Leaderboard</p></div><LeaderboardTable title="Strokes HCP adjusted" players={sortHcpAdjustedStrokePlay(tableStats)} columns={[{ label: "+/−", render: (p) => formatToPar(p.hcpAdjustedToPar, p.played), emphasize: true }, { label: "Netto", render: (p) => p.played ? p.hcpAdjustedTotal : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Strokes" players={sortStrokePlay(tableStats)} columns={[{ label: "+/−", render: (p) => formatToPar(p.toPar, p.played), emphasize: true }, { label: "Schläge", render: (p) => p.played ? p.total : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Netto Stableford" players={sortStableford(tableStats, "netStableford")} columns={[{ label: "Punkte", render: (p) => p.netStableford, emphasize: true }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Brutto Punkte" players={sortStableford(tableStats, "grossStableford")} columns={[{ label: "Punkte", render: (p) => p.grossStableford, emphasize: true }, { label: "Schläge", render: (p) => p.played ? p.total : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Putt-Kasse" players={[...tableStats].sort((a, b) => Number(b.puttPenaltyEuro || 0) - Number(a.puttPenaltyEuro || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0))} columns={[{ label: "3 Putts", render: (p) => `${p.threePutts} × 2 €` }, { label: "4+ Putts", render: (p) => `${p.fourPlusPutts} × 4 €` }, { label: "Gesamt", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} /></CardContent>
           </Card>
         </div>
+      </motion.section>
+    );
+  }
+
+  function renderFlightsView() {
+    const playerMap = new Map((allPlayers?.length ? allPlayers : fallbackPlayers).map((player) => [String(player.id), withFallbackAlias(player)]));
+    const drawRounds = (flightDraw?.rounds || []).filter((roundPlan) => String(roundPlan.round_id || "") !== "r4");
+
+    return (
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
+        <Card className="mb-2 rounded-2xl border border-amber-500/30 bg-[linear-gradient(180deg,rgba(48,35,22,0.86),rgba(18,13,9,0.82))] shadow-xl backdrop-blur-sm">
+          <CardContent className="p-3">
+            <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Flights</p>
+            <h2 className="font-serif text-lg text-amber-200">Flight-Ziehung & Zähler</h2>
+            <p className="mt-1 text-sm text-amber-100/65">Übersicht der ausgelosten Flights für Runde 1–3. Runde 4 wird manuell nach Tabellenstand gesetzt.</p>
+
+            {!drawRounds.length ? (
+              <div className="mt-3 rounded-2xl border border-amber-700/35 bg-black/25 p-3 text-sm text-amber-100/75">
+                Noch keine Flight-Ziehung geladen. Sobald die Pergamente gespeichert sind, erscheint hier die vollständige Übersicht.
+              </div>
+            ) : (
+              <div className="mt-3 space-y-3">
+                {drawRounds.map((roundPlan) => (
+                  <div key={roundPlan.round_id} className="rounded-2xl border border-amber-700/35 bg-black/25 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="font-serif text-lg font-black text-amber-200">{roundPlan.round_name || roundPlan.round_id}</div>
+                        {roundPlan.note ? <div className="mt-0.5 text-xs text-amber-100/60">{roundPlan.note}</div> : null}
+                      </div>
+                      <div className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-amber-100/70">
+                        {roundPlan.flights?.length || 0} Flights
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid gap-2">
+                      {(roundPlan.flights || []).map((flight) => (
+                        <div key={`${roundPlan.round_id}-${flight.flight_number}`} className="rounded-2xl border border-amber-700/30 bg-stone-950/55 p-2">
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <div className="font-serif text-base font-black text-amber-200">Flight {flight.flight_number}</div>
+                            <div className="text-xs text-amber-100/55">{(flight.players || []).length} Gefährten</div>
+                          </div>
+
+                          <div className="grid gap-1.5">
+                            {(flight.players || []).map((playerId) => {
+                              const player = withFallbackAlias(playerMap.get(String(playerId)) || { id: playerId });
+                              return (
+                                <div key={playerId} className="rounded-xl bg-amber-500/10 px-3 py-2">
+                                  <div className="font-serif text-lg font-black text-amber-100">{player.alias_name || player.character_name || playerId}</div>
+                                  <div className="text-[10px] uppercase tracking-[0.16em] text-amber-100/50">{player.character_name || player.display_name || playerId}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          <div className="mt-2 rounded-xl border border-sky-400/25 bg-sky-950/25 p-2">
+                            <div className="mb-1 text-[10px] uppercase tracking-[0.18em] text-sky-200/70">Zähl-Zuordnung</div>
+                            <div className="grid gap-1.5">
+                              {(flight.scorers || []).map((assignment) => {
+                                const scorer = withFallbackAlias(playerMap.get(String(assignment.scorer_player_id)) || { id: assignment.scorer_player_id });
+                                const scored = withFallbackAlias(playerMap.get(String(assignment.player_id)) || { id: assignment.player_id });
+                                return (
+                                  <div key={`${assignment.scorer_player_id}-${assignment.player_id}`} className="rounded-lg bg-black/25 px-2 py-1.5 text-xs text-sky-50/90">
+                                    <b className="text-sky-100">{getPlayerLabel(scorer)}</b> zählt <b className="text-amber-100">{getPlayerLabel(scored)}</b>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </motion.section>
     );
   }
@@ -2040,6 +2118,7 @@ function LordOfTheHolesApp() {
     if (view === "tournament") return renderTournamentView();
     if (view === "archive") return renderArchiveView();
     if (view === "fun") return renderFunView();
+    if (view === "flights") return renderFlightsView();
     return renderScoreView();
   }
 
