@@ -1586,7 +1586,8 @@ function LordOfTheHolesApp() {
     if (syncCount > 0) setScoreSyncCount(syncCount);
     setSaving(true);
     const allSaved = await flushPendingScores();
-
+    setSaving(false);
+    setScoreSyncCount(0);
     if (allSaved) {
       setConnectionStatus("online");
       setError("");
@@ -1612,8 +1613,14 @@ function LordOfTheHolesApp() {
     setScoreHintMessage("");
     const syncCount = pendingScoresRef.current.filter(isValidScorePayload).length;
     setActiveHole((h) => Math.min(18, h + 1));
-    if (syncCount > 0) setScoreSyncCount(syncCo    if (syncCount > 0) setScoreSyncCount(syncCount);
-    flushPendingScores().finally(() => setScoreSyncCount(0));});
+    if (syncCount > 0) setScoreSyncCount(syncCount);
+    flushPendingScores().finally(() => setScoreSyncCount(0));
+  }
+
+  async function createRoundBackup() {
+    setBackupSavedMessage("");
+    try {
+      const result = await callSheetApi({ action: "createRoundBackup", round_id: displayedActiveRound?.round_id || "r1" });
       setConnectionStatus("online");
       setError("");
       setBackupSavedMessage(result?.backup_sheet_name ? `Backup erstellt: ${result.backup_sheet_name}` : `${displayedActiveRound?.round_name || "Runde"} wurde gesichert.`);
