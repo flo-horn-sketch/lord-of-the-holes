@@ -154,6 +154,27 @@ function clearLocalScoreStorage() {
   } catch {}
 }
 
+function makeScoreClientVersion() {
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function getScoreClientVersion(score) {
+  return String(score?.client_version || score?.clientVersion || "").trim();
+}
+
+function isSameUploadedScoreVersion(localScore, uploadedScore) {
+  if (!localScore || !uploadedScore) return false;
+  if (getScoreIdentityKey(localScore) !== getScoreIdentityKey(uploadedScore)) return false;
+  const localVersion = getScoreClientVersion(localScore);
+  const uploadedVersion = getScoreClientVersion(uploadedScore);
+  if (localVersion && uploadedVersion) return localVersion === uploadedVersion;
+  return getScoreTimestamp(localScore) <= getScoreTimestamp(uploadedScore);
+}
+
+function removeUploadedScoreVersions(currentScores = [], uploadedScores = []) {
+  return (currentScores || []).filter((localScore) => !(uploadedScores || []).some((uploadedScore) => isSameUploadedScoreVersion(localScore, uploadedScore)));
+}
+
 function cleanHandicapInput(value) {
   const normalized = String(value ?? "").replace(",", ".").replace(/[^0-9.-]/g, "");
   const firstMinus = normalized.startsWith("-") ? "-" : "";
@@ -1592,6 +1613,7 @@ function LordOfTheHolesApp() {
       lady: normalizeBoolean(baseScore.lady),
       scorer_player_id: targetIsControl ? safePlayerId : myPlayerId || "",
       updated_at: new Date().toISOString(),
+      client_version: makeScoreClientVersion(),
       ...patch,
     });
     addLocalScoreDraft(next);
@@ -1630,28 +1652,35 @@ function LordOfTheHolesApp() {
   function queueCurrentHoleScoresForSync() {
     const roundId = String(displayedActiveRound?.round_id || "").trim();
     const holeNumber = Number(activeHole || 0);
-    const scorerId = String(myPlayerId || "").trim();
-    if (!roundId || !holeNumber || !scorerId) return [];
-    const queuedScores = [];
-    if (officialScoreForActiveHole && officialScoreForActiveHole.strokes !== "" && officialScoreForActiveHole.strokes != null) {
-      const queued = queueScoreForSync(officialScoreForActiveHole, {
-        round_id: roundId,
-        player_id: String(scoredPlayerId || officialScoreForActiveHole.player_id || "").trim(),
-        hole_number: holeNumber,
-        scorer_player_id: scorerId,
-      });
-      if (queued) queuedScores.push(queued);
-    }
-    if (controlScoreForActiveHole && controlScoreForActiveHole.strokes !== "" && controlScoreForActiveHole.strokes != null) {
-      const queued = queueScoreForSync(controlScoreForActiveHole, {
-        round_id: roundId,
-        player_id: scorerId,
-        hole_number: holeNumber,
-        scorer_player_id: scorerId,
-      });
-      if (queued) queuedScores.push(queued);
-    }
-    return queuedScores;
+    if (!roundId || !holeNumber) return false;
+
+    const findNewestLocalFirst = (playerId, wantControlScore) => {
+      const targetPlayerId = String(playerId || "").trim();
+      if (!targetPlayerId) return null;
+      const sources = [localScoreDraftsRef.current, pendingScoresRef.current, scoresRef.current, allScoresRef.current];
+      for (const source of sources) {
+        const match = (source || [])
+          .filter((score) =>
+            String(score.round_id || "") === roundId &&
+            String(score.player_id || "") === targetPlayerId &&
+            Number(score.hole_number) === holeNumber &&
+            isScorerControlScore(score) === wantControlScore
+          )
+          .sort((a, b) => getScoreTimestamp(b) - getScoreTimestamp(a))[0];
+        if (match) return normalizeScoreRecord(match);
+      }
+      return null;
+    };
+
+    const scoresToQueue = [];
+    const officialScore = findNewestLocalFirst(scoredPlayerId, false);
+    const controlScore = findNewestLocalFirst(myPlayerId, true);
+
+    if (officialScore && officialScore.strokes !== "" && officialScore.strokes != null && officialScore.putts_count !== "" && officialScore.putts_count != null) scoresToQueue.push(officialScore);
+    if (controlScore && controlScore.strokes !== "" && controlScore.strokes != null && controlScore.putts_count !== "" && controlScore.putts_count != null) scoresToQueue.push(controlScore);
+
+    scoresToQueue.forEach(addPendingScore);
+    return scoresToQueue.length > 0;
   }
 
   function removePendingScore(score) {
@@ -1718,17 +1747,15 @@ function LordOfTheHolesApp() {
         throw new Error(result?.error || "Batch wurde von der Datenbank abgelehnt.");
       }
 
-      const savedKeys = new Set(validScores.map(getScoreIdentityKey));
-
       setPendingScores((current) => {
-        const nextPendingScores = (current || []).filter((score) => !savedKeys.has(getScoreIdentityKey(score)));
+        const nextPendingScores = removeUploadedScoreVersions(current || [], validScores);
         pendingScoresRef.current = nextPendingScores;
         writeLocalJson("lordOfTheHoles.pendingScores", nextPendingScores);
         return nextPendingScores;
       });
 
       setLocalScoreDrafts((current) => {
-        const nextDrafts = (current || []).filter((score) => !savedKeys.has(getScoreIdentityKey(score)));
+        const nextDrafts = removeUploadedScoreVersions(current || [], validScores);
         localScoreDraftsRef.current = nextDrafts;
         writeLocalJson("lordOfTheHoles.localScoreDrafts", nextDrafts);
         return nextDrafts;
