@@ -2397,32 +2397,80 @@ function LordOfTheHolesApp() {
   async function fullResetForAllDevices() {
     setSetupSavedMessage("");
     setError("");
+
     try {
+      // 1. Server-Reset: Scores, alte Draws, Marker etc. löschen
       const result = await callSheetApi({ action: "clearResetMarkersAndFullReset" });
       const resetAt = String(result?.full_reset_at || result?.fullResetAt || new Date().toISOString());
+
       const emptyScores = [];
       setScores(emptyScores);
       setAllScores(emptyScores);
-      applyLocalCacheClear(resetAt, "Kompletter Reset wurde für alle Geräte ausgelöst. Flight-Ziehung wird neu bestimmt ...");
+      setPendingScores(emptyScores);
+      pendingScoresRef.current = emptyScores;
+      setLocalScoreDrafts(emptyScores);
+      localScoreDraftsRef.current = emptyScores;
+      clearLocalScoreStorage();
 
-      const freshDraw = buildFlightDraw(allPlayers, rounds);
-      const drawResult = await callSheetApi({ action: "saveFlightDraw", draw: nextFlightDraw, flight_draw: nextFlightDraw, flightDraw: nextFlightDraw });
-      try {
-        await savePersistentTeamDraw(callSheetApi, playersWithCurrentHandicaps);
-      } catch (teamDrawError) {
-        console.warn("TeamDraw konnte nicht gespeichert werden:", teamDrawError);
+      applyLocalCacheClear(resetAt, "Runde wird begonnen. Flights und Teams werden neu bestimmt ...");
+
+      // 2. FlightDraw neu bestimmen
+      const freshFlightDraw = buildFlightDraw(allPlayers, rounds);
+
+      if (!freshFlightDraw?.rounds?.length) {
+        throw new Error("Flight-Ziehung konnte nicht erstellt werden.");
+      }
+
+      const flightResult = await callSheetApi({
+        action: "saveFlightDraw",
+        draw: freshFlightDraw,
+        flight_draw: freshFlightDraw,
+        flightDraw: freshFlightDraw,
+        test: false,
+      });
+
+      const savedFlightDraw = flightResult?.flight_draw || flightResult?.flightDraw || freshFlightDraw;
+
+      if (!savedFlightDraw?.rounds?.length) {
+        throw new Error("Flight-Ziehung wurde nicht korrekt gespeichert.");
+      }
+
+      // 3. TeamDraw neu bestimmen
+      // Wichtig: allPlayers verwenden, nicht playersWithCurrentHandicaps,
+      // weil Runde 2/3 alle Spieler enthalten müssen.
+      const freshTeamDraw = buildPersistentTeamDraw(allPlayers);
+
+      if (!freshTeamDraw?.rounds?.length) {
         try {
           await callSheetApi({ action: "clearFlightDraw" });
-        } catch (rollbackError) {
-          console.warn("FlightDraw-Rollback fehlgeschlagen:", rollbackError);
-        }
-        const message = `Teamauslosung konnte nicht gespeichert werden: ${teamDrawError?.message || teamDrawError}`;
-        setError(message);
-        throw new Error(message);
+        } catch {}
+        throw new Error("Teamauslosung konnte nicht erstellt werden.");
       }
-      const savedDraw = drawResult?.flight_draw || drawResult?.flightDraw || freshDraw;
-      setFlightDraw(savedDraw);
-      writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, savedDraw);
+
+      const teamResult = await callSheetApi({
+        action: "saveTeamDraw",
+        team_draw: freshTeamDraw,
+        teamDraw: freshTeamDraw,
+        test: false,
+      });
+
+      const savedTeamDraw = teamResult?.team_draw || teamResult?.teamDraw || freshTeamDraw;
+
+      if (!savedTeamDraw?.rounds?.length) {
+        try {
+          await callSheetApi({ action: "clearFlightDraw" });
+          await callSheetApi({ action: "clearTeamDraw" });
+        } catch {}
+        throw new Error("Teamauslosung wurde nicht korrekt gespeichert.");
+      }
+
+      // 4. Lokale Draws setzen
+      setFlightDraw(savedFlightDraw);
+      writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, savedFlightDraw);
+
+      writeLocalJson("lordOfTheHoles.teamDraw.r2r3", savedTeamDraw);
+      writeLocalJson("lordOfTheHoles.teamDraw.r2r3.revealedRounds", {});
+
       setFlightCeremonyRunning(false);
       setFlightCeremonyCompleted(false);
       setFlightSummaryOpen(false);
@@ -2430,11 +2478,15 @@ function LordOfTheHolesApp() {
 
       setConnectionStatus("online");
       setError("");
-      setSetupSavedMessage("Kompletter Reset wurde für alle Geräte ausgelöst. Die Flight-Ziehung wurde neu bestimmt und gespeichert.");
-      if (result?.backup_sheet_name) setBackupSavedMessage(`Backup erstellt: ${result.backup_sheet_name}`);
+
+      if (result?.backup_sheet_name) {
+        setBackupSavedMessage(`Backup erstellt: ${result.backup_sheet_name}`);
+      }
+
+      setSetupSavedMessage("Runde begonnen. Flight-Ziehung und Teamauslosung wurden neu bestimmt und gespeichert.");
     } catch (err) {
       setConnectionStatus("offline");
-      setError(err.message || "Kompletter Reset oder neue Flight-Ziehung konnte nicht ausgelöst werden.");
+      setError(err.message || "Runde konnte nicht begonnen werden. Flight-Ziehung oder Teamauslosung wurde nicht vollständig gespeichert.");
     }
   }
 
@@ -3154,7 +3206,7 @@ function LordOfTheHolesApp() {
     if (view === "archive") return renderArchiveView();
     if (view === "fun") return renderFunView();
     if (view === "flights") return renderFlightsView();
-    if (view === "teams") return <TeamDrawView players={playersWithCurrentHandicaps} callSheetApi={callSheetApi} />;
+    if (view === "teams") return <TeamDrawView players={allPlayers} callSheetApi={callSheetApi} />;
     if (view === "rules") return renderRulesView();
     return renderScoreView();
   }
