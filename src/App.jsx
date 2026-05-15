@@ -1269,7 +1269,11 @@ function LordOfTheHolesApp() {
     if (!timeline.length) return undefined;
     const isLastStep = flightCeremonyStepIndex >= timeline.length - 1;
     const currentStep = timeline[Math.min(flightCeremonyStepIndex, timeline.length - 1)];
-    const delay = currentStep?.type === "reveal" ? 850 : 3100;
+    const completedRevealPlayers = currentStep?.type === "reveal"
+      ? (currentStep.roundPlan?.flights || []).reduce((sum, flight) => sum + (flight.players || []).length, 0)
+      : 0;
+    const revealIsComplete = currentStep?.type === "reveal" && Number(currentStep.revealCount || 0) >= completedRevealPlayers;
+    const delay = currentStep?.type === "reveal" ? (revealIsComplete ? 2400 : 850) : 3100;
     const timer = window.setTimeout(() => {
       if (isLastStep) {
         setFlightCeremonyRunning(false);
@@ -2325,7 +2329,7 @@ function LordOfTheHolesApp() {
     return (
       <div className="absolute inset-0 flex items-center justify-center px-3 py-5">
         <div className="max-h-full w-full max-w-md overflow-auto rounded-3xl border border-amber-400/55 bg-stone-950/82 p-4 text-center text-amber-50 shadow-2xl shadow-black/80 backdrop-blur-md [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <div className="text-[10px] uppercase tracking-[0.28em] text-amber-300/75">Der Rat von Bruchtal</div>
+          <div className="text-[10px] uppercase tracking-[0.28em] text-amber-300/75">DER RAT VON BRUCHTAL</div>
           {step.type === "reveal" ? (
             <>
               <motion.div key={`${step.roundPlan?.round_id}-${step.revealCount}-title`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-2 font-serif text-2xl font-black text-amber-200">{step.roundPlan?.round_name || "Runde"}</motion.div>
@@ -2364,7 +2368,7 @@ function LordOfTheHolesApp() {
     const hasDraw = Boolean(flightDraw?.rounds?.length);
     return (
       <div className="rounded-3xl border border-amber-500/35 bg-black/55 p-4 text-center text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm">
-        <div className="text-[10px] uppercase tracking-[0.28em] text-amber-300/75">Der Rat von Bruchtal</div>
+        <div className="text-[10px] uppercase tracking-[0.28em] text-amber-300/75">DER RAT VON BRUCHTAL</div>
         <div className="mt-1 font-serif text-2xl font-black text-amber-200">Flight-Ziehung der Pergamente</div>
         <div className="mx-auto mt-3 max-w-[230px] rounded-2xl border border-amber-400/40 bg-amber-500/10 p-3 shadow-[inset_0_1px_0_rgba(251,191,36,0.14)]">
           <div className="text-xs uppercase tracking-[0.18em] text-amber-100/65">Flight-Ziehung</div>
@@ -2387,7 +2391,7 @@ function LordOfTheHolesApp() {
         ) : (
           <div className="mt-3 rounded-2xl border border-amber-700/35 bg-black/25 p-3">
             <button type="button" onClick={() => setFlightSummaryOpen((value) => !value)} className="flex w-full items-center justify-between rounded-2xl border border-amber-500/40 bg-amber-600/80 px-4 py-2.5 font-bold text-amber-50 shadow-lg shadow-black/25">
-              <span className="font-serif text-lg">Flights</span>
+              <span className="font-serif text-lg">{flightSummaryOpen ? "Flights schließen" : "Flights öffnen"}</span>
               <span className="text-sm uppercase tracking-[0.16em]">{flightSummaryOpen ? "schließen" : "öffnen"}</span>
             </button>
             {flightSummaryOpen ? renderFlightDrawSummary() : null}
@@ -2426,7 +2430,7 @@ function LordOfTheHolesApp() {
             <div className="mb-2 text-xs uppercase tracking-[0.18em] text-amber-300/70">Admin</div>
             <input type="password" value={lockPasswordInput} onChange={(e) => setLockPasswordInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") startFlightCeremonyAsAdmin(); }} placeholder="Passwort" className="mb-2 w-full rounded-xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" autoFocus />
             <div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => { setLockUnlockOpen(false); setLockPasswordInput(""); }} className="rounded-xl bg-stone-800 py-2 text-sm font-bold text-amber-100">Abbrechen</button><button type="button" disabled={splashEntering} onClick={startFlightCeremonyAsAdmin} className="rounded-xl bg-amber-600 py-2 text-sm font-bold text-amber-50 disabled:opacity-60">{splashEntering ? "Lade ..." : "Zeremonienmeister"}</button></div>
-            <button type="button" disabled={splashEntering} onClick={enterLockedAppAsAdmin} className="mt-2 w-full rounded-xl border border-amber-500/35 bg-black/35 py-2 text-sm font-bold text-amber-100 disabled:opacity-60">Direkt in die App</button>
+            <button type="button" disabled={splashEntering} onClick={enterLockedAppAsAdmin} className="mt-2 w-full rounded-xl border border-amber-500/35 bg-black/35 py-2 text-sm font-bold text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.08)] disabled:opacity-60">Direkt in die App</button>
           </div>
         ) : null}
       </div>
