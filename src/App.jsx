@@ -48,11 +48,9 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
-const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbxPDXioaPlYU8fNras_JIz5QPJptOyHey_UrEH979jRmCUYbDRsvPOWKI4WGdbtD9E/exec";
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbySHbh5V_FZTo4rCzEewajlM7Nvcg2_TG14RhIcR3GJWOqW4-eo6nEnYFHW31xyKQ0K/exec";
 const ADMIN_PASSWORD = "weimar";
-const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T10:00:00+02:00");
-const FLIGHT_DRAW_TARGET = new Date("2026-05-21T20:00:00+02:00");
-const FLIGHT_DRAW_STORAGE_KEY = "lordOfTheHoles.flightDraw";
+const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T11:00:00+02:00");
 
 const fallbackAliases = {
   florian: "Sliceron",
@@ -154,36 +152,16 @@ function cleanHandicapInput(value) {
   return firstMinus + parts[0] + (parts.length > 1 ? "." + parts.slice(1).join("") : "");
 }
 
-function looksNumericValue(value) {
-  if (value === null || value === undefined) return false;
-  const text = String(value).trim();
-  if (!text) return false;
-  return Number.isFinite(Number(text.replace(",", ".")));
-}
-
-function cleanAliasValue(value) {
-  const text = String(value || "").trim();
-  return text && !looksNumericValue(text) ? text : "";
-}
-
 function withFallbackAlias(player) {
   if (!player) return player;
-  const characterName = String(player.character_name || player.display_name || player.name || player.id || "").trim();
-  const displayName = String(player.display_name || player.character_name || player.name || player.id || "").trim();
-  const fallbackAliasById = {
-    florian: "Sliceron",
-    mucky: "Gimme",
-    kio: "Foredo",
-    andreas: "Bogeymir",
-    achim: "Gangolf",
-    phillip: "Golfum",
-  };
-  const alias = cleanAliasValue(player.alias_name) || cleanAliasValue(player.alias) || fallbackAliasById[String(player.id || "").toLowerCase()] || "";
+  const id = String(player.id || "").trim();
   return {
     ...player,
-    character_name: characterName,
-    display_name: displayName,
-    alias_name: alias,
+    id,
+    character_name: String(player.character_name || player.display_name || id || "").trim(),
+    display_name: String(player.display_name || player.character_name || id || "").trim(),
+    alias_name: String(player.alias_name || fallbackAliases[id] || "").trim(),
+    sort_order: Number(player.sort_order || 0),
   };
 }
 
@@ -192,167 +170,6 @@ function getPlayerLabel(player) {
   const normalized = withFallbackAlias(player);
   const realName = normalized.character_name || normalized.display_name || normalized.id;
   return normalized.alias_name ? `${normalized.alias_name} (${realName})` : realName;
-}
-
-function seededRandom(seedText = "") {
-  let seed = 2166136261;
-  String(seedText).split("").forEach((char) => {
-    seed ^= char.charCodeAt(0);
-    seed = Math.imul(seed, 16777619);
-  });
-  return function nextRandom() {
-    seed += 0x6d2b79f5;
-    let value = seed;
-    value = Math.imul(value ^ (value >>> 15), value | 1);
-    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function shuffleWithRandom(items = [], random = Math.random) {
-  const next = [...items];
-  for (let index = next.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(random() * (index + 1));
-    [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
-  }
-  return next;
-}
-
-function pairKey(a, b) {
-  return [String(a || ""), String(b || "")].sort().join("|");
-}
-
-function splitIntoFlightsForRound(playerIds = [], roundId = "") {
-  const ids = [...playerIds];
-  if (String(roundId) === "r1") return [ids.slice(0, 3), ids.slice(3, 5)].filter((flight) => flight.length);
-  return [ids.slice(0, 3), ids.slice(3, 6)].filter((flight) => flight.length);
-}
-
-function assignScorersForFlight(flightPlayerIds = []) {
-  return flightPlayerIds.map((scorerId, index) => ({
-    scorer_player_id: scorerId,
-    player_id: flightPlayerIds[(index + 1) % flightPlayerIds.length],
-  }));
-}
-
-function scoreFlightPlan(roundPlans = []) {
-  const seenPlayerPairs = new Map();
-  const seenScorerPairs = new Map();
-  let penalty = 0;
-
-  roundPlans.forEach((roundPlan) => {
-    (roundPlan.flights || []).forEach((flight) => {
-      const playerIds = flight.players || [];
-      for (let a = 0; a < playerIds.length; a += 1) {
-        for (let b = a + 1; b < playerIds.length; b += 1) {
-          const key = pairKey(playerIds[a], playerIds[b]);
-          const previous = seenPlayerPairs.get(key) || 0;
-          penalty += previous * 14;
-          seenPlayerPairs.set(key, previous + 1);
-        }
-      }
-
-      (flight.scorers || []).forEach((assignment) => {
-        const key = `${assignment.scorer_player_id}|${assignment.player_id}`;
-        const previous = seenScorerPairs.get(key) || 0;
-        penalty += previous * 22;
-        seenScorerPairs.set(key, previous + 1);
-      });
-    });
-  });
-
-  return penalty;
-}
-
-function buildFlightDraw(players = fallbackPlayers, rounds = fallbackRounds) {
-  const allPlayerIds = (players?.length ? players : fallbackPlayers).map((player) => String(player.id)).filter(Boolean);
-  const roundList = (rounds?.length ? rounds : fallbackRounds)
-    .filter((round) => ["r1", "r2", "r3"].includes(String(round.round_id)))
-    .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
-  const seed = `bruchtal-${Date.now()}-${Math.random().toString(36).slice(2)}-${allPlayerIds.join("-")}`;
-  let bestPlan = null;
-  let bestScore = Infinity;
-
-  for (let attempt = 0; attempt < 1800; attempt += 1) {
-    const random = seededRandom(`${seed}-${attempt}`);
-    const roundPlans = roundList.map((round) => {
-      const eligibleIds = allPlayerIds.filter((id) => String(round.round_id) !== "r1" || id !== "achim");
-      const shuffledIds = shuffleWithRandom(eligibleIds, random);
-      const flights = splitIntoFlightsForRound(shuffledIds, round.round_id).map((flightPlayerIds, index) => ({
-        flight_number: index + 1,
-        players: flightPlayerIds,
-        scorers: assignScorersForFlight(flightPlayerIds),
-      }));
-      return {
-        round_id: round.round_id,
-        round_name: getRoundChapterLabel(round),
-        note: String(round.round_id) === "r1" ? "Gangolf verweilt noch fern der Gefährten und betritt den Pfad erst ab Runde 2." : "",
-        flights,
-      };
-    });
-    const score = scoreFlightPlan(roundPlans);
-    if (score < bestScore) {
-      bestScore = score;
-      bestPlan = roundPlans;
-      if (score === 0) break;
-    }
-  }
-
-  return {
-    created_at: new Date().toISOString(),
-    target_at: FLIGHT_DRAW_TARGET.toISOString(),
-    seed,
-    score: bestScore,
-    rounds: bestPlan || [],
-  };
-}
-
-function getScorerLabel(assignment, playerMap = new Map()) {
-  const scorer = playerMap.get(String(assignment?.scorer_player_id || ""));
-  const player = playerMap.get(String(assignment?.player_id || ""));
-  return `${getPlayerLabel(scorer) || assignment?.scorer_player_id || "Zähler"} zählt ${getPlayerLabel(player) || assignment?.player_id || "Spieler"}`;
-}
-
-function stableFlightDrawSignature(draw) {
-  if (!draw) return "";
-  try {
-    return JSON.stringify(draw);
-  } catch (err) {
-    return String(Date.now());
-  }
-}
-
-function areFlightDrawsEqual(a, b) {
-  return stableFlightDrawSignature(a) === stableFlightDrawSignature(b);
-}
-
-function getAssignedScoredPlayerIdFromDraw(flightDraw, roundId, scorerPlayerId) {
-  const normalizedRoundId = String(roundId || "");
-  const normalizedScorerId = String(scorerPlayerId || "");
-  if (!flightDraw || !normalizedRoundId || !normalizedScorerId) return "";
-
-  // Normales React-Objekt aus Apps Script: flightDraw.rounds[].flights[].scorers[]
-  if (flightDraw?.rounds?.length) {
-    const roundPlan = flightDraw.rounds.find((round) => String(round.round_id) === normalizedRoundId);
-    if (!roundPlan?.flights?.length) return "";
-    for (const flight of roundPlan.flights) {
-      const assignment = (flight.scorers || []).find((item) => String(item.scorer_player_id) === normalizedScorerId);
-      if (assignment?.player_id) return String(assignment.player_id);
-    }
-    return "";
-  }
-
-  // Fallback, falls irgendwann direkt tabellarische FlightDraw-Zeilen im Client landen.
-  const rows = Array.isArray(flightDraw) ? flightDraw : flightDraw.rows || flightDraw.flight_draw_rows || [];
-  const row = rows.find((item) => String(item.round_id) === normalizedRoundId && String(item.scorer_player_id) === normalizedScorerId);
-  return row?.player_id ? String(row.player_id) : "";
-}
-
-function getPlayerFlightFromDraw(flightDraw, roundId, playerId) {
-  if (!flightDraw?.rounds?.length || !roundId || !playerId) return null;
-  const roundPlan = flightDraw.rounds.find((round) => String(round.round_id) === String(roundId));
-  if (!roundPlan?.flights?.length) return null;
-  return roundPlan.flights.find((flight) => (flight.players || []).some((id) => String(id) === String(playerId))) || null;
 }
 
 function getCourseSettings(id, list = fallbackCourses) {
@@ -564,22 +381,6 @@ function getMismatchesForRound(scores, roundId, players = []) {
     .filter(Boolean)))
     .sort((a, b) => a - b);
   return holeNumbers.flatMap((holeNumber) => getMismatchesForHole(scores, roundId, holeNumber, players));
-}
-
-function hasCompleteScoreValue(score) {
-  return Boolean(score && score.strokes !== "" && score.strokes != null && score.putts_count !== "" && score.putts_count != null);
-}
-
-function isRoundFullyScoredAndClean(scores, roundId, players = [], holes = []) {
-  if (!roundId || !(players || []).length || !(holes || []).length) return false;
-  const mismatches = getMismatchesForRound(scores, roundId, players);
-  if (mismatches.length > 0) return false;
-
-  return (players || []).every((player) => (holes || []).every((hole) => {
-    const officialScore = findScoreForPlayerHole(scores, roundId, player.id, hole.hole_number, false);
-    const controlScore = findScoreForPlayerHole(scores, roundId, player.id, hole.hole_number, true);
-    return hasCompleteScoreValue(officialScore) && hasCompleteScoreValue(controlScore);
-  }));
 }
 
 function buildPlayerStats(players, holes, scores) {
@@ -1017,11 +818,6 @@ function LordOfTheHolesApp() {
   const [allScores, setAllScores] = useState(cachedState?.allScores?.length ? cachedState.allScores.map(normalizeScoreRecord) : []);
   const [pendingScores, setPendingScores] = useState(() => readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord).filter(isValidScorePayload));
   const pendingScoresRef = useRef(readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord).filter(isValidScorePayload));
-  const [dirtyScoreKeys, setDirtyScoreKeys] = useState(() => readLocalJson("lordOfTheHoles.dirtyScoreKeys", {}));
-  const dirtyScoreKeysRef = useRef(readLocalJson("lordOfTheHoles.dirtyScoreKeys", {}));
-  const syncingScoreKeysRef = useRef({});
-  const scoresRef = useRef([]);
-  const allScoresRef = useRef([]);
   const [scoredPlayerId, setScoredPlayerId] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerId", ""));
   const [scoredPlayerByRound, setScoredPlayerByRound] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerByRound", {}));
   const [scoreEntryMode, setScoreEntryMode] = useState("player");
@@ -1046,7 +842,7 @@ function LordOfTheHolesApp() {
   const [scoreHintMessage, setScoreHintMessage] = useState("");
   const [showSplash, setShowSplash] = useState(true);
   const [splashEntering, setSplashEntering] = useState(false);
-  const [appLocked, setAppLocked] = useState(true);
+  const [appLocked, setAppLocked] = useState(() => readLocalJson("lordOfTheHoles.appLocked", false));
   const [lockUnlockOpen, setLockUnlockOpen] = useState(false);
   const [lockPasswordInput, setLockPasswordInput] = useState("");
   const [lockAdminBypass, setLockAdminBypass] = useState(false);
@@ -1062,17 +858,6 @@ function LordOfTheHolesApp() {
   const [scorecardRoundId, setScorecardRoundId] = useState(() => readLocalJson("lordOfTheHoles.scorecardRoundId", ""));
   const [roundTableRoundId, setRoundTableRoundId] = useState(() => readLocalJson("lordOfTheHoles.roundTableRoundId", ""));
   const [roundSummaryDismissedKeys, setRoundSummaryDismissedKeys] = useState(() => readLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", []));
-  const [flightDraw, setFlightDraw] = useState(() => readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null));
-  const [flightDrawSaving, setFlightDrawSaving] = useState(false);
-  const [flightRevealRunning, setFlightRevealRunning] = useState(false);
-  const [flightRevealRoundIndex, setFlightRevealRoundIndex] = useState(0);
-  const [flightRevealCount, setFlightRevealCount] = useState(0);
-  const [flightRevealIntroStep, setFlightRevealIntroStep] = useState(0);
-  const [flightRevealOutroStep, setFlightRevealOutroStep] = useState(0);
-  const [expandedFlightKeys, setExpandedFlightKeys] = useState({});
-  const [flightSummaryOpen, setFlightSummaryOpen] = useState(false);
-  const [flightDrawCeremonyCompleted, setFlightDrawCeremonyCompleted] = useState(false);
-  const [flightAutoRevealStarted, setFlightAutoRevealStarted] = useState(false);
   const [localHandicaps, setLocalHandicaps] = useState({});
   const introAudioRef = useRef(null);
   const lastLoadedRoundRef = useRef("");
@@ -1086,11 +871,9 @@ function LordOfTheHolesApp() {
     const filteredPlayers = myPlayerId ? visiblePlayers.filter((p) => String(p.id) !== String(myPlayerId)) : visiblePlayers;
     return filteredPlayers.length ? filteredPlayers : visiblePlayers;
   }, [visiblePlayers, myPlayerId]);
-  const assignedScoredPlayerId = useMemo(() => getAssignedScoredPlayerIdFromDraw(flightDraw, displayedActiveRound?.round_id || "", myPlayerId), [flightDraw, displayedActiveRound?.round_id, myPlayerId]);
-  const myFlightFromDraw = useMemo(() => getPlayerFlightFromDraw(flightDraw, displayedActiveRound?.round_id || "", myPlayerId), [flightDraw, displayedActiveRound?.round_id, myPlayerId]);
   const playersWithCurrentHandicaps = useMemo(() => getPlayersForCourse(visiblePlayers, displayCourseId, courses), [visiblePlayers, displayCourseId, courses]);
   const activeHoleData = holes.find((h) => Number(h.hole_number) === Number(activeHole)) || holes[Number(activeHole) - 1] || fallbackHoles.find((h) => h.course_id === displayCourseId && h.hole_number === Number(activeHole)) || fallbackHoles[0];
-  const scoredPlayerBase = scoredPlayerId ? visiblePlayers.find((p) => String(p.id) === String(scoredPlayerId)) : null;
+  const scoredPlayerBase = scoredPlayerId ? scoreablePlayers.find((p) => String(p.id) === String(scoredPlayerId)) : null;
   const scoredPlayer = scoredPlayerBase ? getPlayerForCourse(scoredPlayerBase, displayCourseId, courses) : null;
   const myCurrentPlayerBase = myPlayerId ? (visiblePlayers.find((player) => String(player.id) === String(myPlayerId)) || allPlayers.find((player) => String(player.id) === String(myPlayerId))) : null;
   const myCurrentPlayer = myPlayerId ? getPlayerForCourse(myCurrentPlayerBase, displayCourseId, courses) : null;
@@ -1105,44 +888,12 @@ function LordOfTheHolesApp() {
     if (isScorerEntryMode) return String(s.player_id) === String(entryPlayerId) && isScorerControlScore(s);
     return String(s.player_id) === String(entryPlayerId) && !isScorerControlScore(s);
   }) || { strokes: "", picked_up: false, over_two_putts: false, putts_count: "", lady: false }, [scores, entryPlayerId, activeHole, displayedActiveRound?.round_id, isScorerEntryMode]);
-  const hasPredefinedScorerAssignment = Boolean(assignedScoredPlayerId);
   const canEnterScores = Boolean(displayedActiveRound?.round_id && myPlayerId && scoredPlayerId && entryPlayerId && entryPlayer && Number(activeHole) > 0);
   const currentEffectiveStrokes = normalizeBoolean(currentScore.picked_up) ? Number(pickedUpStrokes || 0) : Number(currentScore.strokes || 0);
   const maxPuttsForCurrentScore = currentEffectiveStrokes > 1 ? currentEffectiveStrokes - 1 : 0;
   const officialScoreForActiveHole = useMemo(() => findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", scoredPlayerId, activeHole, false), [scores, displayedActiveRound?.round_id, scoredPlayerId, activeHole]);
   const controlScoreForActiveHole = useMemo(() => (myPlayerId ? findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", myPlayerId, activeHole, true) : null), [scores, displayedActiveRound?.round_id, myPlayerId, activeHole]);
-  const hasRequiredScoresForNext = useMemo(() => {
-    if (!myPlayerId || !scoredPlayerId) return false;
-    const currentScores = scoresRef.current || [];
-    const officialScore = findScoreForPlayerHole(currentScores, displayedActiveRound?.round_id || "r1", scoredPlayerId, activeHole, false);
-    const controlScore = findScoreForPlayerHole(currentScores, displayedActiveRound?.round_id || "r1", myPlayerId, activeHole, true);
-    return hasCompleteScoreValue(officialScore) && hasCompleteScoreValue(controlScore);
-  }, [myPlayerId, scoredPlayerId, scores, displayedActiveRound?.round_id, activeHole]);
-  const currentRoundPendingScores = useMemo(() => (pendingScores || []).filter((score) => String(score.round_id || "") === String(displayedActiveRound?.round_id || "")), [pendingScores, displayedActiveRound?.round_id]);
-  const currentRoundHasDirtyScores = useMemo(() => {
-    const roundId = String(displayedActiveRound?.round_id || "");
-    if (!roundId) return false;
-
-    return Object.keys(dirtyScoreKeys || {}).some((key) => key.startsWith(`${roundId}|`));
-  }, [dirtyScoreKeys, displayedActiveRound?.round_id]);
-  const isCurrentRoundScoringLocked = useMemo(() => {
-    if (currentRoundPendingScores.length || currentRoundHasDirtyScores) return false;
-
-    return isRoundFullyScoredAndClean(
-      scores,
-      displayedActiveRound?.round_id || "",
-      visiblePlayers,
-      holes
-    );
-  }, [
-    currentRoundPendingScores.length,
-    currentRoundHasDirtyScores,
-    scores,
-    displayedActiveRound?.round_id,
-    visiblePlayers,
-    holes,
-  ]);
-  const pendingHoleUpdateCount = useMemo(() => new Set((pendingScores || []).filter(isValidScorePayload).map((score) => `${score.round_id}|${score.hole_number}`)).size, [pendingScores]);
+  const hasRequiredScoresForNext = Boolean(myPlayerId && officialScoreForActiveHole?.strokes !== "" && officialScoreForActiveHole?.strokes != null && officialScoreForActiveHole?.putts_count !== "" && officialScoreForActiveHole?.putts_count != null && controlScoreForActiveHole?.strokes !== "" && controlScoreForActiveHole?.strokes != null && controlScoreForActiveHole?.putts_count !== "" && controlScoreForActiveHole?.putts_count != null);
   const officialScores = useMemo(() => getOfficialScores(scores), [scores]);
   const officialAllScores = useMemo(() => getOfficialScores(allScores), [allScores]);
   const roundMismatches = useMemo(() => getMismatchesForRound(scores, displayedActiveRound?.round_id || "r1", visiblePlayers), [scores, displayedActiveRound?.round_id, visiblePlayers]);
@@ -1261,57 +1012,12 @@ function LordOfTheHolesApp() {
     const seconds = totalSeconds % 60;
     return { days, hours, minutes, seconds };
   }, [lockCountdownNow]);
-  const flightDrawAvailable = lockCountdownNow.getTime() >= FLIGHT_DRAW_TARGET.getTime();
-  const shouldAutoOpenFlightDraw = appLocked && flightDrawAvailable && !flightDraw && !flightDrawSaving && !flightAutoRevealStarted;
-  const shouldAutoReplayStoredFlightDraw = appLocked && flightDrawAvailable && Boolean(flightDraw?.rounds?.length) && !flightRevealRunning && !flightAutoRevealStarted;
-  const currentRevealRound = flightDraw?.rounds?.[flightRevealRoundIndex] || null;
-  const currentRevealPlayers = currentRevealRound?.flights?.flatMap((flight) => (flight.players || []).map((playerId) => ({ player_id: playerId, flight_number: flight.flight_number }))) || [];
-  const flightRevealIntroLinesByRound = [
-    [
-      "Die Türen von Bruchtal schließen sich. Kein Hobbit raschelt mehr mit der Scorekarte.",
-      "Elrond hebt die Hand. Das erste Pergament wird in den Kreis getragen.",
-      "Runde 1 wird ohne Gangolf beschritten. Sein Pfad beginnt erst später.",
-      "Möge das erste Kapitel die Gemeinschaft nicht schon am Tee 1 entzweien.",
-    ],
-    [
-      "Das erste Pergament ist gesprochen. Manche Blicke sagen: Das war bestimmt kein Zufall.",
-      "Nun tritt Gangolf aus dem Schatten hinzu. Die Gemeinschaft ist vollständig.",
-      "Das zweite Pergament wird geöffnet — und irgendwo lacht ein Ork über die Startzeiten.",
-      "Runde 2 führt durch die Minen von Moria. Wer hier zittert, sollte wenigstens gerade putten.",
-    ],
-    [
-      "Zwei Kapitel sind besiegelt. Noch atmet die Gemeinschaft, wenn auch hörbar schwerer.",
-      "Das dritte Pergament liegt bereit. Vor den Toren Mordors zählt jede Allianz doppelt.",
-      "Die letzten Flights vor dem Schicksalsberg werden offenbart.",
-      "Mögen die Drives lang, die Ausreden kurz und die Zähler gnädig sein.",
-    ],
-  ];
-  const flightRevealOutroLines = [
-    "Die Pergamente sinken. Der Rat schweigt. Selbst Golfum sagt kurz nichts.",
-    "Die Flights der ersten drei Kapitel sind besiegelt.",
-    "Was am Schicksalsberg geschieht, entscheidet allein die Tabelle.",
-  ];
-  const currentIntroLines = flightRevealIntroLinesByRound[flightRevealRoundIndex] || flightRevealIntroLinesByRound[0];
-  const currentRevealLine = currentIntroLines[flightRevealIntroStep] || null;
-  const currentOutroLine = flightRevealOutroLines[flightRevealOutroStep] || null;
-  const flightDrawCountdown = useMemo(() => {
-    const diffMs = Math.max(0, FLIGHT_DRAW_TARGET.getTime() - lockCountdownNow.getTime());
-    const totalSeconds = Math.floor(diffMs / 1000);
-    const days = Math.floor(totalSeconds / 86400);
-    const hours = Math.floor((totalSeconds % 86400) / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    return { days, hours, minutes, seconds };
-  }, [lockCountdownNow]);
 
   useEffect(() => { writeLocalJson("lordOfTheHoles.myPlayerId", myPlayerId); }, [myPlayerId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerId", scoredPlayerId); }, [scoredPlayerId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerByRound", scoredPlayerByRound); }, [scoredPlayerByRound]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.selectedActiveRoundId", selectedActiveRoundId); }, [selectedActiveRoundId]);
   useEffect(() => { pendingScoresRef.current = pendingScores; writeLocalJson("lordOfTheHoles.pendingScores", pendingScores); }, [pendingScores]);
-  useEffect(() => { scoresRef.current = scores; }, [scores]);
-  useEffect(() => { dirtyScoreKeysRef.current = dirtyScoreKeys; writeLocalJson("lordOfTheHoles.dirtyScoreKeys", dirtyScoreKeys); }, [dirtyScoreKeys]);
-  useEffect(() => { allScoresRef.current = allScores; }, [allScores]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.appLocked", appLocked); }, [appLocked]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", deviceAssignmentsResetAt); }, [deviceAssignmentsResetAt]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoresResetAt", scoresResetAt); }, [scoresResetAt]);
@@ -1321,10 +1027,9 @@ function LordOfTheHolesApp() {
   useEffect(() => { writeLocalJson("lordOfTheHoles.scorecardRoundId", scorecardRoundId); }, [scorecardRoundId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundTableRoundId", roundTableRoundId); }, [roundTableRoundId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", roundSummaryDismissedKeys); }, [roundSummaryDismissedKeys]);
-  useEffect(() => { writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, flightDraw); }, [flightDraw]);
   useEffect(() => {
-    writeLocalJson("lordOfTheHoles.cachedState", { players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId, flightDraw, cachedAt: new Date().toISOString() });
-  }, [players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId, flightDraw]);
+    writeLocalJson("lordOfTheHoles.cachedState", { players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId, cachedAt: new Date().toISOString() });
+  }, [players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId]);
   useEffect(() => { introAudioRef.current = new Audio("/intro-sound.mp3"); introAudioRef.current.preload = "auto"; introAudioRef.current.loop = false; }, []);
   useEffect(() => { if (!autoSync) return undefined; loadData({ silent: true }); const timer = setInterval(() => loadData({ silent: true }), 30000); return () => clearInterval(timer); }, [autoSync]);
   useEffect(() => { if (!autoSync || !pendingScores.length) return undefined; const timer = setInterval(() => flushPendingScores(), 10000); return () => clearInterval(timer); }, [autoSync, pendingScores]);
@@ -1352,58 +1057,22 @@ function LordOfTheHolesApp() {
   useEffect(() => {
     const roundId = String(displayedActiveRound?.round_id || "");
     if (!roundId || !myPlayerId || showSplash || (appLocked && !lockAdminBypass)) return;
+    const storedPlayerId = String(scoredPlayerByRound?.[roundId] || "");
+    const storedPlayerIsValid = Boolean(storedPlayerId && scoreablePlayers.some((player) => String(player.id) === String(storedPlayerId)));
     if (lastLoadedRoundRef.current !== roundId) {
       lastLoadedRoundRef.current = roundId;
       setScoreEntryMode("player");
     }
-    if (assignedScoredPlayerId) {
-      if (String(scoredPlayerId || "") !== String(assignedScoredPlayerId)) {
-        setScoredPlayerId(assignedScoredPlayerId);
-        saveLocalScoredPlayerForRound(roundId, assignedScoredPlayerId);
-      }
-      return;
-    }
-    if (["r1", "r2", "r3"].includes(roundId) && scoredPlayerId) {
-      setScoredPlayerId("");
-      removeLocalScoredPlayerForRound(roundId);
-    }
-  }, [displayedActiveRound?.round_id, myPlayerId, assignedScoredPlayerId, scoredPlayerId, showSplash, appLocked, lockAdminBypass]);
+    if (storedPlayerIsValid && String(scoredPlayerId || "") !== String(storedPlayerId)) setScoredPlayerId(storedPlayerId);
+  }, [displayedActiveRound?.round_id, myPlayerId, scoreablePlayers, scoredPlayerByRound, scoredPlayerId, showSplash, appLocked, lockAdminBypass]);
 
   async function callSheetApi(payload) {
-    const payloadText = JSON.stringify(payload || { action: "getState" });
     const url = new URL(GOOGLE_SHEETS_API_URL);
-    url.searchParams.set("payload", payloadText);
+    url.searchParams.set("payload", JSON.stringify(payload));
     url.searchParams.set("cacheBust", String(Date.now()));
-
-    let response;
-    try {
-      response = await fetch(url.toString(), {
-        method: "GET",
-        cache: "no-store",
-        redirect: "follow",
-        headers: {
-          Accept: "application/json",
-        },
-      });
-    } catch (err) {
-      throw new Error(
-        `Datenbank nicht erreichbar: ${err?.message || "Netzwerk-/CORS-Fehler"}. Bitte prüfen: Apps-Script-Web-App muss als neue Version deployed und für „Jeder“ freigegeben sein.`
-      );
-    }
-
-    const text = await response.text();
-
-    if (!response.ok) {
-      throw new Error(`Datenbank antwortet mit HTTP ${response.status}: ${text.slice(0, 180) || response.statusText}`);
-    }
-
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch (err) {
-      throw new Error(`Datenbank liefert kein gültiges JSON: ${text.slice(0, 180) || err?.message || "Unbekannte Antwort"}`);
-    }
-
+    const response = await fetch(url.toString(), { method: "GET" });
+    if (!response.ok) throw new Error("Datenbank nicht erreichbar.");
+    const data = await response.json();
     if (data && data.ok === false) throw new Error(data.error || "Datenbank meldet einen Fehler.");
     return data;
   }
@@ -1427,27 +1096,19 @@ function LordOfTheHolesApp() {
         if (nextAppLocked && !lockAdminBypass) setShowSplash(true);
       }
       const nextFullResetAt = String(data.full_reset_at || data.fullResetAt || "");
-      applyFullResetFromServer(nextFullResetAt);
+      const localFullResetAt = String(readLocalJson("lordOfTheHoles.fullResetAt", "") || "");
+      if (nextFullResetAt && nextFullResetAt !== localFullResetAt) applyLocalCacheClear(nextFullResetAt, "Kompletter Reset wurde übernommen.");
       const nextScoresResetAt = String(data.scores_reset_at || data.scoresResetAt || "");
       const localScoresResetAt = String(readLocalJson("lordOfTheHoles.scoresResetAt", "") || "");
       if (nextScoresResetAt && nextScoresResetAt !== localScoresResetAt) {
         const emptyScores = [];
-
         setScores(emptyScores);
         setAllScores(emptyScores);
-
         setPendingScores(emptyScores);
         pendingScoresRef.current = emptyScores;
         writeLocalJson("lordOfTheHoles.pendingScores", emptyScores);
-
-        setDirtyScoreKeys({});
-        dirtyScoreKeysRef.current = {};
-        syncingScoreKeysRef.current = {};
-        writeLocalJson("lordOfTheHoles.dirtyScoreKeys", {});
-
         writeLocalJson("lordOfTheHoles.cachedState", null);
         writeLocalJson("lordOfTheHoles.scoresResetAt", nextScoresResetAt);
-
         setScoresResetAt(nextScoresResetAt);
         setActiveHole(1);
       }
@@ -1458,20 +1119,6 @@ function LordOfTheHolesApp() {
         setDeviceAssignmentsResetAt(nextDeviceAssignmentsResetAt);
       } else if (nextDeviceAssignmentsResetAt && nextDeviceAssignmentsResetAt !== deviceAssignmentsResetAt) {
         setDeviceAssignmentsResetAt(nextDeviceAssignmentsResetAt);
-      }
-      const serverFlightDraw = data.flight_draw || data.flightDraw || null;
-      const serverSentFlightDraw = Object.prototype.hasOwnProperty.call(data, "flight_draw") || Object.prototype.hasOwnProperty.call(data, "flightDraw");
-      const localStoredFlightDraw = readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null);
-      if (serverFlightDraw?.rounds?.length) {
-        const currentDraw = flightDraw || localStoredFlightDraw;
-        if (!areFlightDrawsEqual(currentDraw, serverFlightDraw)) {
-          setFlightDraw(serverFlightDraw);
-          writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, serverFlightDraw);
-        } else if (!flightDraw) {
-          setFlightDraw(localStoredFlightDraw || serverFlightDraw);
-        }
-      } else if (serverSentFlightDraw && localStoredFlightDraw) {
-        setFlightDraw(localStoredFlightDraw);
       }
       const nextAllPlayers = (data.players?.length ? data.players : fallbackPlayers).map(withFallbackAlias);
       const nextRounds = data.rounds?.length ? data.rounds : fallbackRounds;
@@ -1501,16 +1148,8 @@ function LordOfTheHolesApp() {
       const sheetAllScores = (data.scores || []).map(normalizeScoreRecord);
       const sheetActiveScores = (data.activeScores || []).map(normalizeScoreRecord);
       const livePendingScores = pendingScoresRef.current;
-      const localAllScores = allScoresRef.current || [];
-      const localActiveScores = (scoresRef.current || []).filter((score) => String(score.round_id || "") === String(nextActiveRound?.round_id || ""));
-      const nextAllScores = mergeScoresPreservingPending(
-        mergeScoresPreservingPending(sheetAllScores, localAllScores),
-        livePendingScores
-      );
-      const nextActiveScores = mergeScoresPreservingPending(
-        mergeScoresPreservingPending(sheetActiveScores, localActiveScores),
-        livePendingScores.filter((score) => String(score.round_id || "") === String(nextActiveRound?.round_id || ""))
-      );
+      const nextAllScores = mergeScoresPreservingPending(sheetAllScores, livePendingScores);
+      const nextActiveScores = mergeScoresPreservingPending(sheetActiveScores, livePendingScores.filter((score) => String(score.round_id || "") === String(nextActiveRound?.round_id || "")));
       setAllScores(nextAllScores);
       setScores(nextActiveScores);
       setConnectionStatus("online");
@@ -1518,36 +1157,11 @@ function LordOfTheHolesApp() {
       return data;
     } catch (err) {
       setConnectionStatus("offline");
-      setError(err?.message || "Datenbank konnte nicht geladen werden.");
+      setError(err.message || "Datenbank konnte nicht geladen werden.");
       return null;
     } finally {
       if (!silent) setLoading(false);
     }
-  }
-
-  function upsertScoreIntoList(currentScores, score) {
-    const normalizedScore = normalizeScoreRecord(score);
-    const scoreKey = getScoreIdentityKey(normalizedScore);
-    return [
-      ...(currentScores || []).filter((item) => getScoreIdentityKey(item) !== scoreKey),
-      normalizedScore,
-    ];
-  }
-
-  function persistScoreLocally(score) {
-    if (!isValidScorePayload(score)) return;
-
-    const normalizedScore = normalizeScoreRecord(score);
-
-    scoresRef.current = upsertScoreIntoList(scoresRef.current, normalizedScore);
-    allScoresRef.current = upsertScoreIntoList(allScoresRef.current, normalizedScore);
-
-    setScores(scoresRef.current);
-    setAllScores(allScoresRef.current);
-
-    addPendingScore(normalizedScore);
-    markScoreDirty(normalizedScore);
-    queueScoreForBackgroundSync(normalizedScore);
   }
 
   function optimisticUpdate(patch) {
@@ -1555,32 +1169,11 @@ function LordOfTheHolesApp() {
     const safePlayerId = String(entryPlayerId || "").trim();
     const safeHoleNumber = Number(activeHole || 0);
     if (!safeRoundId || !safePlayerId || !safeHoleNumber) throw new Error("Score kann noch nicht gespeichert werden: Runde, Spieler oder Loch fehlt.");
-
-    const latestScores = scoresRef.current || [];
-    const latestScore = findScoreForPlayerHole(
-      latestScores,
-      safeRoundId,
-      safePlayerId,
-      safeHoleNumber,
-      isScorerEntryMode
-    );
-
-    const baseScore = latestScore || currentScore || {};
-    const next = normalizeScoreRecord({
-      round_id: safeRoundId,
-      player_id: safePlayerId,
-      hole_number: safeHoleNumber,
-      strokes: baseScore.strokes ?? "",
-      picked_up: normalizeBoolean(baseScore.picked_up),
-      over_two_putts: normalizeBoolean(baseScore.over_two_putts),
-      putts_count: baseScore.putts_count ?? "",
-      lady: normalizeBoolean(baseScore.lady),
-      scorer_player_id: isScorerEntryMode ? safePlayerId : myPlayerId || "",
-      updated_at: new Date().toISOString(),
-      ...patch,
-    });
-
-    persistScoreLocally(next);
+    const next = normalizeScoreRecord({ round_id: safeRoundId, player_id: safePlayerId, hole_number: safeHoleNumber, strokes: currentScore.strokes ?? "", picked_up: normalizeBoolean(currentScore.picked_up), over_two_putts: normalizeBoolean(currentScore.over_two_putts), putts_count: currentScore.putts_count ?? "", lady: normalizeBoolean(currentScore.lady), scorer_player_id: isScorerEntryMode ? entryPlayerId : myPlayerId || "", updated_at: new Date().toISOString(), ...patch });
+    const sameScore = (score) => String(score.round_id) === String(next.round_id) && String(score.player_id) === String(next.player_id) && Number(score.hole_number) === Number(next.hole_number) && isScorerControlScore(score) === isScorerControlScore(next);
+    const updateList = (current) => current.some(sameScore) ? current.map((s) => sameScore(s) ? next : s) : [...current, next];
+    setScores(updateList);
+    setAllScores(updateList);
     return next;
   }
 
@@ -1607,55 +1200,9 @@ function LordOfTheHolesApp() {
   }
 
   async function savePendingScore(score) {
-    if (!isValidScorePayload(score)) {
-      removePendingScore(score);
-      clearScoreDirty(score);
-      return true;
-    }
-
-    const scoreKey = getScoreSyncKey(score);
-    const scoreTimestamp = getScoreTimestamp(score);
-
-    if (
-      syncingScoreKeysRef.current[scoreKey] &&
-      getScoreTimestamp(syncingScoreKeysRef.current[scoreKey]) >= scoreTimestamp
-    ) {
-      return false;
-    }
-
-    syncingScoreKeysRef.current = {
-      ...syncingScoreKeysRef.current,
-      [scoreKey]: score,
-    };
-
-    try {
-      await callSheetApi({ action: "upsertScore", score });
-
-      syncingScoreKeysRef.current = { ...syncingScoreKeysRef.current };
-      delete syncingScoreKeysRef.current[scoreKey];
-
-      removePendingScore(score);
-
-      const stillHasNewerPending = (pendingScoresRef.current || []).some(
-        (item) =>
-          getScoreSyncKey(item) === scoreKey &&
-          getScoreTimestamp(item) > scoreTimestamp
-      );
-
-      if (!stillHasNewerPending) {
-        clearScoreDirty(score);
-      }
-
-      setConnectionStatus("online");
-      setError("");
-      return true;
-    } catch (err) {
-      syncingScoreKeysRef.current = { ...syncingScoreKeysRef.current };
-      delete syncingScoreKeysRef.current[scoreKey];
-
-      setConnectionStatus("offline");
-      return false;
-    }
+    if (!isValidScorePayload(score)) { removePendingScore(score); return true; }
+    try { await callSheetApi({ action: "upsertScore", score }); removePendingScore(score); setConnectionStatus("online"); setError(""); return true; }
+    catch (err) { setConnectionStatus("offline"); setError(err.message || "Score ist lokal gesichert und wird später synchronisiert."); return false; }
   }
 
   async function flushPendingScores() {
@@ -1674,237 +1221,47 @@ function LordOfTheHolesApp() {
     return allSaved;
   }
 
-  function getScoreSyncKey(score) {
-    return [score?.round_id || "", score?.player_id || "", score?.hole_number || "", score?.scorer_player_id || "official"].join("|");
-  }
-
-  function markScoreDirty(score) {
-    if (!score) return;
-    const key = getScoreSyncKey(score);
-    dirtyScoreKeysRef.current = { ...dirtyScoreKeysRef.current, [key]: true };
-    setDirtyScoreKeys(dirtyScoreKeysRef.current);
-    writeLocalJson("lordOfTheHoles.dirtyScoreKeys", dirtyScoreKeysRef.current);
-  }
-
-  function clearScoreDirty(score) {
-    if (!score) return;
-    const key = getScoreSyncKey(score);
-    if (!dirtyScoreKeysRef.current[key]) return;
-    const next = { ...dirtyScoreKeysRef.current };
-    delete next[key];
-    dirtyScoreKeysRef.current = next;
-    setDirtyScoreKeys(next);
-    writeLocalJson("lordOfTheHoles.dirtyScoreKeys", next);
-  }
-
-  function isScoreDirty(score) {
-    if (!score) return false;
-    return Boolean(dirtyScoreKeysRef.current[getScoreSyncKey(score)]);
-  }
-
-  function queueScoreForBackgroundSync(score) {
-    const normalizedScore = {
-      ...score,
-      updated_at: score?.updated_at || new Date().toISOString(),
-    };
-    const scoreKey = getScoreSyncKey(normalizedScore);
-    const normalizedTimestamp = getScoreTimestamp(normalizedScore);
-
-    if (syncingScoreKeysRef.current[scoreKey] && getScoreTimestamp(syncingScoreKeysRef.current[scoreKey]) >= normalizedTimestamp) {
-      return;
-    }
-    syncingScoreKeysRef.current = { ...syncingScoreKeysRef.current, [scoreKey]: normalizedScore };
-
-    setPendingScores((current) => {
-      const filtered = (current || []).filter((item) => {
-        const itemKey = getScoreSyncKey(item);
-        return itemKey !== scoreKey;
-      });
-      const nextPendingScores = [...filtered, normalizedScore];
-      pendingScoresRef.current = nextPendingScores;
-      writeLocalJson("lordOfTheHoles.pendingScores", nextPendingScores);
-      return nextPendingScores;
-    });
-
-    setScores((current) => {
-      const filtered = (current || []).filter((item) => {
-        const itemKey = getScoreSyncKey(item);
-        return itemKey !== scoreKey;
-      });
-      return [...filtered, normalizedScore];
-    });
-
-    setAllScores((current) => {
-      const filtered = (current || []).filter((item) => {
-        const itemKey = getScoreSyncKey(item);
-        return itemKey !== scoreKey;
-      });
-      return [...filtered, normalizedScore];
-    });
-
-    callSheetApi({ action: "upsertScore", score: normalizedScore })
-      .then(() => {
-        setConnectionStatus("online");
-        const currentSync = syncingScoreKeysRef.current[scoreKey];
-        const currentSyncTimestamp = getScoreTimestamp(currentSync);
-        syncingScoreKeysRef.current = { ...syncingScoreKeysRef.current };
-        delete syncingScoreKeysRef.current[scoreKey];
-
-        setPendingScores((current) => {
-          const nextPendingScores = (current || []).filter((item) => {
-            const itemKey = getScoreSyncKey(item);
-            if (itemKey !== scoreKey) return true;
-            return getScoreTimestamp(item) > currentSyncTimestamp;
-          });
-          pendingScoresRef.current = nextPendingScores;
-          writeLocalJson("lordOfTheHoles.pendingScores", nextPendingScores);
-          return nextPendingScores;
-        });
-
-        const stillHasNewerPending = (pendingScoresRef.current || []).some((item) => getScoreSyncKey(item) === scoreKey && getScoreTimestamp(item) > currentSyncTimestamp);
-        if (!stillHasNewerPending && getScoreTimestamp(normalizedScore) >= currentSyncTimestamp) {
-          clearScoreDirty(normalizedScore);
-        }
-      })
-      .catch(() => {
-        syncingScoreKeysRef.current = { ...syncingScoreKeysRef.current };
-        delete syncingScoreKeysRef.current[scoreKey];
-        setConnectionStatus("offline");
-      });
-  }
-
-  function saveScore(patch) {
+  async function saveScore(patch) {
     const nextPatch = { ...patch };
     const nextStrokes = nextPatch.strokes !== undefined ? Number(nextPatch.strokes || 0) : currentEffectiveStrokes;
-    if ((nextPatch.strokes !== undefined || nextPatch.picked_up !== undefined) && !normalizeBoolean(nextPatch.picked_up) && Number(nextStrokes) <= 1) {
-      nextPatch.putts_count = 0;
-      nextPatch.over_two_putts = false;
-    }
-
     if (nextPatch.putts_count !== undefined && nextStrokes > 0 && Number(nextPatch.putts_count || 0) > Math.max(0, nextStrokes - 1)) {
       setScoreHintMessage("Putts dürfen maximal Schläge minus 1 sein.");
       window.setTimeout(() => setScoreHintMessage(""), 1800);
       return;
     }
-
     if (nextPatch.strokes !== undefined && currentScore.putts_count !== "" && currentScore.putts_count != null && Number(currentScore.putts_count || 0) > Math.max(0, Number(nextPatch.strokes || 0) - 1)) {
       nextPatch.putts_count = Math.max(0, Number(nextPatch.strokes || 0) - 1);
       nextPatch.over_two_putts = Number(nextPatch.putts_count || 0) >= 3;
     }
-
-    if (isCurrentRoundScoringLocked) {
-      setScoreHintMessage("Diese Runde ist vollständig und ohne Abweichung besiegelt. Scores können nicht mehr geändert werden.");
-      window.setTimeout(() => setScoreHintMessage(""), 2400);
-      return;
-    }
-
     if (!canEnterScores) {
-      setScoreHintMessage("Erst Handy-Besitzer wählen und Flight-Ziehung laden.");
+      setScoreHintMessage("Erst Runde, Spieler und Zähler auswählen.");
       window.setTimeout(() => setScoreHintMessage(""), 1800);
       return;
     }
-
-    try {
-      optimisticUpdate(nextPatch);
-    } catch (err) {
-      setError(err.message || "Score kann noch nicht lokal vorgemerkt werden.");
-    }
-  }
-
-  function hasBothScoresForHoleNow(roundId, officialPlayerId, controlPlayerId, holeNumber) {
-    if (!roundId || !officialPlayerId || !controlPlayerId || !holeNumber) return false;
-    const currentScores = scoresRef.current || [];
-    const officialScore = findScoreForPlayerHole(currentScores, roundId, officialPlayerId, holeNumber, false);
-    const controlScore = findScoreForPlayerHole(currentScores, roundId, controlPlayerId, holeNumber, true);
-    return hasCompleteScoreValue(officialScore) && hasCompleteScoreValue(controlScore);
-  }
-
-  function getCurrentHoleScoreSnapshot() {
-    const roundId = String(displayedActiveRound?.round_id || "r1");
-    const holeNumber = Number(activeHole || 0);
-    const latestScores = scoresRef.current || scores || [];
-
-    return {
-      officialScore: findScoreForPlayerHole(latestScores, roundId, scoredPlayerId, holeNumber, false),
-      controlScore: myPlayerId ? findScoreForPlayerHole(latestScores, roundId, myPlayerId, holeNumber, true) : null,
-    };
-  }
-
-  function hasRequiredScoresForCurrentHoleNow() {
-    const snapshot = getCurrentHoleScoreSnapshot();
-    return Boolean(
-      myPlayerId &&
-      hasCompleteScoreValue(snapshot.officialScore) &&
-      hasCompleteScoreValue(snapshot.controlScore)
-    );
-  }
-
-  function getMissingScoreItemsForCurrentHole() {
-    const snapshot = getCurrentHoleScoreSnapshot();
-    const missingItems = [];
-
-    if (!snapshot.officialScore || snapshot.officialScore.strokes === "" || snapshot.officialScore.strokes == null) {
-      missingItems.push(`Score für ${getPlayerLabel(scoredPlayer) || "Spieler"}`);
-    }
-    if (!snapshot.officialScore || snapshot.officialScore.putts_count === "" || snapshot.officialScore.putts_count == null) {
-      missingItems.push(`Putts für ${getPlayerLabel(scoredPlayer) || "Spieler"}`);
-    }
-    if (!snapshot.controlScore || snapshot.controlScore.strokes === "" || snapshot.controlScore.strokes == null) {
-      missingItems.push("mein Score");
-    }
-    if (!snapshot.controlScore || snapshot.controlScore.putts_count === "" || snapshot.controlScore.putts_count == null) {
-      missingItems.push("meine Putts");
-    }
-
-    return missingItems;
-  }
-
-  function syncCurrentHoleScoresNow() {
-    const snapshot = getCurrentHoleScoreSnapshot();
-
-    if (snapshot.officialScore && hasCompleteScoreValue(snapshot.officialScore)) {
-      queueScoreForBackgroundSync(snapshot.officialScore);
-    }
-
-    if (snapshot.controlScore && hasCompleteScoreValue(snapshot.controlScore)) {
-      queueScoreForBackgroundSync(snapshot.controlScore);
-    }
+    let next;
+    try { next = optimisticUpdate(nextPatch); }
+    catch (err) { setError(err.message || "Score kann noch nicht gespeichert werden."); return; }
+    addPendingScore(next);
+    setSaving(true);
+    try { await callSheetApi({ action: "upsertScore", score: next }); removePendingScore(next); setConnectionStatus("online"); setError(""); }
+    catch { addPendingScore(next); setConnectionStatus("offline"); setError("Score lokal gesichert. Wird automatisch synchronisiert, sobald die Datenbank erreichbar ist."); }
+    finally { setSaving(false); }
   }
 
   function goToNextHole() {
-    if (isCurrentRoundScoringLocked) {
-      setScoreHintMessage("Diese Runde ist vollständig und ohne Abweichung besiegelt.");
-      window.setTimeout(() => setScoreHintMessage(""), 2400);
-      return;
-    }
     if (activeHole === 18) return;
-    if (!hasRequiredScoresForCurrentHoleNow()) {
-      const missingItems = getMissingScoreItemsForCurrentHole();
+    if (!hasRequiredScoresForNext) {
+      const missingItems = [];
+      if (!officialScoreForActiveHole || officialScoreForActiveHole.strokes === "" || officialScoreForActiveHole.strokes == null) missingItems.push(`Score für ${getPlayerLabel(scoredPlayer) || "Spieler"}`);
+      if (!officialScoreForActiveHole || officialScoreForActiveHole.putts_count === "" || officialScoreForActiveHole.putts_count == null) missingItems.push(`Putts für ${getPlayerLabel(scoredPlayer) || "Spieler"}`);
+      if (!controlScoreForActiveHole || controlScoreForActiveHole.strokes === "" || controlScoreForActiveHole.strokes == null) missingItems.push("mein Score");
+      if (!controlScoreForActiveHole || controlScoreForActiveHole.putts_count === "" || controlScoreForActiveHole.putts_count == null) missingItems.push("meine Putts");
       setScoreHintMessage(`Erst ${missingItems.join(", ")} eintragen, dann weiter.`);
       window.setTimeout(() => setScoreHintMessage(""), 2400);
       return;
     }
     setScoreHintMessage("");
-    syncCurrentHoleScoresNow();
     setActiveHole((h) => Math.min(18, h + 1));
-  }
-
-  function finishRoundFromHole18() {
-    if (isCurrentRoundScoringLocked) {
-      setScoreHintMessage("Diese Runde ist vollständig und ohne Abweichung besiegelt.");
-      window.setTimeout(() => setScoreHintMessage(""), 2400);
-      return;
-    }
-    if (activeHole !== 18) return;
-    if (!hasRequiredScoresForCurrentHoleNow()) {
-      const missingItems = getMissingScoreItemsForCurrentHole();
-      setScoreHintMessage(`Erst ${missingItems.join(", ")} eintragen, dann abschließen.`);
-      window.setTimeout(() => setScoreHintMessage(""), 2400);
-      return;
-    }
-    setScoreHintMessage("Loch 18 wurde gespeichert. Die Chronik kann beginnen.");
-    window.setTimeout(() => setScoreHintMessage(""), 2400);
-    syncCurrentHoleScoresNow();
   }
 
   async function createRoundBackup() {
@@ -1931,10 +1288,6 @@ function LordOfTheHolesApp() {
       setPendingScores(emptyScores);
       pendingScoresRef.current = emptyScores;
       writeLocalJson("lordOfTheHoles.pendingScores", emptyScores);
-      setDirtyScoreKeys({});
-      dirtyScoreKeysRef.current = {};
-      syncingScoreKeysRef.current = {};
-      writeLocalJson("lordOfTheHoles.dirtyScoreKeys", {});
       writeLocalJson("lordOfTheHoles.cachedState", null);
       if (result?.scores_reset_at || result?.scoresResetAt) {
         const resetAt = String(result.scores_reset_at || result.scoresResetAt);
@@ -1974,7 +1327,7 @@ function LordOfTheHolesApp() {
       writeLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", resetAt);
       setConnectionStatus("online");
       setError("");
-      setSetupSavedMessage("Handy-Besitzer wurden zurückgesetzt. Die Zähler-Zuordnungen kommen aus der Flight-Ziehung.");
+      setSetupSavedMessage("Spieler- und Zähler-Zuordnungen wurden zurückgesetzt.");
     } catch (err) {
       setConnectionStatus("offline");
       setError(err.message || "Spieler-/Zähler-Zuordnungen konnten nicht zurückgesetzt werden.");
@@ -1982,19 +1335,37 @@ function LordOfTheHolesApp() {
   }
 
   function applyLocalCacheClear(resetAt = "", message = "Lokaler Cache auf diesem Gerät wurde gelöscht.") {
-    clearLocalDeviceCacheAfterFullReset(resetAt || new Date().toISOString());
+    try {
+      Object.keys(window.localStorage || {}).forEach((key) => {
+        if (String(key).startsWith("lordOfTheHoles.")) window.localStorage.removeItem(key);
+      });
+    } catch {}
+    setMyPlayerId("");
+    setScoredPlayerId("");
+    setScoredPlayerByRound({});
+    setPendingScores([]);
+    pendingScoresRef.current = [];
+    setWinnerPopupDismissedKey("");
+    setRoundHonorDismissedKeys([]);
+    setRoundSummaryDismissedKeys([]);
+    setScorecardRoundId("");
+    setRoundTableRoundId("");
+    setSelectedActiveRoundId(displayedActiveRound?.round_id || activeRound?.round_id || "r1");
     setDeviceAssignmentsResetAt("");
     setScoresResetAt("");
-    setFullResetAt(resetAt || "");
-    if (resetAt) writeLocalJson("lordOfTheHoles.fullResetAt", resetAt);
-    setSelectedActiveRoundId(displayedActiveRound?.round_id || activeRound?.round_id || "r1");
     setScoreEntryMode("player");
     setActiveHole(1);
+    if (resetAt) {
+      setFullResetAt(resetAt);
+      writeLocalJson("lordOfTheHoles.fullResetAt", resetAt);
+    } else {
+      setFullResetAt("");
+    }
     setSetupSavedMessage(message);
   }
 
   function clearLocalCache() {
-    applyLocalCacheClear("", "Lokaler Cache auf diesem Gerät wurde vollständig gelöscht.");
+    applyLocalCacheClear("", "Lokaler Cache auf diesem Gerät wurde gelöscht.");
   }
 
   async function fullResetForAllDevices() {
@@ -2003,58 +1374,16 @@ function LordOfTheHolesApp() {
     try {
       const result = await callSheetApi({ action: "clearResetMarkersAndFullReset" });
       const resetAt = String(result?.full_reset_at || result?.fullResetAt || new Date().toISOString());
-      clearLocalDeviceCacheAfterFullReset(resetAt);
-      setFullResetAt(resetAt);
-      writeLocalJson("lordOfTheHoles.fullResetAt", resetAt);
+      const emptyScores = [];
+      setScores(emptyScores);
+      setAllScores(emptyScores);
+      applyLocalCacheClear(resetAt, "Kompletter Reset wurde für alle Geräte ausgelöst.");
       setConnectionStatus("online");
       setError("");
       if (result?.backup_sheet_name) setBackupSavedMessage(`Backup erstellt: ${result.backup_sheet_name}`);
-      setSetupSavedMessage("Kompletter Reset wurde für alle Geräte ausgelöst. Scores, FlightDraw und lokale Caches werden auf allen Geräten gelöscht.");
-      await loadData({ silent: true });
     } catch (err) {
       setConnectionStatus("offline");
       setError(err.message || "Kompletter Reset konnte nicht ausgelöst werden.");
-    }
-  }
-
-  async function startRoundWithFullResetAndFlightDraw() {
-    if (!isAdminUnlocked || flightDrawSaving) return;
-    setSetupSavedMessage("");
-    setError("");
-    setFlightDrawSaving(true);
-    try {
-      const resetResult = await callSheetApi({ action: "clearResetMarkersAndFullReset" });
-      const resetAt = String(resetResult?.full_reset_at || resetResult?.fullResetAt || new Date().toISOString());
-      clearLocalDeviceCacheAfterFullReset(resetAt);
-      setFullResetAt(resetAt);
-      writeLocalJson("lordOfTheHoles.fullResetAt", resetAt);
-      if (resetResult?.backup_sheet_name) setBackupSavedMessage(`Backup erstellt: ${resetResult.backup_sheet_name}`);
-
-      const draw = buildFlightDraw(allPlayers, rounds);
-      const saveResult = await callSheetApi({ action: "saveFlightDraw", draw, test: false });
-      const savedDraw = saveResult?.flight_draw || saveResult?.flightDraw || draw;
-      setFlightDraw(savedDraw);
-      writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, savedDraw);
-      setFlightRevealRunning(false);
-      setFlightSummaryOpen(false);
-      setFlightDrawCeremonyCompleted(false);
-      setFlightAutoRevealStarted(false);
-      setFlightRevealRoundIndex(0);
-      setFlightRevealCount(0);
-      setFlightRevealIntroStep(0);
-      setFlightRevealOutroStep(0);
-      setExpandedFlightKeys({});
-      setConnectionStatus("online");
-      setError("");
-      setSetupSavedMessage(
-        "Runde vorbereitet: Full Reset für alle ausgeführt, alte Caches gelöscht und neue Flights im Sheet gespeichert. Runde und Kurs kannst du manuell im Admin setzen."
-      );
-      await loadData({ silent: true });
-    } catch (err) {
-      setConnectionStatus("offline");
-      setError(err.message || "Rundenstart konnte nicht vorbereitet werden.");
-    } finally {
-      setFlightDrawSaving(false);
     }
   }
 
@@ -2129,276 +1458,23 @@ function LordOfTheHolesApp() {
     }
   }
 
-  function clearLocalDeviceCacheAfterFullReset(fullResetAt = "") {
-    try {
-      const markerKey = "lordOfTheHoles.fullResetSeenAt";
-      const preserveMarker = String(fullResetAt || new Date().toISOString());
-      Object.keys(window.localStorage || {}).forEach((key) => {
-        if (key.startsWith("lordOfTheHoles")) window.localStorage.removeItem(key);
-      });
-      window.localStorage.setItem(markerKey, JSON.stringify(preserveMarker));
-      if (window.sessionStorage) {
-        Object.keys(window.sessionStorage).forEach((key) => {
-          if (key.startsWith("lordOfTheHoles")) window.sessionStorage.removeItem(key);
-        });
-      }
-    } catch (err) {
-      console.warn("Lokaler Cache konnte nicht vollständig gelöscht werden:", err);
-    }
-
-    setPendingScores([]);
-    pendingScoresRef.current = [];
-    setDirtyScoreKeys({});
-    dirtyScoreKeysRef.current = {};
-    syncingScoreKeysRef.current = {};
-    writeLocalJson("lordOfTheHoles.dirtyScoreKeys", {});
-    setScores([]);
-    setAllScores([]);
-    scoresRef.current = [];
-    allScoresRef.current = [];
-    setMyPlayerId("");
-    setScoredPlayerId("");
-    setScoredPlayerByRound({});
-    setScoreEntryMode("player");
-    setActiveHole(1);
-    setWinnerPopupDismissedKey("");
-    setRoundHonorDismissedKeys([]);
-    setRoundSummaryDismissedKeys([]);
-    setScorecardRoundId("");
-    setRoundTableRoundId("");
-    setFlightDraw(null);
-    setFlightRevealRunning(false);
-    setFlightSummaryOpen(false);
-    setFlightDrawCeremonyCompleted(false);
-    setFlightAutoRevealStarted(false);
-    setFlightRevealRoundIndex(0);
-    setFlightRevealCount(0);
-    setFlightRevealIntroStep(0);
-    setFlightRevealOutroStep(0);
-    setExpandedFlightKeys({});
-  }
-
-  function applyFullResetFromServer(fullResetAt) {
-    if (!fullResetAt) return;
-    const markerKey = "lordOfTheHoles.fullResetSeenAt";
-    const seenAt = readLocalJson(markerKey, "");
-    if (String(seenAt || "") === String(fullResetAt || "")) return;
-    clearLocalDeviceCacheAfterFullReset(fullResetAt);
-  }
-
   async function enterLockedAppAsAdmin() {
     if (lockPasswordInput !== ADMIN_PASSWORD) { setError("Passwort ist falsch."); return; }
-    if (splashEntering || flightDrawSaving) return;
-
-    const storedDraw = flightDraw || readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null);
-    if (!storedDraw?.rounds?.length) {
-      setError("Keine gespeicherte Flight-Ziehung gefunden. Bitte zuerst im Admin-Bereich „Flights neu bestimmen“ ausführen.");
-      loadData({ silent: true });
-      return;
-    }
-
-    setIsAdminUnlocked(true);
-    setLockAdminBypass(false);
-    setShowSplash(true);
-    setLockUnlockOpen(false);
-    setLockPasswordInput("");
-    setFlightDraw(storedDraw);
-    setFlightRevealRoundIndex(0);
-    setFlightRevealCount(0);
-    setFlightRevealIntroStep(0);
-    setFlightRevealOutroStep(0);
-    setExpandedFlightKeys({});
-    setFlightRevealRunning(true);
-    setError("");
-
-    loadData({ silent: true });
-  }
-
-  async function enterAppWithoutFlightDraw() {
-    if (lockPasswordInput !== ADMIN_PASSWORD && !isAdminUnlocked) { setError("Passwort ist falsch."); return; }
-    if (splashEntering || flightDrawSaving) return;
+    if (splashEntering) return;
     setSplashEntering(true);
-    await loadData({ silent: true });
+    const data = await loadData({ silent: true });
     setSplashEntering(false);
-    setIsAdminUnlocked(true);
+    if (!data) return;
+    if (!myPlayerId && !readLocalJson("lordOfTheHoles.myPlayerId", "")) setForceMyPlayerPromptOpen(true);
     setLockAdminBypass(true);
+    setIsAdminUnlocked(true);
+    setMainMenu("current");
+    setView("score");
     setShowSplash(false);
     setLockUnlockOpen(false);
     setLockPasswordInput("");
-    setFlightRevealRunning(false);
     setError("");
   }
-
-  async function openFlightDrawPergaments({ automatic = false, forceLocalTest = false, replaceExisting = false, saveTestToSheet = false, startReveal = true, allowBeforeTarget = false } = {}) {
-    if (!automatic && !isAdminUnlocked) {
-      setError("Nur der Zeremonienmeister kann die Pergamente öffnen.");
-      return;
-    }
-    if (!flightDrawAvailable && !automatic && !forceLocalTest && !allowBeforeTarget) {
-      setError("Die Pergamente sind noch versiegelt.");
-      return;
-    }
-    if (flightDraw && !replaceExisting) {
-      setFlightRevealRoundIndex(0);
-      setFlightRevealCount(0);
-      setFlightRevealIntroStep(0);
-      setFlightRevealOutroStep(0);
-      setFlightRevealRunning(true);
-      return;
-    }
-
-    const draw = buildFlightDraw(allPlayers, rounds);
-    setFlightDrawSaving(true);
-    setError("");
-
-    try {
-      const saveResult = await Promise.race([
-        callSheetApi({ action: "saveFlightDraw", draw, test: Boolean(forceLocalTest || saveTestToSheet) }),
-        new Promise((_, reject) => window.setTimeout(() => reject(new Error("saveFlightDraw hat zu lange gedauert. Bitte Apps Script Deployment und Berechtigungen prüfen.")), 15000)),
-      ]);
-      const savedDraw = saveResult?.flight_draw || saveResult?.flightDraw || draw;
-
-      if (replaceExisting) {
-        window.localStorage.removeItem(FLIGHT_DRAW_STORAGE_KEY);
-      }
-
-      setFlightDraw(savedDraw);
-      writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, savedDraw);
-      setConnectionStatus("online");
-      setSetupSavedMessage(forceLocalTest || saveTestToSheet ? "Die Test-Ziehung der Pergamente wurde im Sheet gespeichert." : "Die Flight-Ziehung wurde neu bestimmt und im Sheet gespeichert.");
-
-      setFlightRevealRoundIndex(0);
-      setFlightRevealCount(0);
-      setFlightRevealIntroStep(0);
-      setFlightRevealOutroStep(0);
-      setExpandedFlightKeys({});
-      setFlightRevealRunning(Boolean(startReveal));
-
-      await loadData({ silent: true });
-    } catch (err) {
-      setConnectionStatus("offline");
-      setFlightRevealRunning(false);
-      setError(`${err.message || "saveFlightDraw konnte nicht gespeichert werden."} Die Zeremonie startet erst, wenn die Ziehung erfolgreich im Sheet gespeichert wurde.`);
-    } finally {
-      setFlightDrawSaving(false);
-    }
-  }
-
-  async function resetFlightDrawAfterFullReset() {
-    window.localStorage.removeItem(FLIGHT_DRAW_STORAGE_KEY);
-    setFlightDraw(null);
-    setFlightRevealRunning(false);
-    setFlightAutoRevealStarted(false);
-    setFlightRevealRoundIndex(0);
-    setFlightRevealCount(0);
-    setFlightRevealIntroStep(0);
-    setFlightRevealOutroStep(0);
-    setExpandedFlightKeys({});
-    try {
-      await callSheetApi({ action: "clearFlightDraw" });
-    } catch (err) {
-      console.warn("clearFlightDraw fehlt vermutlich noch im Apps Script:", err);
-    }
-  }
-
-  async function redrawFlightsFromAdmin() {
-    await openFlightDrawPergaments({
-      automatic: false,
-      allowBeforeTarget: true,
-      replaceExisting: true,
-      saveTestToSheet: false,
-      startReveal: false,
-    });
-  }
-
-  useEffect(() => {
-    if (!shouldAutoReplayStoredFlightDraw) return;
-    const storedDraw = flightDraw || readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null);
-    if (!storedDraw?.rounds?.length) {
-      setError("Keine gespeicherte Flight-Ziehung gefunden. Bitte zuerst im Admin-Bereich „Flights neu bestimmen“ ausführen.");
-      return;
-    }
-    setFlightAutoRevealStarted(true);
-    setFlightDraw(storedDraw);
-    setFlightRevealRoundIndex(0);
-    setFlightRevealCount(0);
-    setFlightRevealIntroStep(0);
-    setFlightRevealOutroStep(0);
-    setExpandedFlightKeys({});
-    setFlightRevealRunning(true);
-    loadData({ silent: true });
-  }, [shouldAutoReplayStoredFlightDraw]);
-
-  useEffect(() => {
-    if (!shouldAutoOpenFlightDraw) return;
-    const storedDraw = flightDraw || readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null);
-    if (storedDraw?.rounds?.length) {
-      setFlightAutoRevealStarted(true);
-      setFlightDraw(storedDraw);
-      setFlightRevealRoundIndex(0);
-      setFlightRevealCount(0);
-      setFlightRevealIntroStep(0);
-      setFlightRevealOutroStep(0);
-      setExpandedFlightKeys({});
-      setFlightRevealRunning(true);
-      loadData({ silent: true });
-      return;
-    }
-    setFlightAutoRevealStarted(true);
-    loadData({ silent: true }).finally(() => {
-      const latestStoredDraw = readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null);
-      if (latestStoredDraw?.rounds?.length) {
-        setFlightDraw(latestStoredDraw);
-        setFlightRevealRoundIndex(0);
-        setFlightRevealCount(0);
-        setFlightRevealIntroStep(0);
-        setFlightRevealOutroStep(0);
-        setExpandedFlightKeys({});
-        setFlightRevealRunning(true);
-        return;
-      }
-      setError("Keine gespeicherte Flight-Ziehung gefunden. Bitte zuerst im Admin-Bereich „Flights neu bestimmen“ ausführen.");
-    });
-  }, [shouldAutoOpenFlightDraw]);
-
-  useEffect(() => {
-    if (!flightRevealRunning || !flightDraw?.rounds?.length) return undefined;
-    const introDone = flightRevealIntroStep >= currentIntroLines.length;
-    const players = currentRevealPlayers;
-    const allPlayersVisible = introDone && flightRevealCount >= players.length;
-    const roundPlayersDone = introDone && flightRevealCount > players.length;
-    const finalRoundDone = roundPlayersDone && flightRevealRoundIndex >= flightDraw.rounds.length - 1;
-    const outroDone = !finalRoundDone || flightRevealOutroStep >= flightRevealOutroLines.length;
-    const delay = !introDone ? 5600 : !allPlayersVisible ? 4100 : !roundPlayersDone ? 8200 : finalRoundDone && !outroDone ? 5600 : 7200;
-    const timer = window.setTimeout(() => {
-      if (!introDone) {
-        setFlightRevealIntroStep((step) => step + 1);
-        return;
-      }
-      if (!roundPlayersDone) {
-        setFlightRevealCount((count) => count + 1);
-        return;
-      }
-      if (finalRoundDone && !outroDone) {
-        if (flightRevealOutroStep >= flightRevealOutroLines.length - 1) {
-          setFlightRevealRunning(false);
-          setFlightDrawCeremonyCompleted(true);
-          setFlightSummaryOpen(false);
-          return;
-        }
-        setFlightRevealOutroStep((step) => step + 1);
-        return;
-      }
-      if (flightRevealRoundIndex < flightDraw.rounds.length - 1) {
-        setFlightRevealRoundIndex((index) => index + 1);
-        setFlightRevealCount(0);
-        setFlightRevealIntroStep(0);
-        return;
-      }
-      setFlightRevealRunning(false);
-    }, delay);
-    return () => window.clearTimeout(timer);
-  }, [flightRevealRunning, flightDraw, flightRevealRoundIndex, flightRevealCount, flightRevealIntroStep, flightRevealOutroStep, currentRevealPlayers.length, currentIntroLines.length]);
 
   function saveLocalScoredPlayerForRound(roundId, scoredPlayerIdValue) {
     if (!roundId || !scoredPlayerIdValue) return;
@@ -2426,136 +1502,6 @@ function LordOfTheHolesApp() {
     if (value === "admin") setView("admin");
   }
 
-  function renderFlightDrawPanel() {
-    const playerMap = new Map((allPlayers?.length ? allPlayers : fallbackPlayers).map((player) => [String(player.id), withFallbackAlias(player)]));
-    if (flightDraw && flightRevealRunning && currentRevealRound) {
-      const introDone = flightRevealIntroStep >= currentIntroLines.length;
-      const roundPlayersDone = introDone && flightRevealCount > currentRevealPlayers.length;
-      const finalOutroRunning = roundPlayersDone && flightRevealRoundIndex >= flightDraw.rounds.length - 1 && flightRevealOutroStep < flightRevealOutroLines.length;
-      const visiblePlayers = currentRevealPlayers.slice(0, Math.min(flightRevealCount, currentRevealPlayers.length));
-      return (
-        <div className="flex min-h-[78vh] flex-col justify-center rounded-3xl border border-amber-300/55 bg-black/75 p-4 text-center text-amber-50 shadow-2xl shadow-black/80 backdrop-blur-sm">
-          <style>{`@keyframes lotrSoftReveal { 0% { opacity: 0; transform: translateY(10px) scale(.985); filter: blur(3px); } 18% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } 78% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } 100% { opacity: .18; transform: translateY(-5px) scale(.995); filter: blur(2px); } } @keyframes lotrPlayerReveal { 0% { opacity: 0; transform: translateY(12px) scale(.96); filter: blur(4px); } 26% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } 100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); } } .lotr-soft-reveal { animation: lotrSoftReveal 5.3s ease-in-out both; } .lotr-player-reveal { animation: lotrPlayerReveal 1.6s ease-out both; }`}</style>
-          <div className="text-[10px] uppercase tracking-[0.32em] text-amber-300/75">Der Rat von Bruchtal</div>
-          {!introDone || finalOutroRunning ? (
-            <div className="mx-auto mt-5 max-w-sm">
-              <div className="font-serif text-2xl font-black leading-tight text-amber-200">{finalOutroRunning ? "Der Rat hat gesprochen" : "Flight-Ziehung der Pergamente"}</div>
-              <div key={finalOutroRunning ? `outro-${flightRevealOutroStep}` : `intro-${flightRevealRoundIndex}-${flightRevealIntroStep}`} className="lotr-soft-reveal mt-6 rounded-3xl border border-amber-500/30 bg-stone-950/60 p-5 font-serif text-xl font-bold leading-snug text-amber-50 shadow-lg shadow-black/40">
-                {finalOutroRunning ? currentOutroLine : currentRevealLine}
-              </div>
-              <div className="mt-5 text-xs uppercase tracking-[0.22em] text-amber-100/45">{finalOutroRunning ? "Die Chronik wird geschlossen ..." : "Die Gemeinschaft wartet ..."}</div>
-            </div>
-          ) : (
-            <>
-              <div className="mt-2 font-serif text-2xl font-black leading-tight text-amber-200">{currentRevealRound.round_name}</div>
-              {null}
-              <div className="mt-5 grid gap-3 text-left">
-                {currentRevealRound.flights.map((flight) => {
-                  const flightVisiblePlayers = visiblePlayers.filter((entry) => entry.flight_number === flight.flight_number);
-                  return (
-                    <div key={`${currentRevealRound.round_id}-${flight.flight_number}`} className="rounded-3xl border border-amber-500/30 bg-stone-950/60 p-3 shadow-lg shadow-black/35">
-                      <div className="text-center font-serif text-lg font-black text-amber-200">Flight {flight.flight_number}</div>
-                      <div className="mt-3 grid gap-2">
-                        {flightVisiblePlayers.length ? flightVisiblePlayers.map((entry) => {
-                          const player = playerMap.get(String(entry.player_id));
-                          const normalized = withFallbackAlias(player || { id: entry.player_id });
-                          return (
-                            <div key={`${entry.flight_number}-${entry.player_id}`} className="lotr-player-reveal rounded-2xl border border-amber-400/30 bg-amber-500/15 px-3 py-3 text-center shadow-md shadow-black/30">
-                              <div className="font-serif text-3xl font-black leading-none text-amber-100">{normalized.alias_name || normalized.character_name || entry.player_id}</div>
-                              <div className="mt-1 text-xs uppercase tracking-[0.18em] text-amber-100/55">{normalized.character_name || normalized.display_name || entry.player_id}</div>
-                            </div>
-                          );
-                        }) : <div className="rounded-2xl border border-dashed border-amber-500/25 px-3 py-4 text-center text-sm text-amber-100/45">Das Pergament bleibt noch verschlossen ...</div>}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="mt-5 text-xs uppercase tracking-[0.22em] text-amber-100/55">Kapitel {flightRevealRoundIndex + 1} von {flightDraw.rounds.length}</div>
-            </>
-          )}
-        </div>
-      );
-    }
-    return (
-      <div className="rounded-3xl border border-amber-400/45 bg-black/62 p-2.5 text-left text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm">
-        <div className="text-center">
-          <div className="text-[10px] uppercase tracking-[0.28em] text-amber-300/80">Der Rat von Bruchtal</div>
-          <div className="mt-1 font-serif text-xl font-black text-amber-200">Flight-Ziehung der Pergamente</div>
-          <div className="mt-1.5 rounded-2xl border border-amber-400/35 bg-amber-500/10 p-2 text-center">
-            <div className="text-[10px] uppercase tracking-[0.24em] text-amber-300/80">Flight-Ziehung</div>
-            <div className="mt-1 font-serif text-xl font-black leading-none text-amber-200">21.05.26</div>
-            <div className="mt-0.5 font-serif text-lg font-black leading-none text-amber-100">20:00 Uhr</div>
-          </div>
-          <div className="mt-1.5 rounded-2xl border border-amber-400/30 bg-black/35 p-1.5 text-center">
-            <div className="font-serif text-lg font-black text-amber-100">Hier live</div>
-          </div>
-          <p className="mt-1.5 text-[11px] leading-snug text-amber-100/75">Bitte öffnet die App 1–2 Minuten vorher, damit die Pergamente rechtzeitig geladen sind.</p>
-        </div>
-
-        {!flightDraw ? (
-          <div className="mt-2 rounded-2xl border border-amber-500/25 bg-black/35 p-2 text-center">
-            {!flightDrawAvailable ? (
-              <>
-                <div className="font-serif text-base font-bold text-amber-200">Die Pergamente sind noch versiegelt.</div>
-                <div className="mt-1 text-xs text-amber-100/65">Die Pforten sind noch verschlossen. Gandalf selbst würde jetzt sagen: „Du kommst hier noch nicht rein.“</div>
-                <div className="mt-1.5 grid grid-cols-4 gap-1 rounded-2xl border border-amber-500/20 bg-black/30 p-1.5 text-center">
-                  <div><div className="font-serif text-base font-black text-amber-200">{flightDrawCountdown.days}</div><div className="text-[8px] uppercase tracking-[0.14em] text-amber-100/55">Tage</div></div>
-                  <div><div className="font-serif text-base font-black text-amber-200">{String(flightDrawCountdown.hours).padStart(2, "0")}</div><div className="text-[8px] uppercase tracking-[0.14em] text-amber-100/55">Std</div></div>
-                  <div><div className="font-serif text-base font-black text-amber-200">{String(flightDrawCountdown.minutes).padStart(2, "0")}</div><div className="text-[8px] uppercase tracking-[0.14em] text-amber-100/55">Min</div></div>
-                  <div><div className="font-serif text-base font-black text-amber-200">{String(flightDrawCountdown.seconds).padStart(2, "0")}</div><div className="text-[8px] uppercase tracking-[0.14em] text-amber-100/55">Sek</div></div>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="font-serif text-base font-bold text-amber-200">{flightDrawSaving ? "Die Pergamente öffnen sich ..." : "Die Pergamente öffnen sich von selbst."}</div>
-                {isAdminUnlocked ? (
-                  <button type="button" disabled={flightDrawSaving} onClick={enterLockedAppAsAdmin} className="mt-3 w-full rounded-2xl border border-amber-300/50 bg-amber-600 px-4 py-2.5 font-serif text-base font-black text-amber-50 shadow-lg shadow-black/40 disabled:opacity-60">
-                    Zeremonie testen
-                  </button>
-                ) : null}
-              </>
-            )}
-          </div>
-        ) : !flightDrawCeremonyCompleted ? null : (
-          <div className="mt-3">
-            <button type="button" onClick={() => setFlightSummaryOpen((open) => !open)} className="flex w-full items-center justify-between rounded-2xl border border-amber-500/30 bg-stone-950/75 px-4 py-3 font-serif text-lg font-black text-amber-200 shadow-lg shadow-black/35">
-              <span>Flights</span>
-              <span className="text-xs uppercase tracking-[0.18em] text-amber-100/55">{flightSummaryOpen ? "schließen" : "öffnen"}</span>
-            </button>
-            {flightSummaryOpen ? <div className="mt-3 max-h-[54vh] overflow-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {flightDraw.rounds.map((roundPlan) => (
-              <div key={roundPlan.round_id} className="mb-3 rounded-2xl border border-amber-500/25 bg-black/30 p-3 last:mb-0">
-                <div className="font-serif text-base font-black text-amber-200">{roundPlan.round_name}</div>
-                {null}
-                <div className="mt-2 grid gap-2">
-                  {roundPlan.flights.map((flight) => (
-                    <div key={`${roundPlan.round_id}-${flight.flight_number}`} className="rounded-2xl border border-amber-700/30 bg-stone-950/55 p-2">
-                      <div className="mb-2 text-center font-serif text-sm font-bold text-amber-200">Flight {flight.flight_number}</div>
-                      <div className="grid gap-1.5">
-                        {flight.players.map((playerId) => {
-                          const player = withFallbackAlias(playerMap.get(String(playerId)) || { id: playerId });
-                          return (
-                            <div key={playerId} className="rounded-xl bg-amber-500/10 px-3 py-2 text-center">
-                              <div className="font-serif text-xl font-black text-amber-100">{player.alias_name || player.character_name || playerId}</div>
-                              <div className="text-[10px] uppercase tracking-[0.16em] text-amber-100/50">{player.character_name || player.display_name || playerId}</div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-            <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-3 text-center font-serif text-sm font-bold text-amber-100">Die Flights der ersten drei Kapitel sind besiegelt. Was am Schicksalsberg geschieht, entscheidet allein die Tabelle.</div>
-            </div> : null}
-          </div>
-        )}
-      </div>
-    );
-  }
-
   function renderHeader() {
     const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "admin" ? "Admin" : "Einstellungen";
     return (
@@ -2563,7 +1509,7 @@ function LordOfTheHolesApp() {
         <div className="relative flex h-8 items-center justify-center">
           <div className="pointer-events-none absolute left-1/2 top-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 rounded-full border border-amber-500/35 bg-black/40 px-2.5 py-0.5 text-[10px] text-amber-100/80 shadow-[inset_0_1px_0_rgba(251,191,36,0.12),0_8px_18px_rgba(0,0,0,0.28)]">
             <span className={connectionStatus === "online" ? "animate-pulse text-emerald-300" : "text-red-300"}>{connectionStatus === "online" ? "●" : "○"}</span>
-            <span>{pendingHoleUpdateCount ? `${pendingHoleUpdateCount} Loch${pendingHoleUpdateCount === 1 ? "" : "er"} offen` : connectionStatus === "online" ? "Datenbank verbunden" : "Datenbank offline"}</span>
+            <span>{pendingScores.length ? `${pendingScores.length} offen` : connectionStatus === "online" ? "Datenbank verbunden" : "Datenbank offline"}</span>
           </div>
           <button type="button" onClick={() => setMenuOpen((value) => !value)} className="ml-auto rounded-xl border border-amber-500/35 bg-[linear-gradient(180deg,rgba(48,35,22,0.82),rgba(12,10,9,0.82))] px-2.5 py-1 text-base leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.12),0_8px_18px_rgba(0,0,0,0.35)] backdrop-blur-sm transition active:scale-[0.96]" aria-label="Menü öffnen">☰</button>
           {menuOpen ? (
@@ -2606,15 +1552,9 @@ function LordOfTheHolesApp() {
   }
 
   function renderStatusMessages() {
-    if (!error) return null;
-
-    return (
-      <Card className="mb-2 rounded-2xl border-amber-700/40 bg-amber-950/50">
-        <CardContent className="p-3 text-sm text-amber-100">
-          {error}
-        </CardContent>
-      </Card>
-    );
+    const isDatabaseStatusOnly = /Datenbank|offline|nicht erreichbar|nicht geladen|lokal gesichert/i.test(String(error || ""));
+    if (!error || isDatabaseStatusOnly) return null;
+    return <Card className="mb-2 rounded-2xl border-amber-700/40 bg-amber-950/50"><CardContent className="p-3 text-sm text-amber-100">{error}</CardContent></Card>;
   }
 
   function renderScoreView() {
@@ -2648,11 +1588,9 @@ function LordOfTheHolesApp() {
               </div>
             ) : <div className="mb-2 rounded-xl border border-amber-700/30 bg-black/25 p-1.5 text-[10px] text-amber-100/75">Wähle zuerst im Start-Popup deinen Spieler aus.</div>}
             {myPlayerId && !scoredPlayerId ? (
-              <div className="mb-2 rounded-2xl border border-amber-500/45 bg-stone-950/75 p-3 text-center shadow-xl shadow-black/30 backdrop-blur-sm">
-                <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300/75">Zähler-Zuordnung</div>
-                <div className="mt-1 font-serif text-lg font-black text-amber-200">Die Pergamente fehlen noch.</div>
-                <div className="mt-1 text-xs text-amber-100/65">Für diese Runde ist noch kein zugeloster Spieler für dein Handy hinterlegt. Sobald die Flight-Ziehung geladen ist, wird dein Spieler automatisch gesetzt.</div>
-                {myFlightFromDraw ? <div className="mt-2 rounded-xl bg-amber-500/10 p-2 text-xs text-amber-100/70">Du bist in Flight {myFlightFromDraw.flight_number} eingeteilt.</div> : null}
+              <div className="mb-2 rounded-2xl border border-amber-500/45 bg-stone-950/75 p-2 shadow-xl shadow-black/30 backdrop-blur-sm">
+                <div className="mb-2 text-center"><div className="text-[10px] uppercase tracking-[0.2em] text-amber-300/75">Neue Zähl-Zuordnung</div><div className="font-serif text-lg font-black text-amber-200">Wen zählst du?</div><div className="mt-1 text-xs text-amber-100/65">Wähle erst einen Spieler für diese Runde. Danach öffnet sich die Score-Eingabe.</div></div>
+                <div className="grid grid-cols-2 gap-2">{scoreablePlayers.map((player) => <button key={player.id} type="button" onClick={() => { setScoredPlayerId(player.id); saveLocalScoredPlayerForRound(displayedActiveRound?.round_id || "", player.id); }} className="rounded-2xl bg-stone-800 px-2 py-3 font-serif text-sm font-bold text-amber-100 active:scale-[0.98]">{getPlayerLabel(player)}</button>)}</div>
               </div>
             ) : (
               <div className={cls("rounded-3xl transition-colors", scoringTintClass, hasScoreMismatch && "rounded-3xl ring-1 ring-red-500/40")}>
@@ -2673,12 +1611,11 @@ function LordOfTheHolesApp() {
                   </div>
                 ) : null}
                 <div className="mb-1.5 grid grid-cols-[auto_1fr] items-center gap-2 rounded-2xl border border-[rgb(var(--score-accent)/0.30)] bg-black/25 px-3 py-2 text-[10px] text-amber-100/70"><div className="font-serif text-xl font-black leading-none text-amber-200">Loch {activeHole}</div><div className="flex items-center justify-end gap-2.5 text-right text-[11px]"><span>Par <b className="text-amber-200">{activeHoleData.par}</b></span><span>HCP <b className="text-amber-200">{activeHoleData.hcp}</b></span><span>{activeHoleData.meters} m</span><span>Vorgabe <b className="text-amber-200 tracking-[0.18em]">{formatShotMarks(entryPlayerShotsOnActiveHole)}</b></span></div></div>
-                {isCurrentRoundScoringLocked ? <div className="mb-2 rounded-2xl border border-emerald-500/45 bg-emerald-950/40 p-2 text-center text-xs font-bold text-emerald-100">Diese Runde ist vollständig und ohne Abweichung besiegelt. Scores können nicht mehr geändert werden.</div> : null}
-                <div className="mb-3"><ScoreStepper value={normalizeBoolean(currentScore.picked_up) ? 0 : currentScore.strokes ?? ""} par={activeHoleData?.par || 4} pickedUpStrokes={pickedUpStrokes} disabled={!canEnterScores || isCurrentRoundScoringLocked} onChange={(scoreValue) => Number(scoreValue) === 0 || Number(scoreValue) >= Number(pickedUpStrokes || 0) ? saveScore({ strokes: pickedUpStrokes, picked_up: true }) : saveScore({ strokes: scoreValue, picked_up: false })} /></div>
-                <div className="mb-3"><PuttStepper value={currentScore.putts_count} disabled={!canEnterScores || isCurrentRoundScoringLocked || currentEffectiveStrokes <= 1} max={maxPuttsForCurrentScore} onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })} /></div>
-                <div className="mb-3 rounded-2xl border border-[rgb(var(--score-accent)/0.30)] bg-black/25 p-2"><div className="flex items-center justify-between gap-2"><div><div className="text-xs font-semibold text-amber-100">Lady</div><div className="text-[10px] text-amber-100/65">Markiert eine Lady.</div></div><input type="checkbox" disabled={!canEnterScores || isCurrentRoundScoringLocked} checked={normalizeBoolean(currentScore.lady)} onChange={(e) => saveScore({ lady: e.target.checked })} className="h-6 w-6 accent-amber-500 disabled:opacity-40" /></div></div>
+                <div className="mb-3"><ScoreStepper value={normalizeBoolean(currentScore.picked_up) ? 0 : currentScore.strokes ?? ""} par={activeHoleData?.par || 4} pickedUpStrokes={pickedUpStrokes} disabled={!canEnterScores} onChange={(scoreValue) => Number(scoreValue) === 0 || Number(scoreValue) >= Number(pickedUpStrokes || 0) ? saveScore({ strokes: pickedUpStrokes, picked_up: true }) : saveScore({ strokes: scoreValue, picked_up: false })} /></div>
+                <div className="mb-3"><PuttStepper value={currentScore.putts_count} disabled={!canEnterScores || currentEffectiveStrokes <= 1} max={maxPuttsForCurrentScore} onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })} /></div>
+                <div className="mb-3 rounded-2xl border border-[rgb(var(--score-accent)/0.30)] bg-black/25 p-2"><div className="flex items-center justify-between gap-2"><div><div className="text-xs font-semibold text-amber-100">Lady</div><div className="text-[10px] text-amber-100/65">Markiert eine Lady.</div></div><input type="checkbox" disabled={!canEnterScores} checked={normalizeBoolean(currentScore.lady)} onChange={(e) => saveScore({ lady: e.target.checked })} className="h-6 w-6 accent-amber-500 disabled:opacity-40" /></div></div>
                 {scoreHintMessage ? <div className="mb-2 rounded-xl border border-amber-500/40 bg-amber-950/50 p-1.5 text-center text-xs font-semibold text-amber-100">{scoreHintMessage}</div> : null}
-                <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 py-3 text-base font-bold text-amber-100">Zurück</Button><Button disabled={!canEnterScores || isCurrentRoundScoringLocked} onClick={activeHole === 18 ? finishRoundFromHole18 : goToNextHole} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>{activeHole === 18 ? "Runde abschließen" : `Loch ${Math.min(18, Number(activeHole || 1) + 1)}` }</Button></div>
+                <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 py-3 text-base font-bold text-amber-100">Zurück</Button><Button disabled={activeHole === 18 || !canEnterScores} onClick={goToNextHole} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>Loch {Math.min(18, Number(activeHole || 1) + 1)}</Button></div>
               </div>
             )}
           </CardContent>
@@ -2719,19 +1656,18 @@ function LordOfTheHolesApp() {
             <h2 className="font-serif text-lg text-amber-200">Mein Handy</h2>
             <p className="mt-1 text-sm text-amber-100/65">Diese Einstellung wird nur lokal auf diesem Handy gespeichert.</p>
             <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
-              <label className="mb-1 block text-sm text-amber-100/80">Dieses Handy gehört</label>
+              <label className="mb-1 block text-sm text-amber-100/80">Zähler auf diesem Gerät</label>
               <select value={myPlayerId} onChange={(e) => { const nextMyPlayerId = e.target.value; setMyPlayerId(nextMyPlayerId); setScoreEntryMode("player"); if (displayedActiveRound?.round_id && nextMyPlayerId && String(scoredPlayerId) === String(nextMyPlayerId)) { setScoredPlayerId(""); removeLocalScoredPlayerForRound(displayedActiveRound.round_id); } }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50">
                 <option value="">Spieler auswählen</option>
                 {allPlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}
               </select>
             </div>
-            <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2 text-sm text-amber-100/75">
-              <div className="mb-1 font-semibold text-amber-100">Zugeloste Zähl-Zuordnung</div>
-              {assignedScoredPlayerId ? (
-                <div>Du zählst in dieser Runde automatisch <b className="text-amber-200">{getPlayerLabel(scoredPlayer)}</b>.</div>
-              ) : (
-                <div>Nach der Flight-Ziehung wird hier automatisch angezeigt, wen du zählst.</div>
-              )}
+            <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
+              <label className="mb-1 block text-sm text-amber-100/80">Spieler für die aktive Runde</label>
+              <select value={scoredPlayerId} onChange={(e) => { const nextPlayerId = e.target.value; setScoredPlayerId(nextPlayerId); if (displayedActiveRound?.round_id) { if (nextPlayerId) saveLocalScoredPlayerForRound(displayedActiveRound.round_id, nextPlayerId); else removeLocalScoredPlayerForRound(displayedActiveRound.round_id); } }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50">
+                <option value="">Spieler auswählen</option>
+                {scoreablePlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}
+              </select>
             </div>
           </CardContent>
         </Card>
@@ -2753,8 +1689,7 @@ function LordOfTheHolesApp() {
             <Button disabled={!isAdminUnlocked} onClick={createRoundBackup} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-700/80 py-2 text-emerald-50 disabled:opacity-50">Backup für aktive Runde erstellen</Button>
             {appLocked ? <Button disabled={!isAdminUnlocked} onClick={() => { setGlobalAppLock(false); setLockAdminBypass(false); }} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-800/70 py-2 text-emerald-50 disabled:opacity-50">App für alle freigeben</Button> : <Button disabled={!isAdminUnlocked} onClick={() => { setMenuOpen(false); setLockAdminBypass(false); setGlobalAppLock(true); }} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">App für alle sperren</Button>}
             <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={() => setClearScoresConfirmOpen(true)} className="mt-2 w-full rounded-2xl border border-red-500/50 bg-red-950/60 py-2 text-red-100 disabled:opacity-50">Scores löschen</Button>
-            <Button disabled={!isAdminUnlocked || flightDrawSaving || connectionStatus !== "online"} onClick={redrawFlightsFromAdmin} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-amber-800/70 py-2 text-amber-50 disabled:opacity-50">{flightDrawSaving ? "Flights werden bestimmt ..." : "Flights neu bestimmen"}</Button>
-            <Button disabled={!isAdminUnlocked || flightDrawSaving || connectionStatus !== "online"} onClick={startRoundWithFullResetAndFlightDraw} className="mt-2 w-full rounded-2xl border border-emerald-400/60 bg-emerald-800/80 py-2 text-emerald-50 disabled:opacity-50">{flightDrawSaving ? "Rundenstart wird vorbereitet ..." : "Runde kann beginnen"}</Button>
+            <Button disabled={!isAdminUnlocked || connectionStatus !== "online"} onClick={resetDeviceAssignmentsForAll} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">Spieler-/Zähler-Zuordnungen zurücksetzen</Button>
             <Button disabled={!isAdminUnlocked} onClick={clearLocalCache} className="mt-2 w-full rounded-2xl border border-sky-500/40 bg-sky-950/60 py-2 text-sky-100 disabled:opacity-50">Lokalen Cache dieses Geräts löschen</Button>
             <Button disabled={!isAdminUnlocked || connectionStatus !== "online"} onClick={fullResetForAllDevices} className="mt-2 w-full rounded-2xl border border-red-400/60 bg-red-950/80 py-2 text-red-100 disabled:opacity-50">Script-Cache löschen + Komplett-Reset für alle</Button>
           </CardContent>
@@ -2881,7 +1816,7 @@ function LordOfTheHolesApp() {
       <div className="fixed inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/lord-bg.webp')" }} />
       <div className="fixed inset-0 bg-black/45" />
       <div className="fixed inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.06),rgba(0,0,0,0.58)_38%,rgba(0,0,0,0.86)_100%)]" />
-      {((showSplash || appLocked) && !lockAdminBypass) ? <div className="fixed inset-0 z-[100] bg-black"><div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/lord-bg.webp')" }} /><div className="absolute inset-0 bg-black/25" />{!appLocked ? <div className="absolute inset-x-0 bottom-8 flex justify-center px-6 pb-[env(safe-area-inset-bottom)]"><button type="button" disabled={splashEntering} onClick={enterRoundFromSplash} className="w-full max-w-xs rounded-2xl border border-amber-300/55 bg-black/55 px-5 py-2.5 font-serif text-lg font-black tracking-wide text-amber-200 shadow-2xl shadow-black/70 backdrop-blur-sm active:scale-[0.98] disabled:opacity-60">{splashEntering ? "Datenbank wird geladen ..." : "Die Saga beginnt"}</button></div> : flightRevealRunning ? <div className="absolute inset-x-3 bottom-5 top-5 mx-auto flex max-w-md items-center justify-center pb-[env(safe-area-inset-bottom)]"><div className="w-full">{renderFlightDrawPanel()}</div></div> : <div className="absolute inset-x-4 bottom-6 mx-auto max-w-sm pb-[env(safe-area-inset-bottom)]"><div className="mb-3">{renderFlightDrawPanel()}</div><div className="rounded-3xl border border-amber-500/35 bg-black/55 p-3 text-center text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm"><div className="font-serif text-lg font-black text-amber-200">Der Rat ist noch nicht einberufen.</div><div className="mt-1.5 text-xs leading-snug text-amber-100/80">Im Weimarer Land werden Stimmen gesenkt, alte Karten entrollt und verdächtig ernste Blicke ausgetauscht. Die Gefährten werden bald gerufen.</div><div className="mt-2.5 grid grid-cols-4 gap-1 rounded-2xl border border-amber-500/25 bg-black/35 p-1.5 text-center"><div><div className="font-serif text-lg font-black text-amber-200">{lockCountdown.days}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Tage</div></div><div><div className="font-serif text-lg font-black text-amber-200">{String(lockCountdown.hours).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Std</div></div><div><div className="font-serif text-lg font-black text-amber-200">{String(lockCountdown.minutes).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Min</div></div><div><div className="font-serif text-lg font-black text-amber-200">{String(lockCountdown.seconds).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Sek</div></div></div><div className="mt-2 rounded-2xl border border-amber-500/25 bg-black/30 px-2.5 py-1.5 font-serif text-xs font-bold text-amber-100">Die Pforten sind noch verschlossen. Gandalf selbst würde jetzt sagen: „Du kommst hier noch nicht rein.“</div></div></div>}{appLocked ? <button type="button" onClick={() => setLockUnlockOpen(true)} className="absolute bottom-3 left-3 h-8 w-8 rounded-full text-[10px] text-amber-100/10" aria-label="Admin-Zugang">•</button> : null}{appLocked && lockUnlockOpen ? <div className="absolute inset-x-4 bottom-8 mx-auto max-w-xs rounded-2xl border border-amber-700/35 bg-black/70 p-3 text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm"><div className="mb-2 text-xs uppercase tracking-[0.18em] text-amber-300/70">Admin</div><input type="password" value={lockPasswordInput} onChange={(e) => setLockPasswordInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") enterLockedAppAsAdmin(); }} placeholder="Passwort" className="mb-2 w-full rounded-xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" autoFocus /><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => { setLockUnlockOpen(false); setLockPasswordInput(""); }} className="rounded-xl bg-stone-800 py-2 text-sm font-bold text-amber-100">Abbrechen</button><button type="button" disabled={splashEntering} onClick={enterLockedAppAsAdmin} className="rounded-xl bg-amber-600 py-2 text-sm font-bold text-amber-50 disabled:opacity-60">{splashEntering || flightDrawSaving ? "Öffne ..." : "Zeremonienmeister"}</button></div><button type="button" disabled={splashEntering || flightDrawSaving} onClick={enterAppWithoutFlightDraw} className="mt-2 w-full rounded-xl border border-amber-500/35 bg-stone-950/85 py-2 text-sm font-bold text-amber-100 disabled:opacity-60">Direkt in die App</button></div> : null}</div> : null}
+      {((showSplash || appLocked) && !lockAdminBypass) ? <div className="fixed inset-0 z-[100] bg-black"><div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/lord-bg.webp')" }} /><div className="absolute inset-0 bg-black/25" />{!appLocked ? <div className="absolute inset-x-0 bottom-8 flex justify-center px-6 pb-[env(safe-area-inset-bottom)]"><button type="button" disabled={splashEntering} onClick={enterRoundFromSplash} className="w-full max-w-xs rounded-2xl border border-amber-300/55 bg-black/55 px-5 py-2.5 font-serif text-lg font-black tracking-wide text-amber-200 shadow-2xl shadow-black/70 backdrop-blur-sm active:scale-[0.98] disabled:opacity-60">{splashEntering ? "Datenbank wird geladen ..." : "Runde betreten"}</button></div> : <div className="absolute inset-x-4 bottom-10 mx-auto max-w-sm rounded-3xl border border-amber-500/35 bg-black/55 p-4 text-center text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm"><div className="font-serif text-xl font-black text-amber-200">Der Rat ist noch nicht einberufen.</div><div className="mt-2 text-sm text-amber-100/80">Im Weimarer Land werden Stimmen gesenkt, alte Karten entrollt und verdächtig ernste Blicke ausgetauscht. Die Gefährten werden bald gerufen.</div><div className="mt-4 grid grid-cols-4 gap-1.5 rounded-2xl border border-amber-500/25 bg-black/35 p-2 text-center"><div><div className="font-serif text-xl font-black text-amber-200">{lockCountdown.days}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Tage</div></div><div><div className="font-serif text-xl font-black text-amber-200">{String(lockCountdown.hours).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Std</div></div><div><div className="font-serif text-xl font-black text-amber-200">{String(lockCountdown.minutes).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Min</div></div><div><div className="font-serif text-xl font-black text-amber-200">{String(lockCountdown.seconds).padStart(2, "0")}</div><div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">Sek</div></div></div></div>}{appLocked ? <button type="button" onClick={() => setLockUnlockOpen(true)} className="absolute bottom-3 left-3 h-8 w-8 rounded-full text-[10px] text-amber-100/10" aria-label="Admin-Zugang">•</button> : null}{appLocked && lockUnlockOpen ? <div className="absolute inset-x-4 bottom-8 mx-auto max-w-xs rounded-2xl border border-amber-700/35 bg-black/70 p-3 text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm"><div className="mb-2 text-xs uppercase tracking-[0.18em] text-amber-300/70">Admin</div><input type="password" value={lockPasswordInput} onChange={(e) => setLockPasswordInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") enterLockedAppAsAdmin(); }} placeholder="Passwort" className="mb-2 w-full rounded-xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" autoFocus /><div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => { setLockUnlockOpen(false); setLockPasswordInput(""); }} className="rounded-xl bg-stone-800 py-2 text-sm font-bold text-amber-100">Abbrechen</button><button type="button" disabled={splashEntering} onClick={enterLockedAppAsAdmin} className="rounded-xl bg-amber-600 py-2 text-sm font-bold text-amber-50 disabled:opacity-60">{splashEntering ? "Lade ..." : "Admin rein"}</button></div></div> : null}</div> : null}
       <main className="relative z-10 mx-auto max-w-md px-2 py-1.5">
         {renderHeader()}
         {renderStatusMessages()}
