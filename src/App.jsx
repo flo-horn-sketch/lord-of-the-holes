@@ -1404,10 +1404,11 @@ function LordOfTheHolesApp() {
   }, [displayedActiveRound?.round_id, myPlayerId, assignedScoredPlayerId, scoredPlayerId, showSplash, appLocked, lockAdminBypass]);
 
   async function callSheetApi(payload) {
-    const url = new URL(GOOGLE_SHEETS_API_URL);
-    url.searchParams.set("payload", JSON.stringify(payload));
-    url.searchParams.set("cacheBust", String(Date.now()));
-    const response = await fetch(url.toString(), { method: "GET" });
+    const response = await fetch(GOOGLE_SHEETS_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ ...payload, cacheBust: Date.now() }),
+    });
     if (!response.ok) throw new Error("Datenbank nicht erreichbar.");
     const data = await response.json();
     if (data && data.ok === false) throw new Error(data.error || "Datenbank meldet einen Fehler.");
