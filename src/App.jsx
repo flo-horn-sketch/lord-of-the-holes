@@ -48,7 +48,7 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
-const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbx-Wi4oNTAppKeiE-sdqh6cuuwQNd-nlUKklfAQVhyGuJOI6FVJFOMugBmkGyp-ZITN/exec";
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbxbBaOQbU8It4jqrKUAe23Sc1hBLqNDEz8ZdSvUxIDz8UpJDxS99J_g7xN2T4tQNu0V/exec";
 const ADMIN_PASSWORD = "weimar";
 const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T10:00:00+02:00");
 const FLIGHT_DRAW_TARGET = new Date("2026-05-21T20:00:00+02:00");
@@ -957,6 +957,346 @@ function FunTable({ title, subtitle = "", players, columns, nameLabel = "Name" }
         </table>
       </div>
     </div>
+  );
+}
+
+function TeamDrawView({ players, callSheetApi }) {
+  const storageKey = "lordOfTheHoles.teamDraw.r2r3";
+  const [teamDraw, setTeamDraw] = useState(() => readLocalJson(storageKey, null));
+  const [ceremonyRunning, setCeremonyRunning] = useState(false);
+  const [ceremonyRoundIndex, setCeremonyRoundIndex] = useState(0);
+  const [ceremonyStep, setCeremonyStep] = useState(0);
+  const [expanded, setExpanded] = useState(false);
+  const revealedStorageKey = `${storageKey}.revealedRounds`;
+  const [revealedRounds, setRevealedRounds] = useState(() => readLocalJson(revealedStorageKey, {}));
+  const [saving, setSaving] = useState(false);
+  const [teamDrawError, setTeamDrawError] = useState("");
+  const [ceremonyPassword, setCeremonyPassword] = useState("");
+  const [ceremonyUnlocked, setCeremonyUnlocked] = useState(false);
+
+  const eligiblePlayers = useMemo(() => (players || []).filter((player) => String(player.id || "") !== ""), [players]);
+
+  const pairKey = (a, b) => [String(a), String(b)].sort().join("|");
+
+  const createRoundTeams = (playerList, forbiddenPairs = new Set()) => {
+    const ids = playerList.map((player) => String(player.id));
+    const makeTeamsFromOrder = (order) => {
+      const teams = [];
+      for (let index = 0; index < order.length; index += 2) teams.push(order.slice(index, index + 2));
+      return teams;
+    };
+    const isValid = (teams) => teams.every((team) => team.length < 2 || !forbiddenPairs.has(pairKey(team[0], team[1])));
+
+    for (let attempt = 0; attempt < 1200; attempt += 1) {
+      const shuffled = [...ids].sort(() => Math.random() - 0.5);
+      const teams = makeTeamsFromOrder(shuffled);
+      if (isValid(teams)) return teams;
+    }
+
+    return makeTeamsFromOrder(ids);
+  };
+
+  const buildTeamDraw = () => {
+    const forbiddenPairs = new Set();
+    const round2Teams = createRoundTeams(eligiblePlayers, forbiddenPairs);
+    round2Teams.forEach((team) => { if (team.length >= 2) forbiddenPairs.add(pairKey(team[0], team[1])); });
+    const round3Teams = createRoundTeams(eligiblePlayers, forbiddenPairs);
+
+    return {
+      draw_key: `teams-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      rounds: [
+        { round_id: "r2", round_name: "Runde 2 · Durch die Minen von Moria", teams: round2Teams },
+        { round_id: "r3", round_name: "Runde 3 · Vor den Toren Mordors", teams: round3Teams },
+      ],
+    };
+  };
+
+  const loadTeamDrawFromSheet = async () => {
+    if (!callSheetApi) return;
+    try {
+      const state = await callSheetApi({ action: "getState" });
+      const sheetDraw = state?.team_draw || state?.teamDraw || null;
+      if (sheetDraw?.rounds?.length) {
+        setTeamDraw(sheetDraw);
+        writeLocalJson(storageKey, sheetDraw);
+      }
+    } catch {
+      // Lokaler Fallback bleibt sichtbar, falls das Apps Script noch nicht aktualisiert ist.
+    }
+  };
+
+  useEffect(() => {
+    loadTeamDrawFromSheet();
+  }, []);
+
+  const saveTeamDrawToSheet = async (draw) => {
+    if (!callSheetApi) throw new Error("Datenbankfunktion nicht verfügbar.");
+    const result = await callSheetApi({ action: "saveTeamDraw", team_draw: draw, teamDraw: draw });
+    if (!result || result.ok === false) throw new Error(result?.error || "Teamauslosung konnte nicht gespeichert werden.");
+    return result?.team_draw || result?.teamDraw || draw;
+  };
+
+  const unlockCeremony = () => {
+    if (String(ceremonyPassword || "").trim() !== ADMIN_PASSWORD) {
+      setTeamDrawError("Passwort ist falsch.");
+      return;
+    }
+    setTeamDrawError("");
+    setCeremonyPassword("");
+    setCeremonyUnlocked(true);
+  };
+
+  const startCeremony = async (roundIndex) => {
+    if (!ceremonyUnlocked) {
+      setTeamDrawError("Bitte zuerst das Zeremonienmeister-Passwort eingeben.");
+      return;
+    }
+    let draw = teamDraw;
+    if (!draw?.rounds?.length) {
+      await loadTeamDrawFromSheet();
+      draw = readLocalJson(storageKey, null);
+    }
+    if (!draw?.rounds?.[roundIndex]) {
+      setTeamDrawError("Noch keine Teamauslosung gefunden. Bitte zuerst über \"Runde beginnen\" neu auslosen.");
+      return;
+    }
+    setExpanded(false);
+    setCeremonyRoundIndex(roundIndex);
+    setCeremonyStep(0);
+    setCeremonyRunning(true);
+  };
+
+
+  const ceremonyFrames = useMemo(() => {
+    const round = teamDraw?.rounds?.[ceremonyRoundIndex];
+    if (!round) return [];
+    const roundLabel = ceremonyRoundIndex === 0 ? "Runde 2" : "Runde 3";
+    const introText = ceremonyRoundIndex === 0
+      ? "In den Minen von Moria sollte niemand allein gehen. Die Bündnisse für Runde 2 werden geöffnet."
+      : "Vor den Toren Mordors zählt jede Allianz doppelt. Die Bündnisse für Runde 3 werden offenbart.";
+    const frames = [
+      { type: "text", title: "Teamauslosung der Bündnisse", text: "Der Rat hebt die Hand. Die Pergamente rascheln. Neue Allianzen werden besiegelt." },
+      { type: "text", title: roundLabel, text: introText },
+      { type: "reveal", revealCount: 0 },
+    ];
+    const revealTotal = (round.teams || []).flat().length;
+    for (let count = 1; count <= revealTotal; count += 1) frames.push({ type: "reveal", revealCount: count });
+    frames.push({ type: "text", title: "Das Bündnis ist besiegelt", text: `${roundLabel} hat seine Teams gefunden. Mögen sie daran wachsen und nicht schon am ersten Grün zerbrechen.` });
+    return frames;
+  }, [teamDraw, ceremonyRoundIndex]);
+
+  useEffect(() => {
+    if (!ceremonyRunning || !ceremonyFrames.length) return undefined;
+    if (ceremonyStep >= ceremonyFrames.length - 1) {
+      const doneTimer = window.setTimeout(() => {
+        setCeremonyRunning(false);
+        const finishedRoundId = String(teamDraw?.rounds?.[ceremonyRoundIndex]?.round_id || "");
+        if (finishedRoundId) {
+          setRevealedRounds((current) => {
+            const next = { ...(current || {}), [finishedRoundId]: true };
+            writeLocalJson(revealedStorageKey, next);
+            return next;
+          });
+        }
+        setExpanded(true);
+      }, 2600);
+      return () => window.clearTimeout(doneTimer);
+    }
+    const current = ceremonyFrames[ceremonyStep];
+    const delay = current?.type === "reveal" ? 1200 : 3200;
+    const timer = window.setTimeout(() => setCeremonyStep((step) => step + 1), delay);
+    return () => window.clearTimeout(timer);
+  }, [ceremonyRunning, ceremonyStep, ceremonyFrames]);
+
+  const playerById = useMemo(() => {
+    const map = {};
+    eligiblePlayers.forEach((player) => { map[String(player.id)] = player; });
+    return map;
+  }, [eligiblePlayers]);
+
+  const renderPlayerChip = (playerId, index = 0) => {
+    const player = playerById[String(playerId)] || { id: playerId, display_name: playerId, alias_name: playerId };
+    return (
+      <motion.div key={`${playerId}-${index}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.42, delay: index * 0.08 }} className="rounded-2xl border border-amber-400/35 bg-amber-500/10 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]">
+        <div className="font-serif text-base font-black leading-tight text-amber-100">{player.alias_name || player.display_name || player.character_name || player.id}</div>
+        <div className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-100/50">{player.display_name || player.character_name || player.id}</div>
+      </motion.div>
+    );
+  };
+
+  const renderTeams = (round, revealCount = 999) => {
+    let shown = 0;
+    return (
+      <div className="space-y-2">
+        <h3 className="font-serif text-xl font-black text-amber-200">{round.round_name}</h3>
+        {(round.teams || []).map((team, teamIndex) => (
+          <div key={`${round.round_id}-${teamIndex}`} className="rounded-3xl border border-amber-600/32 bg-black/28 p-3 shadow-xl">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="font-serif text-lg font-black text-amber-200">Team {teamIndex + 1}</div>
+              <div className="rounded-full border border-amber-500/25 bg-black/25 px-2 py-1 text-[10px] uppercase tracking-[0.18em] text-amber-100/55">Bündnis</div>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {team.map((playerId) => {
+                shown += 1;
+                if (shown > revealCount) return null;
+                return renderPlayerChip(playerId, shown);
+              })}
+            </div>
+            {shown <= revealCount ? null : <div className="rounded-2xl border border-amber-700/25 bg-black/25 px-3 py-2 text-sm text-amber-100/55">Das Pergament bleibt noch verschlossen ...</div>}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const teamRewardText = (teamIndex) => {
+    if (teamIndex === 0) return "+100 € p.P.";
+    if (teamIndex === 1) return "0 € p.P.";
+    if (teamIndex === 2) return "−100 € p.P.";
+    return "nach Platzierung";
+  };
+
+  const teamRewardClass = (teamIndex) => {
+    if (teamIndex === 0) return "text-emerald-200";
+    if (teamIndex === 1) return "text-amber-100";
+    if (teamIndex === 2) return "text-red-200";
+    return "text-amber-100/70";
+  };
+
+  const renderRevealedRoundOverview = (round) => (
+    <div className="space-y-2">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h3 className="font-serif text-xl font-black text-amber-200">{round.round_name}</h3>
+          <p className="mt-0.5 text-xs leading-relaxed text-amber-100/60">Übersicht nach der Zeremonie. Die Geldwerte zeigen die Teamwertung pro Person: Platz 1 +100 €, Platz 2 0 €, Platz 3 −100 €.</p>
+        </div>
+        <div className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100/80">enthüllt</div>
+      </div>
+      {(round.teams || []).map((team, teamIndex) => (
+        <div key={`${round.round_id}-overview-${teamIndex}`} className="rounded-3xl border border-amber-700/34 bg-black/28 p-3 shadow-xl">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="font-serif text-lg font-black text-amber-200">Team {teamIndex + 1}</div>
+            <div className={cls("rounded-full border border-amber-500/25 bg-black/35 px-2 py-1 text-xs font-black", teamRewardClass(teamIndex))}>{teamRewardText(teamIndex)}</div>
+          </div>
+          <div className="overflow-hidden rounded-2xl border border-amber-700/25 bg-stone-950/45">
+            <table className="w-full border-collapse text-sm text-amber-50">
+              <thead>
+                <tr className="border-b border-amber-700/20 text-left text-[10px] uppercase tracking-[0.16em] text-amber-100/55">
+                  <th className="px-2 py-1.5">Spieler</th>
+                  <th className="px-2 py-1.5 text-right">Gewinn / Strafe</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(team || []).map((playerId) => {
+                  const player = playerById[String(playerId)] || { id: playerId, display_name: playerId, alias_name: playerId };
+                  return (
+                    <tr key={`${round.round_id}-${teamIndex}-${playerId}`} className="border-t border-amber-700/15">
+                      <td className="px-2 py-2">
+                        <div className="font-serif text-base font-black text-amber-100">{player.alias_name || player.display_name || player.character_name || player.id}</div>
+                        <div className="text-[10px] uppercase tracking-[0.14em] text-amber-100/45">{player.display_name || player.character_name || player.id}</div>
+                      </td>
+                      <td className={cls("px-2 py-2 text-right font-serif text-base font-black", teamRewardClass(teamIndex))}>{teamRewardText(teamIndex)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  const hasRevealedAnyRound = Boolean(teamDraw?.rounds?.some((round) => revealedRounds?.[String(round.round_id)]));
+  const currentFrame = ceremonyFrames[ceremonyStep] || ceremonyFrames[0];
+
+  return (
+    <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
+      <div className="landscape:mx-auto landscape:max-w-3xl landscape:pb-6">
+        <Card className="mb-3 overflow-hidden rounded-3xl border border-amber-400/40 bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.18),transparent_42%),linear-gradient(180deg,rgba(48,35,22,0.92),rgba(12,10,9,0.88))] shadow-[inset_0_1px_0_rgba(251,191,36,0.16),0_22px_52px_rgba(0,0,0,0.48)] backdrop-blur-sm">
+          <CardContent className="p-4 text-center">
+            <p className="text-[10px] uppercase tracking-[0.28em] text-amber-300/75">Der Rat von Bruchtal</p>
+            <h2 className="mt-1 font-serif text-2xl font-black leading-tight text-amber-200">Teamauslosung der Bündnisse</h2>
+            <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-amber-100/72">Nur Runde 2 und Runde 3. Die Teams werden ausschließlich über „Runde beginnen“ neu gezogen, in der Datenbank besiegelt und auf allen Geräten gleich angezeigt.</p>
+            {teamDrawError ? <div className="mt-3 rounded-2xl border border-red-400/35 bg-red-950/35 px-3 py-2 text-sm text-red-100">{teamDrawError}</div> : null}
+            <div className="mt-3 grid grid-cols-1 gap-2">
+              <button type="button" onClick={loadTeamDrawFromSheet} disabled={ceremonyRunning || saving} className="rounded-2xl border border-amber-300/50 bg-amber-500/18 px-3 py-2 font-serif text-base font-black text-amber-100 shadow-lg disabled:opacity-45">
+                Teams aus der Datenbank laden
+              </button>
+              {!ceremonyUnlocked ? (
+                <div className="rounded-3xl border border-amber-700/35 bg-black/26 p-3 text-left">
+                  <div className="mb-2 text-[10px] font-black uppercase tracking-[0.2em] text-amber-300/65">Zeremonienmeister</div>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      value={ceremonyPassword}
+                      onChange={(event) => setCeremonyPassword(event.target.value)}
+                      onKeyDown={(event) => { if (event.key === "Enter") unlockCeremony(); }}
+                      placeholder="Passwort"
+                      className="min-w-0 flex-1 rounded-2xl border border-amber-700/35 bg-stone-950/75 px-3 py-2 text-sm text-amber-100 outline-none placeholder:text-amber-100/30"
+                    />
+                    <button type="button" onClick={unlockCeremony} className="rounded-2xl border border-amber-300/45 bg-amber-500/18 px-3 py-2 font-serif text-sm font-black text-amber-100 shadow-lg">
+                      Öffnen
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => startCeremony(0)} disabled={!teamDraw || ceremonyRunning || saving} className="rounded-2xl border border-amber-300/45 bg-black/28 px-3 py-2 font-serif text-sm font-black text-amber-100 disabled:opacity-45">Zeremonie Runde 2</button>
+                  <button type="button" onClick={() => startCeremony(1)} disabled={!teamDraw || ceremonyRunning || saving} className="rounded-2xl border border-amber-300/45 bg-black/28 px-3 py-2 font-serif text-sm font-black text-amber-100 disabled:opacity-45">Zeremonie Runde 3</button>
+                </div>
+              )}
+              <button type="button" onClick={() => setExpanded((value) => !value)} disabled={!hasRevealedAnyRound || ceremonyRunning} className="rounded-2xl border border-amber-700/35 bg-black/28 px-3 py-2 font-serif text-base font-black text-amber-100/85 disabled:opacity-45">
+                Übersicht {expanded ? "schließen" : "öffnen"}
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {ceremonyRunning && currentFrame ? (
+          <Card className="mb-3 overflow-hidden rounded-3xl border border-amber-400/45 bg-black/72 shadow-[0_22px_60px_rgba(0,0,0,0.62)] backdrop-blur-md">
+            <CardContent className="p-4">
+              <p className="mb-3 text-center text-[10px] uppercase tracking-[0.28em] text-amber-300/72">Der Rat von Bruchtal</p>
+              <AnimatePresence mode="wait">
+                <motion.div key={ceremonyStep} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.55 }}>
+                  {currentFrame.type === "text" ? (
+                    <div className="rounded-3xl border border-amber-500/35 bg-[linear-gradient(180deg,rgba(48,35,22,0.64),rgba(12,10,9,0.72))] p-4 text-center">
+                      <div className="font-serif text-2xl font-black text-amber-200">{currentFrame.title}</div>
+                      <p className="mx-auto mt-3 max-w-md text-base leading-relaxed text-amber-100/82">{currentFrame.text}</p>
+                    </div>
+                  ) : (
+                    <div>{renderTeams(teamDraw?.rounds?.[ceremonyRoundIndex] || { teams: [] }, currentFrame.revealCount)}</div>
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {teamDraw && expanded && !ceremonyRunning ? (
+          <div className="space-y-3">
+            {(teamDraw.rounds || [])
+              .filter((round) => revealedRounds?.[String(round.round_id)])
+              .map((round) => (
+                <Card key={round.round_id} className="rounded-3xl border border-amber-700/34 bg-[linear-gradient(180deg,rgba(32,23,15,0.88),rgba(12,10,9,0.78))] shadow-xl backdrop-blur-sm">
+                  <CardContent className="p-3">{renderRevealedRoundOverview(round)}</CardContent>
+                </Card>
+              ))}
+            {!hasRevealedAnyRound ? (
+              <Card className="rounded-3xl border border-amber-500/30 bg-black/28 shadow-xl backdrop-blur-sm">
+                <CardContent className="p-3 text-center text-sm leading-relaxed text-amber-100/72">Die Teams bleiben verschlossen, bis die jeweilige Zeremonie gespielt wurde.</CardContent>
+              </Card>
+            ) : (
+              <Card className="rounded-3xl border border-amber-500/30 bg-black/28 shadow-xl backdrop-blur-sm">
+                <CardContent className="p-3 text-center text-sm leading-relaxed text-amber-100/72">Nur enthüllte Runden werden angezeigt. Nicht enthüllte Bündnisse bleiben bis zur Zeremonie verborgen.</CardContent>
+              </Card>
+            )}
+          </div>
+        ) : null}
+      </div>
+    </motion.section>
   );
 }
 
@@ -2156,13 +2496,14 @@ function LordOfTheHolesApp() {
     if (value === "archive") setView("archive");
     if (value === "fun") setView("fun");
     if (value === "flights") setView("flights");
+    if (value === "teams") setView("teams");
     if (value === "rules") setView("rules");
     if (value === "settings") setView("handicaps");
     if (value === "admin") setView("admin");
   }
 
   function renderHeader() {
-    const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "flights" ? "Flights" : mainMenu === "rules" ? "Regeln" : mainMenu === "admin" ? "Admin" : "Einstellungen";
+    const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "flights" ? "Flights" : mainMenu === "teams" ? "Teamauslosung" : mainMenu === "rules" ? "Regeln" : mainMenu === "admin" ? "Admin" : "Einstellungen";
     return (
       <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-1 pt-1">
         <div className="relative flex h-8 items-center justify-center">
@@ -2173,7 +2514,7 @@ function LordOfTheHolesApp() {
           <button type="button" onClick={() => setMenuOpen((value) => !value)} className="ml-auto rounded-xl border border-amber-500/35 bg-[linear-gradient(180deg,rgba(48,35,22,0.82),rgba(12,10,9,0.82))] px-2.5 py-1 text-base leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.12),0_8px_18px_rgba(0,0,0,0.35)] backdrop-blur-sm transition active:scale-[0.96]" aria-label="Menü öffnen">☰</button>
           {menuOpen ? (
             <div className="absolute right-0 top-[34px] z-30 w-64 overflow-hidden rounded-2xl border border-amber-700/40 bg-stone-950/95 text-left shadow-2xl shadow-black/70 backdrop-blur">
-              {[["current", "Scoring"], ["roundTables", "Tabellen Runde"], ["tournament", "Turnier"], ["archive", "Scorekarten"], ["fun", "Mittelerde"], ["flights", "Flights"], ["rules", "Regeln"], ["settings", "Einstellungen"], ["admin", "Admin"]].map(([value, label]) => (
+              {[["current", "Scoring"], ["roundTables", "Tabellen Runde"], ["tournament", "Turnier"], ["archive", "Scorekarten"], ["fun", "Mittelerde"], ["flights", "Flights"], ["teams", "Teamauslosung"], ["rules", "Regeln"], ["settings", "Einstellungen"], ["admin", "Admin"]].map(([value, label]) => (
                 <button
                   key={value}
                   type="button"
@@ -2739,6 +3080,7 @@ function LordOfTheHolesApp() {
     if (view === "archive") return renderArchiveView();
     if (view === "fun") return renderFunView();
     if (view === "flights") return renderFlightsView();
+    if (view === "teams") return <TeamDrawView players={playersWithCurrentHandicaps} callSheetApi={callSheetApi} />;
     if (view === "rules") return renderRulesView();
     return renderScoreView();
   }
