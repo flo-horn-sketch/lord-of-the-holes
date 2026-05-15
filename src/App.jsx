@@ -1435,9 +1435,7 @@ function LordOfTheHolesApp() {
       }
       const serverFlightDraw = data.flight_draw || data.flightDraw || null;
       const serverSentFlightDraw = Object.prototype.hasOwnProperty.call(data, "flight_draw") || Object.prototype.hasOwnProperty.call(data, "flightDraw");
-      const serverFlightDrawIsValid = Boolean(serverFlightDraw && (serverFlightDraw.rounds?.length || serverFlightDraw.rows?.length || serverFlightDraw.flight_draw_rows?.length || serverFlightDraw.flightDrawRows?.length || Array.isArray(serverFlightDraw)));
-      const nextLoadedFlightDraw = serverFlightDrawIsValid ? serverFlightDraw : flightDraw || readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null);
-      if (serverFlightDrawIsValid) {
+      if (serverFlightDraw && (serverFlightDraw.rounds?.length || serverFlightDraw.rows?.length || serverFlightDraw.flight_draw_rows?.length || serverFlightDraw.flightDrawRows?.length || Array.isArray(serverFlightDraw))) {
         setFlightDraw(serverFlightDraw);
         writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, serverFlightDraw);
       } else if (serverSentFlightDraw) {
@@ -1463,16 +1461,7 @@ function LordOfTheHolesApp() {
       setSelectedCourseId(nextActiveRound?.course_id || "");
       setSelectedActiveRoundId(nextRoundId);
       if (String(previousRoundId || "") !== String(nextRoundId || "") || roundChanged) {
-        const nextAssignedPlayerId = ["r1", "r2", "r3"].includes(String(nextRoundId))
-          ? getAssignedScoredPlayerIdFromDraw(nextLoadedFlightDraw, nextRoundId, myPlayerId || readLocalJson("lordOfTheHoles.myPlayerId", ""))
-          : "";
-        if (nextAssignedPlayerId) {
-          setScoredPlayerId(nextAssignedPlayerId);
-          saveLocalScoredPlayerForRound(nextRoundId, nextAssignedPlayerId);
-        } else {
-          setScoredPlayerId("");
-          removeLocalScoredPlayerForRound(nextRoundId);
-        }
+        setScoredPlayerId("");
         setScoreEntryMode("player");
         lastLoadedRoundRef.current = "";
       }
