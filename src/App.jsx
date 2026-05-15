@@ -1048,7 +1048,8 @@ function LordOfTheHolesApp() {
   const [scorecardRoundId, setScorecardRoundId] = useState(() => readLocalJson("lordOfTheHoles.scorecardRoundId", ""));
   const [roundTableRoundId, setRoundTableRoundId] = useState(() => readLocalJson("lordOfTheHoles.roundTableRoundId", ""));
   const [roundSummaryDismissedKeys, setRoundSummaryDismissedKeys] = useState(() => readLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", []));
-  const [flightDraw, setFlightDraw] = useState(() => readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null));
+  const [flightDraw, setFlightDraw] = useState(null);
+  const [flightDrawLoadedFromServer, setFlightDrawLoadedFromServer] = useState(false);
   const [flightRevealRunning, setFlightRevealRunning] = useState(false);
   const [flightRevealRoundIndex, setFlightRevealRoundIndex] = useState(0);
   const [flightRevealCount, setFlightRevealCount] = useState(0);
@@ -1218,6 +1219,8 @@ function LordOfTheHolesApp() {
     return { days, hours, minutes, seconds };
   }, [lockCountdownNow]);
 
+  const flightDrawAvailable = lockCountdownNow.getTime() >= FLIGHT_DRAW_TARGET.getTime();
+
   useEffect(() => { writeLocalJson("lordOfTheHoles.myPlayerId", myPlayerId); }, [myPlayerId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerId", scoredPlayerId); }, [scoredPlayerId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerByRound", scoredPlayerByRound); }, [scoredPlayerByRound]);
@@ -1237,7 +1240,12 @@ function LordOfTheHolesApp() {
     writeLocalJson("lordOfTheHoles.cachedState", { players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId, flightDraw, cachedAt: new Date().toISOString() });
   }, [players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId, flightDraw]);
   useEffect(() => { introAudioRef.current = new Audio("/intro-sound.mp3"); introAudioRef.current.preload = "auto"; introAudioRef.current.loop = false; }, []);
-  useEffect(() => { if (!autoSync) return undefined; loadData({ silent: true }); const timer = setInterval(() => loadData({ silent: true }), 30000); return () => clearInterval(timer); }, [autoSync]);
+  useEffect(() => {
+    loadData({ silent: true });
+    if (!autoSync) return undefined;
+    const timer = setInterval(() => loadData({ silent: true }), 30000);
+    return () => clearInterval(timer);
+  }, [autoSync]);
   useEffect(() => { if (!autoSync || !pendingScores.length) return undefined; const timer = setInterval(() => flushPendingScores(), 10000); return () => clearInterval(timer); }, [autoSync, pendingScores]);
   useEffect(() => {
     if (!selectedActiveRoundId) return;
@@ -1350,9 +1358,11 @@ function LordOfTheHolesApp() {
       const serverSentFlightDraw = Object.prototype.hasOwnProperty.call(data, "flight_draw") || Object.prototype.hasOwnProperty.call(data, "flightDraw");
       if (serverFlightDraw && (serverFlightDraw.rounds?.length || serverFlightDraw.rows?.length || serverFlightDraw.flight_draw_rows?.length || serverFlightDraw.flightDrawRows?.length || Array.isArray(serverFlightDraw))) {
         setFlightDraw(serverFlightDraw);
+        setFlightDrawLoadedFromServer(true);
         writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, serverFlightDraw);
       } else if (serverSentFlightDraw) {
         setFlightDraw(null);
+        setFlightDrawLoadedFromServer(false);
         window.localStorage.removeItem(FLIGHT_DRAW_STORAGE_KEY);
       }
 
@@ -1633,6 +1643,7 @@ function LordOfTheHolesApp() {
       const saveResult = await callSheetApi({ action: "saveFlightDraw", draw, test: false });
       const savedDraw = saveResult?.flight_draw || saveResult?.flightDraw || draw;
       setFlightDraw(savedDraw);
+      setFlightDrawLoadedFromServer(true);
       writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, savedDraw);
       setConnectionStatus("online");
       setSetupSavedMessage("Die Flight-Ziehung wurde neu bestimmt und gespeichert.");
@@ -1784,15 +1795,8 @@ function LordOfTheHolesApp() {
     setPendingScores([]);
     pendingScoresRef.current = [];
 
-    setDirtyScoreKeys({});
-    dirtyScoreKeysRef.current = {};
-    syncingScoreKeysRef.current = {};
-    writeLocalJson("lordOfTheHoles.dirtyScoreKeys", {});
-
     setScores([]);
     setAllScores([]);
-    scoresRef.current = [];
-    allScoresRef.current = [];
 
     setMyPlayerId("");
     setScoredPlayerId("");
@@ -1807,6 +1811,7 @@ function LordOfTheHolesApp() {
     setRoundTableRoundId("");
 
     setFlightDraw(null);
+    setFlightDrawLoadedFromServer(false);
     setFlightRevealRunning(false);
     setFlightSummaryOpen(false);
     setFlightDrawCeremonyCompleted(false);
@@ -1886,78 +1891,10 @@ function LordOfTheHolesApp() {
     setError("");
   }
 
-  async function openFlightDrawPergaments({
-    automatic = false,
-    forceLocalTest = false,
-    replaceExisting = false,
-    saveTestToSheet = false,
-    startReveal = true,
-    allowBeforeTarget = false,
-  } = {}) {
-    if (!automatic && !isAdminUnlocked) {
-      setError("Nur der Zeremonienmeister kann die Pergamente öffnen.");
-      return;
-    }
-
-    if (!flightDrawAvailable && !automatic && !forceLocalTest && !allowBeforeTarget) {
-      setError("Die Pergamente sind noch versiegelt.");
-      return;
-    }
-
-    if (flightDraw && !replaceExisting) {
-      setFlightRevealRoundIndex(0);
-      setFlightRevealCount(0);
-      setFlightRevealIntroStep(0);
-      setFlightRevealOutroStep(0);
-      setExpandedFlightKeys({});
-      setFlightRevealRunning(true);
-      return;
-    }
-
-    const draw = buildFlightDraw(allPlayers, rounds);
-    setFlightDrawSaving(true);
-    setError("");
-
-    try {
-      const saveResult = await Promise.race([
-        callSheetApi({ action: "saveFlightDraw", draw, test: Boolean(forceLocalTest || saveTestToSheet) }),
-        new Promise((_, reject) => window.setTimeout(() => reject(new Error("saveFlightDraw hat zu lange gedauert. Bitte Apps Script Deployment und Berechtigungen prüfen.")), 15000)),
-      ]);
-
-      const savedDraw = saveResult?.flight_draw || saveResult?.flightDraw || draw;
-
-      if (replaceExisting) {
-        window.localStorage.removeItem(FLIGHT_DRAW_STORAGE_KEY);
-      }
-
-      setFlightDraw(savedDraw);
-      writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, savedDraw);
-      setConnectionStatus("online");
-      setSetupSavedMessage(forceLocalTest || saveTestToSheet ? "Die Test-Ziehung der Pergamente wurde im Sheet gespeichert." : "Die Flight-Ziehung wurde neu bestimmt und im Sheet gespeichert.");
-
-      setFlightRevealRoundIndex(0);
-      setFlightRevealCount(0);
-      setFlightRevealIntroStep(0);
-      setFlightRevealOutroStep(0);
-      setExpandedFlightKeys({});
-      setFlightDrawCeremonyCompleted(false);
-      setFlightAutoRevealStarted(false);
-      setFlightSummaryOpen(false);
-      setFlightRevealRunning(Boolean(startReveal));
-
-      await loadData({ silent: true });
-    } catch (err) {
-      setConnectionStatus("offline");
-      setFlightRevealRunning(false);
-      setError(`${err.message || "saveFlightDraw konnte nicht gespeichert werden."} Die Zeremonie startet erst, wenn die Ziehung erfolgreich im Sheet gespeichert wurde.`);
-    } finally {
-      setFlightDrawSaving(false);
-    }
-  }
-
   async function resetFlightDrawAfterFullReset() {
     window.localStorage.removeItem(FLIGHT_DRAW_STORAGE_KEY);
     setFlightDraw(null);
+    setFlightDrawLoadedFromServer(false);
     setFlightRevealRunning(false);
     setFlightAutoRevealStarted(false);
     setFlightDrawCeremonyCompleted(false);
@@ -1975,62 +1912,147 @@ function LordOfTheHolesApp() {
     }
   }
 
-  async function redrawFlightsFromAdmin() {
-    await openFlightDrawPergaments({
-      automatic: false,
-      allowBeforeTarget: true,
-      replaceExisting: true,
-      saveTestToSheet: false,
-      startReveal: false,
-    });
+  function redrawFlightsFromAdmin() {
+    saveFlightDrawFromAdmin();
   }
 
   async function startRoundWithFullResetAndFlightDraw() {
-    if (!isAdminUnlocked || flightDrawSaving) return;
+    setError("Die Flight-Ziehung darf nur über den Admin-Button „Flights neu bestimmen“ erstellt werden.");
+  }
 
-    setSetupSavedMessage("");
-    setError("");
-    setFlightDrawSaving(true);
+  /***************************************
+   * Ladebildschirm / Flight-Zeremonie
+   * Alle abgeleiteten Werte bewusst direkt vor dem Rendering,
+   * damit der Splash-Screen keine fehlenden Variablen wirft.
+   ***************************************/
 
-    try {
-      const resetResult = await callSheetApi({ action: "clearResetMarkersAndFullReset" });
-      const resetAt = String(resetResult?.full_reset_at || resetResult?.fullResetAt || new Date().toISOString());
+  const safeFlightDrawRounds = Array.isArray(flightDraw?.rounds) ? flightDraw.rounds : [];
+  const currentRevealRound = safeFlightDrawRounds[flightRevealRoundIndex] || null;
 
-      clearLocalDeviceCacheAfterFullReset(resetAt);
+  const currentRevealPlayers = currentRevealRound?.flights?.flatMap((flight) =>
+    (flight.players || []).map((playerId) => ({
+      player_id: playerId,
+      flight_number: flight.flight_number,
+    }))
+  ) || [];
 
-      setFullResetAt(resetAt);
-      writeLocalJson("lordOfTheHoles.fullResetAt", resetAt);
+  const flightRevealIntroLinesByRound = [
+    [
+      "Die Türen von Bruchtal schließen sich. Kein Hobbit raschelt mehr mit der Scorekarte.",
+      "Elrond hebt die Hand. Das erste Pergament wird in den Kreis getragen.",
+      "Runde 1 wird ohne Gangolf beschritten. Sein Pfad beginnt erst später.",
+      "Möge das erste Kapitel die Gemeinschaft nicht schon am Tee 1 entzweien.",
+    ],
+    [
+      "Das erste Pergament ist gesprochen. Manche Blicke sagen: Das war bestimmt kein Zufall.",
+      "Nun tritt Gangolf aus dem Schatten hinzu. Die Gemeinschaft ist vollständig.",
+      "Das zweite Pergament wird geöffnet — und irgendwo lacht ein Ork über die Startzeiten.",
+      "Runde 2 führt durch die Minen von Moria. Wer hier zittert, sollte wenigstens gerade putten.",
+    ],
+    [
+      "Zwei Kapitel sind besiegelt. Noch atmet die Gemeinschaft, wenn auch hörbar schwerer.",
+      "Das dritte Pergament liegt bereit. Vor den Toren Mordors zählt jede Allianz doppelt.",
+      "Die letzten Flights vor dem Schicksalsberg werden offenbart.",
+      "Mögen die Drives lang, die Ausreden kurz und die Zähler gnädig sein.",
+    ],
+  ];
 
-      if (resetResult?.backup_sheet_name) {
-        setBackupSavedMessage(`Backup erstellt: ${resetResult.backup_sheet_name}`);
-      }
+  const flightRevealOutroLines = [
+    "Die Pergamente sinken. Der Rat schweigt. Selbst Golfum sagt kurz nichts.",
+    "Die Flights der ersten drei Kapitel sind besiegelt.",
+    "Was am Schicksalsberg geschieht, entscheidet allein die Tabelle.",
+  ];
 
-      const draw = buildFlightDraw(allPlayers, rounds);
-      const saveResult = await callSheetApi({ action: "saveFlightDraw", draw, test: false });
-      const savedDraw = saveResult?.flight_draw || saveResult?.flightDraw || draw;
+  const currentIntroLines = flightRevealIntroLinesByRound[flightRevealRoundIndex] || flightRevealIntroLinesByRound[0];
+  const currentRevealLine = currentIntroLines[flightRevealIntroStep] || currentIntroLines[currentIntroLines.length - 1] || "Die Pergamente werden geöffnet.";
+  const currentOutroLine = flightRevealOutroLines[flightRevealOutroStep] || flightRevealOutroLines[flightRevealOutroLines.length - 1] || "Die Flights sind besiegelt.";
 
-      setFlightDraw(savedDraw);
-      writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, savedDraw);
-      setFlightRevealRunning(false);
-      setFlightSummaryOpen(false);
-      setFlightDrawCeremonyCompleted(false);
-      setFlightAutoRevealStarted(false);
-      setFlightRevealRoundIndex(0);
-      setFlightRevealCount(0);
-      setFlightRevealIntroStep(0);
-      setFlightRevealOutroStep(0);
-      setExpandedFlightKeys({});
-      setConnectionStatus("online");
-      setError("");
-      setSetupSavedMessage("Runde vorbereitet: Full Reset für alle ausgeführt, alte Caches gelöscht und neue Flights im Sheet gespeichert. Runde und Kurs kannst du manuell im Admin setzen.");
+  const flightDrawCountdown = useMemo(() => {
+    const diffMs = Math.max(0, FLIGHT_DRAW_TARGET.getTime() - lockCountdownNow.getTime());
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
 
-      await loadData({ silent: true });
-    } catch (err) {
-      setConnectionStatus("offline");
-      setError(err.message || "Rundenstart konnte nicht vorbereitet werden.");
-    } finally {
-      setFlightDrawSaving(false);
+    return { days, hours, minutes, seconds };
+  }, [lockCountdownNow]);
+
+  function resetFlightRevealState() {
+    setFlightRevealRoundIndex(0);
+    setFlightRevealCount(0);
+    setFlightRevealIntroStep(0);
+    setFlightRevealOutroStep(0);
+    setExpandedFlightKeys({});
+  }
+
+  function startFlightReveal(drawToReveal = null) {
+    const nextDraw = drawToReveal || flightDraw;
+
+    if (!flightDrawLoadedFromServer || !nextDraw?.rounds?.length) {
+      setError("Keine Flight-Ziehung aus der Datenbank übertragen. Bitte im Admin-Bereich zuerst „Flights neu bestimmen“ ausführen und danach die Datenbank neu laden.");
+      return false;
     }
+
+    setFlightDraw(nextDraw);
+    resetFlightRevealState();
+    setFlightSummaryOpen(false);
+    setFlightDrawCeremonyCompleted(false);
+    setFlightRevealRunning(true);
+    setError("");
+    return true;
+  }
+
+  async function enterLockedAppAsAdmin() {
+    if (lockPasswordInput !== ADMIN_PASSWORD) {
+      setError("Passwort ist falsch.");
+      return;
+    }
+
+    if (splashEntering || flightDrawSaving) return;
+
+    setSplashEntering(true);
+    const loadedData = await loadData({ silent: true });
+    setSplashEntering(false);
+
+    const serverDraw = loadedData?.flight_draw || loadedData?.flightDraw || null;
+
+    if (!serverDraw?.rounds?.length) {
+      setFlightDraw(null);
+      setFlightDrawLoadedFromServer(false);
+      setError("Keine Flight-Ziehung aus der Datenbank übertragen. Bitte zuerst im Admin-Bereich „Flights neu bestimmen“ ausführen und danach erneut starten.");
+      return;
+    }
+
+    setFlightDraw(serverDraw);
+    setFlightDrawLoadedFromServer(true);
+
+    setIsAdminUnlocked(true);
+    setLockAdminBypass(false);
+    setShowSplash(true);
+    setLockUnlockOpen(false);
+    setLockPasswordInput("");
+    startFlightReveal(serverDraw);
+  }
+
+  async function enterAppWithoutFlightDraw() {
+    if (lockPasswordInput !== ADMIN_PASSWORD && !isAdminUnlocked) {
+      setError("Passwort ist falsch.");
+      return;
+    }
+
+    if (splashEntering || flightDrawSaving) return;
+
+    setSplashEntering(true);
+    await loadData({ silent: true });
+    setSplashEntering(false);
+    setIsAdminUnlocked(true);
+    setLockAdminBypass(true);
+    setShowSplash(false);
+    setLockUnlockOpen(false);
+    setLockPasswordInput("");
+    setFlightRevealRunning(false);
+    setError("");
   }
 
   function renderFlightDrawPanel() {
@@ -2113,12 +2135,8 @@ function LordOfTheHolesApp() {
               </>
             ) : (
               <>
-                <div className="font-serif text-base font-bold text-amber-200">{flightDrawSaving ? "Die Pergamente öffnen sich ..." : "Die Pergamente öffnen sich von selbst."}</div>
-                {isAdminUnlocked ? (
-                  <button type="button" disabled={flightDrawSaving} onClick={enterLockedAppAsAdmin} className="mt-3 w-full rounded-2xl border border-amber-300/50 bg-amber-600 px-4 py-2.5 font-serif text-base font-black text-amber-50 shadow-lg shadow-black/40 disabled:opacity-60">
-                    Zeremonie testen
-                  </button>
-                ) : null}
+                <div className="font-serif text-base font-bold text-amber-200">Keine gespeicherte Flight-Ziehung gefunden.</div>
+                <div className="mt-1 text-xs text-amber-100/65">Die Ziehung wird ausschließlich im Admin-Bereich über „Flights neu bestimmen“ erstellt. Der Ladebildschirm zeigt danach nur die gespeicherten Pergamente an.</div>
               </>
             )}
           </div>
