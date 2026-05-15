@@ -1650,13 +1650,25 @@ function LordOfTheHolesApp() {
       const emptyScores = [];
       setScores(emptyScores);
       setAllScores(emptyScores);
-      applyLocalCacheClear(resetAt, "Kompletter Reset wurde für alle Geräte ausgelöst.");
+      applyLocalCacheClear(resetAt, "Kompletter Reset wurde für alle Geräte ausgelöst. Flight-Ziehung wird neu bestimmt ...");
+
+      const freshDraw = buildFlightDraw(allPlayers, rounds);
+      const drawResult = await callSheetApi({ action: "saveFlightDraw", draw: freshDraw, test: false });
+      const savedDraw = drawResult?.flight_draw || drawResult?.flightDraw || freshDraw;
+      setFlightDraw(savedDraw);
+      writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, savedDraw);
+      setFlightCeremonyRunning(false);
+      setFlightCeremonyCompleted(false);
+      setFlightSummaryOpen(false);
+      setFlightCeremonyStepIndex(0);
+
       setConnectionStatus("online");
       setError("");
+      setSetupSavedMessage("Kompletter Reset wurde für alle Geräte ausgelöst. Die Flight-Ziehung wurde neu bestimmt und gespeichert.");
       if (result?.backup_sheet_name) setBackupSavedMessage(`Backup erstellt: ${result.backup_sheet_name}`);
     } catch (err) {
       setConnectionStatus("offline");
-      setError(err.message || "Kompletter Reset konnte nicht ausgelöst werden.");
+      setError(err.message || "Kompletter Reset oder neue Flight-Ziehung konnte nicht ausgelöst werden.");
     }
   }
 
