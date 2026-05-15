@@ -1712,7 +1712,7 @@ function LordOfTheHolesApp() {
     const validScores = (scoresToSave || []).filter(isValidScorePayload);
     if (!validScores.length) return true;
 
-    const batchSize = 4;
+    const batchSize = 50;
     const chunks = [];
     for (let index = 0; index < validScores.length; index += batchSize) {
       chunks.push(validScores.slice(index, index + batchSize));
