@@ -2407,7 +2407,19 @@ function LordOfTheHolesApp() {
 
       const freshDraw = buildFlightDraw(allPlayers, rounds);
       const drawResult = $1
-      await savePersistentTeamDraw(callSheetApi, playersWithCurrentHandicaps);
+      try {
+        await savePersistentTeamDraw(callSheetApi, playersWithCurrentHandicaps);
+      } catch (teamDrawError) {
+        console.warn("TeamDraw konnte nicht gespeichert werden:", teamDrawError);
+        try {
+          await callSheetApi({ action: "clearFlightDraw" });
+        } catch (rollbackError) {
+          console.warn("FlightDraw-Rollback fehlgeschlagen:", rollbackError);
+        }
+        const message = `Teamauslosung konnte nicht gespeichert werden: ${teamDrawError?.message || teamDrawError}`;
+        setError(message);
+        throw new Error(message);
+      }
       const savedDraw = drawResult?.flight_draw || drawResult?.flightDraw || freshDraw;
       setFlightDraw(savedDraw);
       writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, savedDraw);
