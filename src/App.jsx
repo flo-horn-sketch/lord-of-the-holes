@@ -516,7 +516,7 @@ function isValidScorePayload(score) {
   return Boolean(score && String(score.round_id || "").trim() && String(score.player_id || "").trim() && Number(score.hole_number) > 0);
 }
 
-function mergeScoresPreservingPending(sheetScores = [], pendingScores = []) {
+function mergeScoresPreservingPending(sheetScores = [], pendingScores = [], localDrafts = []) {
   const map = new Map();
   sheetScores.forEach((score) => {
     if (!isValidScorePayload(score)) return;
@@ -524,9 +524,10 @@ function mergeScoresPreservingPending(sheetScores = [], pendingScores = []) {
   });
   pendingScores.forEach((score) => {
     if (!isValidScorePayload(score)) return;
-    // Lokale/offline Scores haben immer Vorrang vor Sheet-Werten.
-    // Keine Timestamp-Abwägung gegen die Datenbank: Wenn ein Pending-Score existiert,
-    // bleibt genau dieser Wert sichtbar, bis er erfolgreich synchronisiert wurde.
+    map.set(getScoreIdentityKey(score), normalizeScoreRecord(score));
+  });
+  localDrafts.forEach((score) => {
+    if (!isValidScorePayload(score)) return;
     map.set(getScoreIdentityKey(score), normalizeScoreRecord(score));
   });
   return Array.from(map.values());
@@ -1054,6 +1055,8 @@ function LordOfTheHolesApp() {
   const [allScores, setAllScores] = useState(cachedState?.allScores?.length ? cachedState.allScores.map(normalizeScoreRecord) : []);
   const [pendingScores, setPendingScores] = useState(() => readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord).filter(isValidScorePayload));
   const pendingScoresRef = useRef(readLocalJson("lordOfTheHoles.pendingScores", []).map(normalizeScoreRecord).filter(isValidScorePayload));
+  const [localScoreDrafts, setLocalScoreDrafts] = useState(() => readLocalJson("lordOfTheHoles.localScoreDrafts", []).map(normalizeScoreRecord).filter(isValidScorePayload));
+  const localScoreDraftsRef = useRef(readLocalJson("lordOfTheHoles.localScoreDrafts", []).map(normalizeScoreRecord).filter(isValidScorePayload));
   const [scoredPlayerId, setScoredPlayerId] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerId", ""));
   const [scoredPlayerByRound, setScoredPlayerByRound] = useState(() => readLocalJson("lordOfTheHoles.scoredPlayerByRound", {}));
   const [scoreEntryMode, setScoreEntryMode] = useState("player");
@@ -1102,6 +1105,8 @@ function LordOfTheHolesApp() {
   const [flightCeremonyCompleted, setFlightCeremonyCompleted] = useState(false);
   const [flightSummaryOpen, setFlightSummaryOpen] = useState(() => readLocalJson("lordOfTheHoles.flightSummaryOpen", false));
   const [localHandicaps, setLocalHandicaps] = useState({});
+  const scoresRef = useRef(scores);
+  const allScoresRef = useRef(allScores);
   const introAudioRef = useRef(null);
   const lastLoadedRoundRef = useRef("");
   const lastAutoHoleTargetRef = useRef("");
@@ -1277,6 +1282,9 @@ function LordOfTheHolesApp() {
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerByRound", scoredPlayerByRound); }, [scoredPlayerByRound]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.selectedActiveRoundId", selectedActiveRoundId); }, [selectedActiveRoundId]);
   useEffect(() => { pendingScoresRef.current = pendingScores; writeLocalJson("lordOfTheHoles.pendingScores", pendingScores); }, [pendingScores]);
+  useEffect(() => { localScoreDraftsRef.current = localScoreDrafts; writeLocalJson("lordOfTheHoles.localScoreDrafts", localScoreDrafts); }, [localScoreDrafts]);
+  useEffect(() => { scoresRef.current = scores; }, [scores]);
+  useEffect(() => { allScoresRef.current = allScores; }, [allScores]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.appLocked", appLocked); }, [appLocked]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", deviceAssignmentsResetAt); }, [deviceAssignmentsResetAt]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoresResetAt", scoresResetAt); }, [scoresResetAt]);
@@ -1300,7 +1308,8 @@ function LordOfTheHolesApp() {
     if (!selectedActiveRoundId) return;
     const selectedRoundScores = allScores.filter((score) => String(score.round_id || "") === String(selectedActiveRoundId));
     const selectedPendingScores = pendingScoresRef.current.filter((score) => String(score.round_id || "") === String(selectedActiveRoundId));
-    const mergedRoundScores = mergeScoresPreservingPending(selectedRoundScores, selectedPendingScores);
+    const selectedLocalDrafts = localScoreDraftsRef.current.filter((score) => String(score.round_id || "") === String(selectedActiveRoundId));
+    const mergedRoundScores = mergeScoresPreservingPending(selectedRoundScores, selectedPendingScores, selectedLocalDrafts);
     setScores(mergedRoundScores);
     const autoHoleTargetKey = `${selectedActiveRoundId}|${scoredPlayerId}`;
     if (lastAutoHoleTargetRef.current !== autoHoleTargetKey) {
@@ -1486,8 +1495,13 @@ function LordOfTheHolesApp() {
       const sheetAllScores = (data.scores || []).map(normalizeScoreRecord);
       const sheetActiveScores = (data.activeScores || []).map(normalizeScoreRecord);
       const livePendingScores = pendingScoresRef.current;
-      const nextAllScores = mergeScoresPreservingPending(sheetAllScores, livePendingScores);
-      const nextActiveScores = mergeScoresPreservingPending(sheetActiveScores, livePendingScores.filter((score) => String(score.round_id || "") === String(nextActiveRound?.round_id || "")));
+      const liveLocalDrafts = localScoreDraftsRef.current;
+      const nextAllScores = mergeScoresPreservingPending(sheetAllScores, livePendingScores, liveLocalDrafts);
+      const nextActiveScores = mergeScoresPreservingPending(
+        sheetActiveScores,
+        livePendingScores.filter((score) => String(score.round_id || "") === String(nextActiveRound?.round_id || "")),
+        liveLocalDrafts.filter((score) => String(score.round_id || "") === String(nextActiveRound?.round_id || ""))
+      );
       setAllScores(nextAllScores);
       setScores(nextActiveScores);
       setConnectionStatus("online");
@@ -1502,16 +1516,72 @@ function LordOfTheHolesApp() {
     }
   }
 
+  function upsertVisibleScore(nextScore) {
+    if (!isValidScorePayload(nextScore)) return;
+    const normalizedScore = normalizeScoreRecord(nextScore);
+    const sameScore = (score) => getScoreIdentityKey(score) === getScoreIdentityKey(normalizedScore);
+    const updateList = (current) => current.some(sameScore) ? current.map((score) => sameScore(score) ? normalizedScore : score) : [...current, normalizedScore];
+    setScores((current) => {
+      const nextScores = updateList(current);
+      scoresRef.current = nextScores;
+      return nextScores;
+    });
+    setAllScores((current) => {
+      const nextAllScores = updateList(current);
+      allScoresRef.current = nextAllScores;
+      return nextAllScores;
+    });
+  }
+
+  function addLocalScoreDraft(score) {
+    if (!isValidScorePayload(score)) return;
+    const normalizedScore = normalizeScoreRecord(score);
+    const key = getScoreIdentityKey(normalizedScore);
+    const currentDrafts = Array.isArray(localScoreDraftsRef.current) ? localScoreDraftsRef.current : [];
+    const nextDrafts = [...currentDrafts.filter((item) => getScoreIdentityKey(item) !== key), normalizedScore];
+    localScoreDraftsRef.current = nextDrafts;
+    writeLocalJson("lordOfTheHoles.localScoreDrafts", nextDrafts);
+    setLocalScoreDrafts(nextDrafts);
+    upsertVisibleScore(normalizedScore);
+  }
+
+  function removeLocalScoreDraft(score) {
+    if (!isValidScorePayload(score)) return;
+    const key = getScoreIdentityKey(score);
+    const currentDrafts = Array.isArray(localScoreDraftsRef.current) ? localScoreDraftsRef.current : [];
+    const nextDrafts = currentDrafts.filter((item) => getScoreIdentityKey(item) !== key);
+    localScoreDraftsRef.current = nextDrafts;
+    writeLocalJson("lordOfTheHoles.localScoreDrafts", nextDrafts);
+    setLocalScoreDrafts(nextDrafts);
+  }
+
   function optimisticUpdate(patch) {
     const safeRoundId = String(displayedActiveRound?.round_id || "").trim();
     const safePlayerId = String(entryPlayerId || "").trim();
     const safeHoleNumber = Number(activeHole || 0);
     if (!safeRoundId || !safePlayerId || !safeHoleNumber) throw new Error("Score kann noch nicht gespeichert werden: Runde, Spieler oder Loch fehlt.");
-    const next = normalizeScoreRecord({ round_id: safeRoundId, player_id: safePlayerId, hole_number: safeHoleNumber, strokes: currentScore.strokes ?? "", picked_up: normalizeBoolean(currentScore.picked_up), over_two_putts: normalizeBoolean(currentScore.over_two_putts), putts_count: currentScore.putts_count ?? "", lady: normalizeBoolean(currentScore.lady), scorer_player_id: isScorerEntryMode ? entryPlayerId : myPlayerId || "", updated_at: new Date().toISOString(), ...patch });
-    const sameScore = (score) => String(score.round_id) === String(next.round_id) && String(score.player_id) === String(next.player_id) && Number(score.hole_number) === Number(next.hole_number) && isScorerControlScore(score) === isScorerControlScore(next);
-    const updateList = (current) => current.some(sameScore) ? current.map((s) => sameScore(s) ? next : s) : [...current, next];
-    setScores(updateList);
-    setAllScores(updateList);
+    const targetIsControl = Boolean(isScorerEntryMode);
+    const findSameScore = (score) => String(score.round_id) === safeRoundId && String(score.player_id) === safePlayerId && Number(score.hole_number) === safeHoleNumber && isScorerControlScore(score) === targetIsControl;
+    const baseScore = localScoreDraftsRef.current.find(findSameScore)
+      || pendingScoresRef.current.find(findSameScore)
+      || scoresRef.current.find(findSameScore)
+      || allScoresRef.current.find(findSameScore)
+      || currentScore
+      || {};
+    const next = normalizeScoreRecord({
+      round_id: safeRoundId,
+      player_id: safePlayerId,
+      hole_number: safeHoleNumber,
+      strokes: baseScore.strokes ?? "",
+      picked_up: normalizeBoolean(baseScore.picked_up),
+      over_two_putts: normalizeBoolean(baseScore.over_two_putts),
+      putts_count: baseScore.putts_count ?? "",
+      lady: normalizeBoolean(baseScore.lady),
+      scorer_player_id: targetIsControl ? safePlayerId : myPlayerId || "",
+      updated_at: new Date().toISOString(),
+      ...patch,
+    });
+    addLocalScoreDraft(next);
     return next;
   }
 
@@ -1591,7 +1661,7 @@ function LordOfTheHolesApp() {
 
   async function savePendingScore(score) {
     if (!isValidScorePayload(score)) { removePendingScore(score); return true; }
-    try { await callSheetApi({ action: "upsertScore", score }); removePendingScore(score); setConnectionStatus("online"); setError(""); return true; }
+    try { await callSheetApi({ action: "upsertScore", score }); removePendingScore(score); removeLocalScoreDraft(score); setConnectionStatus("online"); setError(""); return true; }
     catch (err) { setConnectionStatus("offline"); setError(err.message || "Score ist lokal gesichert und wird später synchronisiert."); return false; }
   }
 
