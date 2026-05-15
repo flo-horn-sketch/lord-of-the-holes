@@ -1050,6 +1050,7 @@ function LordOfTheHolesApp() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [scoreSyncCount, setScoreSyncCount] = useState(0);
   const [autoSync] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState("offline");
   const [error, setError] = useState("");
@@ -1581,9 +1582,12 @@ function LordOfTheHolesApp() {
       return;
     }
     setScoreHintMessage("");
+    const syncCount = pendingScoresRef.current.filter(isValidScorePayload).length;
+    if (syncCount > 0) setScoreSyncCount(syncCount);
     setSaving(true);
     const allSaved = await flushPendingScores();
     setSaving(false);
+    setScoreSyncCount(0);
     if (allSaved) {
       setConnectionStatus("online");
       setError("");
@@ -1607,13 +1611,15 @@ function LordOfTheHolesApp() {
       return;
     }
     setScoreHintMessage("");
+    const syncCount = pendingScoresRef.current.filter(isValidScorePayload).length;
     setActiveHole((h) => Math.min(18, h + 1));
+    if (syncCount > 0) setScoreSyncCount(syncCount);
     flushPendingScores().then((allSaved) => {
       if (allSaved) {
         setConnectionStatus("online");
         setError("");
       }
-    });
+    }).finally(() => setScoreSyncCount(0));
   }
 
   async function createRoundBackup() {
@@ -1896,8 +1902,8 @@ function LordOfTheHolesApp() {
       <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-1 pt-1">
         <div className="relative flex h-8 items-center justify-center">
           <div className="pointer-events-none absolute left-1/2 top-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 rounded-full border border-amber-500/35 bg-black/40 px-2.5 py-0.5 text-[10px] text-amber-100/80 shadow-[inset_0_1px_0_rgba(251,191,36,0.12),0_8px_18px_rgba(0,0,0,0.28)]">
-            <span className={pendingScores.length ? "animate-pulse text-red-300" : connectionStatus === "online" ? "animate-pulse text-emerald-300" : "text-red-300"}>{pendingScores.length ? "●" : connectionStatus === "online" ? "●" : "○"}</span>
-            <span className={pendingScores.length ? "font-bold text-red-200" : ""}>{pendingScores.length ? `${pendingScores.length} Scores offen` : connectionStatus === "online" ? "Datenbank verbunden" : "Datenbank offline"}</span>
+            <span className={scoreSyncCount > 0 ? "animate-pulse text-red-300" : connectionStatus === "online" ? "animate-pulse text-emerald-300" : "text-red-300"}>{scoreSyncCount > 0 ? "●" : connectionStatus === "online" ? "●" : "○"}</span>
+            <span className={scoreSyncCount > 0 ? "font-bold text-red-200" : ""}>{scoreSyncCount > 0 ? `${scoreSyncCount} Scores im Abgleich` : connectionStatus === "online" ? "Datenbank verbunden" : "Datenbank offline"}</span>
           </div>
           <button type="button" onClick={() => setMenuOpen((value) => !value)} className="ml-auto rounded-xl border border-amber-500/35 bg-[linear-gradient(180deg,rgba(48,35,22,0.82),rgba(12,10,9,0.82))] px-2.5 py-1 text-base leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.12),0_8px_18px_rgba(0,0,0,0.35)] backdrop-blur-sm transition active:scale-[0.96]" aria-label="Menü öffnen">☰</button>
           {menuOpen ? (
