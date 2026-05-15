@@ -2250,30 +2250,32 @@ function LordOfTheHolesApp() {
   }
 
   function startFlightCeremony(drawOverride = null) {
-    const nextDraw = drawOverride || flightDraw;
+    const nextDraw = drawOverride || flightDraw || readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null);
     if (!nextDraw?.rounds?.length) {
-      setError("Keine gespeicherte Flight-Ziehung gefunden. Bitte zuerst im Admin-Bereich „Flights neu bestimmen“ ausführen.");
-      return;
+      setFlightCeremonyRunning(false);
+      setError("Keine gespeicherte Flight-Ziehung gefunden. Bitte zuerst im Admin-Bereich „Flights neu bestimmen“ ausführen und die App 1–2 Minuten vorher öffnen.");
+      return false;
     }
-    if (drawOverride) setFlightDraw(drawOverride);
+    setFlightDraw(nextDraw);
     setError("");
     setFlightSummaryOpen(false);
     setFlightCeremonyCompleted(false);
     setFlightCeremonyStepIndex(0);
+    setLockUnlockOpen(false);
     setFlightCeremonyRunning(true);
+    return true;
   }
 
   function startFlightCeremonyAsAdmin() {
-    if (lockPasswordInput !== ADMIN_PASSWORD) { setError("Passwort ist falsch."); return; }
-    const nextDraw = flightDraw;
-    if (!nextDraw?.rounds?.length) {
-      setError("Keine gespeicherte Flight-Ziehung gefunden. Bitte zuerst im Admin-Bereich „Flights neu bestimmen“ ausführen und die App 1–2 Minuten vorher öffnen.");
+    if (lockPasswordInput !== ADMIN_PASSWORD) {
+      setError("Passwort ist falsch.");
       return;
     }
     setIsAdminUnlocked(true);
-    setLockUnlockOpen(false);
-    setLockPasswordInput("");
-    startFlightCeremony(nextDraw);
+    const started = startFlightCeremony(flightDraw || readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null));
+    if (started) {
+      setLockPasswordInput("");
+    }
   }
 
   function renderCountdownGrid(countdown, compact = false) {
@@ -2426,7 +2428,7 @@ function LordOfTheHolesApp() {
           <div className="absolute inset-x-4 bottom-8 mx-auto max-w-xs rounded-2xl border border-amber-700/35 bg-black/80 p-3 text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm">
             <div className="mb-2 text-xs uppercase tracking-[0.18em] text-amber-300/70">Admin</div>
             <input type="password" value={lockPasswordInput} onChange={(e) => setLockPasswordInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") startFlightCeremonyAsAdmin(); }} placeholder="Passwort" className="mb-2 w-full rounded-xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" autoFocus />
-            <div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => { setLockUnlockOpen(false); setLockPasswordInput(""); }} className="rounded-xl bg-stone-800 py-2 text-sm font-bold text-amber-100">Abbrechen</button><button type="button" onClick={startFlightCeremonyAsAdmin} className="rounded-xl bg-amber-600 py-2 text-sm font-bold text-amber-50">Zeremonienmeister</button></div>
+            <div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => { setLockUnlockOpen(false); setLockPasswordInput(""); }} className="rounded-xl bg-stone-800 py-2 text-sm font-bold text-amber-100">Abbrechen</button><button type="button" onClick={startFlightCeremonyAsAdmin} className="rounded-xl bg-amber-600 py-2 text-sm font-bold text-amber-50 active:scale-[0.98]">Zeremonienmeister</button></div>
             <button type="button" disabled={splashEntering} onClick={enterLockedAppAsAdmin} className="mt-2 w-full rounded-xl border border-amber-500/35 bg-black/35 py-2 text-sm font-bold text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.08)] disabled:opacity-60">Direkt in die App</button>
           </div>
         ) : null}
