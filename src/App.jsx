@@ -2052,11 +2052,15 @@ function LordOfTheHolesApp() {
             <p className="mt-1 text-sm text-amber-100/65">Diese Einstellung wird nur lokal auf diesem Handy gespeichert.</p>
             <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
               <label className="mb-1 block text-sm text-amber-100/80">Handy-Eigentümer / Zähler auf diesem Gerät</label>
-              <select value={myPlayerId} onChange={(e) => { const nextMyPlayerId = e.target.value; setMyPlayerId(nextMyPlayerId); setScoreEntryMode("player"); if (displayedActiveRound?.round_id && nextMyPlayerId && String(scoredPlayerId) === String(nextMyPlayerId)) { setScoredPlayerId(""); removeLocalScoredPlayerForRound(displayedActiveRound.round_id); } }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50">
+              <select value={myPlayerId} disabled={pendingScores.length > 0} onChange={(e) => { const nextMyPlayerId = e.target.value; setMyPlayerId(nextMyPlayerId); setScoreEntryMode("player"); if (displayedActiveRound?.round_id && nextMyPlayerId && String(scoredPlayerId) === String(nextMyPlayerId)) { setScoredPlayerId(""); removeLocalScoredPlayerForRound(displayedActiveRound.round_id); } }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:cursor-not-allowed disabled:opacity-50">
                 <option value="">Spieler auswählen</option>
                 {allPlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}
               </select>
-              <p className="mt-1 text-xs text-amber-100/60">Hier kannst du korrigieren, wem dieses Handy gehört. Der zu zählende Spieler kommt automatisch aus der Flight-/Datenbank-Zuordnung.</p>
+              {pendingScores.length > 0 ? (
+                <p className="mt-1 rounded-xl border border-red-500/35 bg-red-950/35 p-2 text-xs font-semibold text-red-100">Handy-Eigentümer kann erst gewechselt werden, wenn alle offenen Scores synchronisiert wurden.</p>
+              ) : (
+                <p className="mt-1 text-xs text-amber-100/60">Hier kannst du korrigieren, wem dieses Handy gehört. Der zu zählende Spieler kommt automatisch aus der Flight-/Datenbank-Zuordnung.</p>
+              )}
             </div>
           </CardContent>
         </Card>
