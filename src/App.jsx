@@ -48,9 +48,11 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
-const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbySHbh5V_FZTo4rCzEewajlM7Nvcg2_TG14RhIcR3GJWOqW4-eo6nEnYFHW31xyKQ0K/exec";
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbyQ3o2tDYmi2B2zuUYLsc9ULEDzpWV52L1u8xsnHPxpx_6-bZynbGp0PRyKt-2gxA/exec";
 const ADMIN_PASSWORD = "weimar";
-const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T11:00:00+02:00");
+const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T10:00:00+02:00");
+const FLIGHT_DRAW_TARGET = new Date("2026-05-21T20:00:00+02:00");
+const FLIGHT_DRAW_STORAGE_KEY = "lordOfTheHoles.flightDraw";
 
 const fallbackAliases = {
   florian: "Sliceron",
@@ -170,6 +172,159 @@ function getPlayerLabel(player) {
   const normalized = withFallbackAlias(player);
   const realName = normalized.character_name || normalized.display_name || normalized.id;
   return normalized.alias_name ? `${normalized.alias_name} (${realName})` : realName;
+}
+
+function seededRandom(seedText = "") {
+  let seed = 2166136261;
+  String(seedText).split("").forEach((char) => {
+    seed ^= char.charCodeAt(0);
+    seed = Math.imul(seed, 16777619);
+  });
+  return function nextRandom() {
+    seed += 0x6d2b79f5;
+    let value = seed;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function shuffleWithRandom(items = [], random = Math.random) {
+  const next = [...items];
+  for (let index = next.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(random() * (index + 1));
+    [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+  }
+  return next;
+}
+
+function pairKey(a, b) {
+  return [String(a || ""), String(b || "")].sort().join("|");
+}
+
+function splitIntoFlightsForRound(playerIds = [], roundId = "") {
+  const ids = [...playerIds];
+  if (String(roundId) === "r1") return [ids.slice(0, 3), ids.slice(3, 5)].filter((flight) => flight.length);
+  return [ids.slice(0, 3), ids.slice(3, 6)].filter((flight) => flight.length);
+}
+
+function assignScorersForFlight(flightPlayerIds = []) {
+  return flightPlayerIds.map((scorerId, index) => ({
+    scorer_player_id: scorerId,
+    player_id: flightPlayerIds[(index + 1) % flightPlayerIds.length],
+  }));
+}
+
+function scoreFlightPlan(roundPlans = []) {
+  const seenPlayerPairs = new Map();
+  const seenScorerPairs = new Map();
+  let penalty = 0;
+
+  roundPlans.forEach((roundPlan) => {
+    (roundPlan.flights || []).forEach((flight) => {
+      const playerIds = flight.players || [];
+      for (let a = 0; a < playerIds.length; a += 1) {
+        for (let b = a + 1; b < playerIds.length; b += 1) {
+          const key = pairKey(playerIds[a], playerIds[b]);
+          const previous = seenPlayerPairs.get(key) || 0;
+          penalty += previous * 14;
+          seenPlayerPairs.set(key, previous + 1);
+        }
+      }
+
+      (flight.scorers || []).forEach((assignment) => {
+        const key = `${assignment.scorer_player_id}|${assignment.player_id}`;
+        const previous = seenScorerPairs.get(key) || 0;
+        penalty += previous * 22;
+        seenScorerPairs.set(key, previous + 1);
+      });
+    });
+  });
+
+  return penalty;
+}
+
+function buildFlightDraw(players = fallbackPlayers, rounds = fallbackRounds) {
+  const allPlayerIds = (players?.length ? players : fallbackPlayers).map((player) => String(player.id)).filter(Boolean);
+  const roundList = (rounds?.length ? rounds : fallbackRounds)
+    .filter((round) => ["r1", "r2", "r3"].includes(String(round.round_id)))
+    .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
+  const seed = `bruchtal-${Date.now()}-${Math.random().toString(36).slice(2)}-${allPlayerIds.join("-")}`;
+  let bestPlan = null;
+  let bestScore = Infinity;
+
+  for (let attempt = 0; attempt < 1800; attempt += 1) {
+    const random = seededRandom(`${seed}-${attempt}`);
+    const roundPlans = roundList.map((round) => {
+      const eligibleIds = allPlayerIds.filter((id) => String(round.round_id) !== "r1" || id !== "achim");
+      const shuffledIds = shuffleWithRandom(eligibleIds, random);
+      const flights = splitIntoFlightsForRound(shuffledIds, round.round_id).map((flightPlayerIds, index) => ({
+        flight_number: index + 1,
+        players: flightPlayerIds,
+        scorers: assignScorersForFlight(flightPlayerIds),
+      }));
+      return {
+        round_id: round.round_id,
+        round_name: getRoundChapterLabel(round),
+        note: String(round.round_id) === "r1" ? "Gangolf verweilt noch fern der Gefährten und betritt den Pfad erst ab Runde 2." : "",
+        flights,
+      };
+    });
+    const score = scoreFlightPlan(roundPlans);
+    if (score < bestScore) {
+      bestScore = score;
+      bestPlan = roundPlans;
+      if (score === 0) break;
+    }
+  }
+
+  return {
+    created_at: new Date().toISOString(),
+    target_at: FLIGHT_DRAW_TARGET.toISOString(),
+    seed,
+    score: bestScore,
+    rounds: bestPlan || [],
+  };
+}
+
+function stableFlightDrawSignature(draw) {
+  if (!draw) return "";
+  try {
+    return JSON.stringify(draw);
+  } catch {
+    return String(Date.now());
+  }
+}
+
+function areFlightDrawsEqual(a, b) {
+  return stableFlightDrawSignature(a) === stableFlightDrawSignature(b);
+}
+
+function getAssignedScoredPlayerIdFromDraw(flightDraw, roundId, scorerPlayerId) {
+  const normalizedRoundId = String(roundId || "");
+  const normalizedScorerId = String(scorerPlayerId || "");
+  if (!flightDraw || !normalizedRoundId || !normalizedScorerId) return "";
+
+  if (flightDraw?.rounds?.length) {
+    const roundPlan = flightDraw.rounds.find((round) => String(round.round_id) === normalizedRoundId);
+    if (!roundPlan?.flights?.length) return "";
+    for (const flight of roundPlan.flights) {
+      const assignment = (flight.scorers || []).find((item) => String(item.scorer_player_id) === normalizedScorerId);
+      if (assignment?.player_id) return String(assignment.player_id);
+    }
+    return "";
+  }
+
+  const rows = Array.isArray(flightDraw) ? flightDraw : flightDraw.rows || flightDraw.flight_draw_rows || [];
+  const row = rows.find((item) => String(item.round_id) === normalizedRoundId && String(item.scorer_player_id) === normalizedScorerId);
+  return row?.player_id ? String(row.player_id) : "";
+}
+
+function getPlayerFlightFromDraw(flightDraw, roundId, playerId) {
+  if (!flightDraw?.rounds?.length || !roundId || !playerId) return null;
+  const roundPlan = flightDraw.rounds.find((round) => String(round.round_id) === String(roundId));
+  if (!roundPlan?.flights?.length) return null;
+  return roundPlan.flights.find((flight) => (flight.players || []).some((id) => String(id) === String(playerId))) || null;
 }
 
 function getCourseSettings(id, list = fallbackCourses) {
@@ -858,6 +1013,8 @@ function LordOfTheHolesApp() {
   const [scorecardRoundId, setScorecardRoundId] = useState(() => readLocalJson("lordOfTheHoles.scorecardRoundId", ""));
   const [roundTableRoundId, setRoundTableRoundId] = useState(() => readLocalJson("lordOfTheHoles.roundTableRoundId", ""));
   const [roundSummaryDismissedKeys, setRoundSummaryDismissedKeys] = useState(() => readLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", []));
+  const [flightDraw, setFlightDraw] = useState(() => readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null));
+  const [flightDrawSaving, setFlightDrawSaving] = useState(false);
   const [localHandicaps, setLocalHandicaps] = useState({});
   const introAudioRef = useRef(null);
   const lastLoadedRoundRef = useRef("");
@@ -867,6 +1024,8 @@ function LordOfTheHolesApp() {
   const displayCourseId = displayedActiveRound?.course_id || selectedCourseId || "goethe";
   const activeCourse = (courses.length ? courses : fallbackCourses).find((course) => String(course.course_id) === String(displayCourseId));
   const visiblePlayers = useMemo(() => getRoundPlayers(displayedActiveRound?.round_id, allPlayers, roundPlayers), [displayedActiveRound?.round_id, allPlayers, roundPlayers]);
+  const assignedScoredPlayerId = useMemo(() => getAssignedScoredPlayerIdFromDraw(flightDraw, displayedActiveRound?.round_id || "", myPlayerId), [flightDraw, displayedActiveRound?.round_id, myPlayerId]);
+  const myFlightFromDraw = useMemo(() => getPlayerFlightFromDraw(flightDraw, displayedActiveRound?.round_id || "", myPlayerId), [flightDraw, displayedActiveRound?.round_id, myPlayerId]);
   const scoreablePlayers = useMemo(() => {
     const filteredPlayers = myPlayerId ? visiblePlayers.filter((p) => String(p.id) !== String(myPlayerId)) : visiblePlayers;
     return filteredPlayers.length ? filteredPlayers : visiblePlayers;
@@ -1027,6 +1186,7 @@ function LordOfTheHolesApp() {
   useEffect(() => { writeLocalJson("lordOfTheHoles.scorecardRoundId", scorecardRoundId); }, [scorecardRoundId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundTableRoundId", roundTableRoundId); }, [roundTableRoundId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", roundSummaryDismissedKeys); }, [roundSummaryDismissedKeys]);
+  useEffect(() => { writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, flightDraw); }, [flightDraw]);
   useEffect(() => {
     writeLocalJson("lordOfTheHoles.cachedState", { players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId, cachedAt: new Date().toISOString() });
   }, [players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId]);
@@ -1387,6 +1547,28 @@ function LordOfTheHolesApp() {
     }
   }
 
+  async function saveFlightDrawFromAdmin() {
+    if (!isAdminUnlocked || flightDrawSaving) return;
+    setSetupSavedMessage("");
+    setError("");
+    setFlightDrawSaving(true);
+    try {
+      const draw = buildFlightDraw(allPlayers, rounds);
+      const saveResult = await callSheetApi({ action: "saveFlightDraw", draw, test: false });
+      const savedDraw = saveResult?.flight_draw || saveResult?.flightDraw || draw;
+      setFlightDraw(savedDraw);
+      writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, savedDraw);
+      setConnectionStatus("online");
+      setSetupSavedMessage("Die Flight-Ziehung wurde neu bestimmt und gespeichert.");
+      await loadData({ silent: true });
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Flight-Ziehung konnte nicht gespeichert werden.");
+    } finally {
+      setFlightDrawSaving(false);
+    }
+  }
+
   async function saveFullSetup() {
     setBackupSavedMessage("");
     setSetupSavedMessage("");
@@ -1689,6 +1871,7 @@ function LordOfTheHolesApp() {
             <Button disabled={!isAdminUnlocked} onClick={createRoundBackup} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-700/80 py-2 text-emerald-50 disabled:opacity-50">Backup für aktive Runde erstellen</Button>
             {appLocked ? <Button disabled={!isAdminUnlocked} onClick={() => { setGlobalAppLock(false); setLockAdminBypass(false); }} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-800/70 py-2 text-emerald-50 disabled:opacity-50">App für alle freigeben</Button> : <Button disabled={!isAdminUnlocked} onClick={() => { setMenuOpen(false); setLockAdminBypass(false); setGlobalAppLock(true); }} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">App für alle sperren</Button>}
             <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={() => setClearScoresConfirmOpen(true)} className="mt-2 w-full rounded-2xl border border-red-500/50 bg-red-950/60 py-2 text-red-100 disabled:opacity-50">Scores löschen</Button>
+            <Button disabled={!isAdminUnlocked || flightDrawSaving || connectionStatus !== "online"} onClick={saveFlightDrawFromAdmin} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-amber-800/70 py-2 text-amber-50 disabled:opacity-50">{flightDrawSaving ? "Flights werden bestimmt ..." : "Flights neu bestimmen"}</Button>
             <Button disabled={!isAdminUnlocked || connectionStatus !== "online"} onClick={resetDeviceAssignmentsForAll} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">Spieler-/Zähler-Zuordnungen zurücksetzen</Button>
             <Button disabled={!isAdminUnlocked} onClick={clearLocalCache} className="mt-2 w-full rounded-2xl border border-sky-500/40 bg-sky-950/60 py-2 text-sky-100 disabled:opacity-50">Lokalen Cache dieses Geräts löschen</Button>
             <Button disabled={!isAdminUnlocked || connectionStatus !== "online"} onClick={fullResetForAllDevices} className="mt-2 w-full rounded-2xl border border-red-400/60 bg-red-950/80 py-2 text-red-100 disabled:opacity-50">Script-Cache löschen + Komplett-Reset für alle</Button>
