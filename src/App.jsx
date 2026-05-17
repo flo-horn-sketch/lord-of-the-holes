@@ -509,7 +509,7 @@ function getCourseHandicap(player, courseId = "goethe", courses = fallbackCourse
 
 function getPlayerForCourse(player, courseId = "goethe", courses = fallbackCourses) {
   if (!player) return null;
-  return { ...withFallbackAlias(player), course_hcp: getCourseHandicap(player, displayCourseId, coursesForUse) };
+  return { ...withFallbackAlias(player), course_hcp: getCourseHandicap(player, selectedCourseId || displayedActiveRound?.course_id || "goethe", coursesForUse) };
 }
 
 function getPlayersForCourse(players, courseId = "goethe", courses = fallbackCourses) {
