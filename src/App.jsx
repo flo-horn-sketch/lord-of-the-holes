@@ -1143,6 +1143,8 @@ function LordOfTheHolesApp() {
   const introAudioRef = useRef(null);
   const lastLoadedRoundRef = useRef("");
   const lastAutoHoleTargetRef = useRef("");
+  const selectedActiveRoundIdRef = useRef(selectedActiveRoundId);
+  const scoredPlayerByRoundRef = useRef(scoredPlayerByRound);
 
   const displayedActiveRound = (selectedActiveRoundId && (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(selectedActiveRoundId))) || activeRound || rounds.find((round) => String(round.status).toLowerCase() === "active") || fallbackRounds[0];
   const displayCourseId = displayedActiveRound?.course_id || selectedCourseId || "goethe";
@@ -1312,8 +1314,14 @@ function LordOfTheHolesApp() {
 
   useEffect(() => { writeLocalJson("lordOfTheHoles.myPlayerId", myPlayerId); }, [myPlayerId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerId", scoredPlayerId); }, [scoredPlayerId]);
-  useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerByRound", scoredPlayerByRound); }, [scoredPlayerByRound]);
-  useEffect(() => { writeLocalJson("lordOfTheHoles.selectedActiveRoundId", selectedActiveRoundId); }, [selectedActiveRoundId]);
+  useEffect(() => {
+    scoredPlayerByRoundRef.current = scoredPlayerByRound;
+    writeLocalJson("lordOfTheHoles.scoredPlayerByRound", scoredPlayerByRound);
+  }, [scoredPlayerByRound]);
+  useEffect(() => {
+    selectedActiveRoundIdRef.current = selectedActiveRoundId;
+    writeLocalJson("lordOfTheHoles.selectedActiveRoundId", selectedActiveRoundId);
+  }, [selectedActiveRoundId]);
   useEffect(() => { pendingScoresRef.current = pendingScores; writeLocalJson("lordOfTheHoles.pendingScores", pendingScores); }, [pendingScores]);
   useEffect(() => { localScoreDraftsRef.current = localScoreDrafts; writeLocalJson("lordOfTheHoles.localScoreDrafts", localScoreDrafts); }, [localScoreDrafts]);
   useEffect(() => { scoresRef.current = scores; }, [scores]);
@@ -1514,14 +1522,23 @@ function LordOfTheHolesApp() {
       setRounds(nextRounds);
       setRoundPlayers(data.roundPlayers || []);
       setActiveRound(nextActiveRound);
-      const previousRoundId = selectedActiveRoundId;
-      const nextRoundId = nextActiveRound?.round_id || fallbackRounds[0].round_id;
+      const previousRoundId = String(selectedActiveRoundIdRef.current || "");
+      const nextRoundId = String(nextActiveRound?.round_id || fallbackRounds[0].round_id);
+      const nextIsFlightDrawRound = ["r1", "r2", "r3"].includes(nextRoundId);
+      const storedScoredPlayerForNextRound = String(scoredPlayerByRoundRef.current?.[nextRoundId] || "");
       setSelectedCourseId(nextActiveRound?.course_id || "");
+      selectedActiveRoundIdRef.current = nextRoundId;
       setSelectedActiveRoundId(nextRoundId);
-      if (String(previousRoundId || "") !== String(nextRoundId || "") || roundChanged) {
-        setScoredPlayerId("");
+      if (previousRoundId !== nextRoundId || roundChanged) {
         setScoreEntryMode("player");
         lastLoadedRoundRef.current = "";
+        if (nextIsFlightDrawRound) {
+          setScoredPlayerId("");
+        } else if (storedScoredPlayerForNextRound) {
+          setScoredPlayerId(storedScoredPlayerForNextRound);
+        } else {
+          setScoredPlayerId("");
+        }
       }
       applyPlayers(nextActivePlayers, nextAllPlayers);
       setHoles(normalizeHoles(data.activeHoles?.length ? data.activeHoles : data.holes).filter((hole) => !nextActiveRound?.course_id || String(hole.course_id) === String(nextActiveRound.course_id)));
@@ -2126,16 +2143,19 @@ function LordOfTheHolesApp() {
 
   function saveLocalScoredPlayerForRound(roundId, scoredPlayerIdValue) {
     if (!roundId || !scoredPlayerIdValue) return;
-    setScoredPlayerByRound((current) => ({ ...(current || {}), [roundId]: scoredPlayerIdValue }));
+    const next = { ...(scoredPlayerByRoundRef.current || {}), [roundId]: scoredPlayerIdValue };
+    scoredPlayerByRoundRef.current = next;
+    writeLocalJson("lordOfTheHoles.scoredPlayerByRound", next);
+    setScoredPlayerByRound(next);
   }
 
   function removeLocalScoredPlayerForRound(roundId) {
     if (!roundId) return;
-    setScoredPlayerByRound((current) => {
-      const next = { ...(current || {}) };
-      delete next[roundId];
-      return next;
-    });
+    const next = { ...(scoredPlayerByRoundRef.current || {}) };
+    delete next[roundId];
+    scoredPlayerByRoundRef.current = next;
+    writeLocalJson("lordOfTheHoles.scoredPlayerByRound", next);
+    setScoredPlayerByRound(next);
   }
 
   function setMainMenuAndView(value) {
