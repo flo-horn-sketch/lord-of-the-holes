@@ -509,7 +509,7 @@ function getCourseHandicap(player, courseId = "goethe", courses = fallbackCourse
 
 function getPlayerForCourse(player, courseId = "goethe", courses = fallbackCourses) {
   if (!player) return null;
-  return { ...withFallbackAlias(player), course_hcp: getCourseHandicap(player, "goethe", coursesForUse) };
+  return { ...withFallbackAlias(player), course_hcp: getCourseHandicap(player, courseId, courses) };
 }
 
 function getPlayersForCourse(players, courseId = "goethe", courses = fallbackCourses) {
@@ -1632,7 +1632,7 @@ function LordOfTheHolesApp() {
   const lastAutoHoleTargetRef = useRef("");
 
   const displayedActiveRound = (selectedActiveRoundId && (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(selectedActiveRoundId))) || activeRound || rounds.find((round) => String(round.status).toLowerCase() === "active") || fallbackRounds[0];
-  const displayCourseId = "goethe";
+  const displayCourseId = selectedCourseId || displayedActiveRound?.course_id || "goethe";
   const coursesForUse = mergeCoursesWithFallback(courses, fallbackCourses);
   const holesForUse = mergeHolesWithFallback(holes, fallbackHoles);
   const activeCourse = coursesForUse.find((course) => String(course.course_id) === String(displayCourseId));
