@@ -64,12 +64,12 @@ const fallbackAliases = {
 };
 
 const fallbackPlayers = [
-  { id: "florian", character_name: "Florian", display_name: "Florian", alias_name: "Sliceron", sort_order: 1, handicap_index: 0, course_hcp_goethe: 0, course_hcp_feininger: 0 },
-  { id: "mucky", character_name: "Mucky", display_name: "Mucky", alias_name: "Gimme", sort_order: 2, handicap_index: 0, course_hcp_goethe: 0, course_hcp_feininger: 0 },
-  { id: "kio", character_name: "Kio", display_name: "Kio", alias_name: "Foredo", sort_order: 3, handicap_index: 0, course_hcp_goethe: 0, course_hcp_feininger: 0 },
-  { id: "andreas", character_name: "Andreas", display_name: "Andreas", alias_name: "Bogeymir", sort_order: 4, handicap_index: 0, course_hcp_goethe: 0, course_hcp_feininger: 0 },
-  { id: "achim", character_name: "Achim", display_name: "Achim", alias_name: "Gangolf", sort_order: 5, handicap_index: 0, course_hcp_goethe: 0, course_hcp_feininger: 0 },
-  { id: "phillip", character_name: "Phillip", display_name: "Phillip", alias_name: "Golfum", sort_order: 6, handicap_index: 0, course_hcp_goethe: 0, course_hcp_feininger: 0 },
+  { id: "florian", character_name: "Florian", display_name: "Florian", alias_name: "Sliceron", sort_order: 1, handicap_index: 0, course_hcp_goethe: 0, course_hcp_feininger: 0, course_hcp_hofhausen: 0 },
+  { id: "mucky", character_name: "Mucky", display_name: "Mucky", alias_name: "Gimme", sort_order: 2, handicap_index: 0, course_hcp_goethe: 0, course_hcp_feininger: 0, course_hcp_hofhausen: 0 },
+  { id: "kio", character_name: "Kio", display_name: "Kio", alias_name: "Foredo", sort_order: 3, handicap_index: 0, course_hcp_goethe: 0, course_hcp_feininger: 0, course_hcp_hofhausen: 0 },
+  { id: "andreas", character_name: "Andreas", display_name: "Andreas", alias_name: "Bogeymir", sort_order: 4, handicap_index: 0, course_hcp_goethe: 0, course_hcp_feininger: 0, course_hcp_hofhausen: 0 },
+  { id: "achim", character_name: "Achim", display_name: "Achim", alias_name: "Gangolf", sort_order: 5, handicap_index: 0, course_hcp_goethe: 0, course_hcp_feininger: 0, course_hcp_hofhausen: 0 },
+  { id: "phillip", character_name: "Phillip", display_name: "Phillip", alias_name: "Golfum", sort_order: 6, handicap_index: 0, course_hcp_goethe: 0, course_hcp_feininger: 0, course_hcp_hofhausen: 0 },
 ];
 
 const fallbackCourses = [
@@ -86,24 +86,24 @@ const fallbackRounds = [
 ];
 
 const fallbackHoles = [
-  { course_id: "hofhausen", hole_number: 1, meters: 330, meters_white: 347, meters_yellow: 330, meters_red: 283, meters_orange: 266, par: 4, hcp: 13 },
-  { course_id: "hofhausen", hole_number: 2, meters: 323, meters_white: 339, meters_yellow: 323, meters_red: 292, meters_orange: 279, par: 4, hcp: 11 },
-  { course_id: "hofhausen", hole_number: 3, meters: 178, meters_white: 178, meters_yellow: 178, meters_red: 162, meters_orange: 162, par: 3, hcp: 15 },
-  { course_id: "hofhausen", hole_number: 4, meters: 331, meters_white: 352, meters_yellow: 331, meters_red: 310, meters_orange: 268, par: 4, hcp: 9 },
-  { course_id: "hofhausen", hole_number: 5, meters: 166, meters_white: 176, meters_yellow: 166, meters_red: 147, meters_orange: 136, par: 3, hcp: 17 },
-  { course_id: "hofhausen", hole_number: 6, meters: 376, meters_white: 386, meters_yellow: 376, meters_red: 320, meters_orange: 320, par: 4, hcp: 5 },
-  { course_id: "hofhausen", hole_number: 7, meters: 496, meters_white: 520, meters_yellow: 496, meters_red: 456, meters_orange: 456, par: 5, hcp: 1 },
-  { course_id: "hofhausen", hole_number: 8, meters: 464, meters_white: 483, meters_yellow: 464, meters_red: 403, meters_orange: 383, par: 5, hcp: 7 },
-  { course_id: "hofhausen", hole_number: 9, meters: 360, meters_white: 381, meters_yellow: 360, meters_red: 309, meters_orange: 291, par: 4, hcp: 3 },
-  { course_id: "hofhausen", hole_number: 10, meters: 281, meters_white: 295, meters_yellow: 281, meters_red: 264, meters_orange: 255, par: 4, hcp: 18 },
-  { course_id: "hofhausen", hole_number: 11, meters: 135, meters_white: 144, meters_yellow: 135, meters_red: 127, meters_orange: 116, par: 3, hcp: 16 },
-  { course_id: "hofhausen", hole_number: 12, meters: 494, meters_white: 519, meters_yellow: 494, meters_red: 403, meters_orange: 385, par: 5, hcp: 4 },
-  { course_id: "hofhausen", hole_number: 13, meters: 330, meters_white: 343, meters_yellow: 330, meters_red: 290, meters_orange: 273, par: 4, hcp: 14 },
-  { course_id: "hofhausen", hole_number: 14, meters: 343, meters_white: 355, meters_yellow: 343, meters_red: 301, meters_orange: 289, par: 4, hcp: 8 },
-  { course_id: "hofhausen", hole_number: 15, meters: 383, meters_white: 402, meters_yellow: 383, meters_red: 318, meters_orange: 300, par: 4, hcp: 2 },
-  { course_id: "hofhausen", hole_number: 16, meters: 178, meters_white: 197, meters_yellow: 178, meters_red: 168, meters_orange: 147, par: 3, hcp: 10 },
-  { course_id: "hofhausen", hole_number: 17, meters: 347, meters_white: 357, meters_yellow: 347, meters_red: 293, meters_orange: 284, par: 4, hcp: 6 },
-  { course_id: "hofhausen", hole_number: 18, meters: 431, meters_white: 441, meters_yellow: 431, meters_red: 373, meters_orange: 365, par: 5, hcp: 12 },
+  { course_id: "hofhausen", hole_number: 1, meters: 330, par: 4, hcp: 13 },
+  { course_id: "hofhausen", hole_number: 2, meters: 323, par: 4, hcp: 11 },
+  { course_id: "hofhausen", hole_number: 3, meters: 178, par: 3, hcp: 15 },
+  { course_id: "hofhausen", hole_number: 4, meters: 331, par: 4, hcp: 9 },
+  { course_id: "hofhausen", hole_number: 5, meters: 166, par: 3, hcp: 17 },
+  { course_id: "hofhausen", hole_number: 6, meters: 376, par: 4, hcp: 5 },
+  { course_id: "hofhausen", hole_number: 7, meters: 496, par: 5, hcp: 1 },
+  { course_id: "hofhausen", hole_number: 8, meters: 464, par: 5, hcp: 7 },
+  { course_id: "hofhausen", hole_number: 9, meters: 360, par: 4, hcp: 3 },
+  { course_id: "hofhausen", hole_number: 10, meters: 281, par: 4, hcp: 18 },
+  { course_id: "hofhausen", hole_number: 11, meters: 135, par: 3, hcp: 16 },
+  { course_id: "hofhausen", hole_number: 12, meters: 494, par: 5, hcp: 4 },
+  { course_id: "hofhausen", hole_number: 13, meters: 330, par: 4, hcp: 14 },
+  { course_id: "hofhausen", hole_number: 14, meters: 343, par: 4, hcp: 8 },
+  { course_id: "hofhausen", hole_number: 15, meters: 383, par: 4, hcp: 2 },
+  { course_id: "hofhausen", hole_number: 16, meters: 178, par: 3, hcp: 10 },
+  { course_id: "hofhausen", hole_number: 17, meters: 347, par: 4, hcp: 6 },
+  { course_id: "hofhausen", hole_number: 18, meters: 431, par: 5, hcp: 12 },
   { course_id: "goethe", hole_number: 1, meters: 345, par: 4, hcp: 11 },
   { course_id: "goethe", hole_number: 2, meters: 474, par: 5, hcp: 5 },
   { course_id: "goethe", hole_number: 3, meters: 155, par: 3, hcp: 13 },
@@ -502,6 +502,7 @@ function getCourseHandicap(player, courseId = "goethe", courses = fallbackCourse
   const handicapIndex = getHandicapIndex(player);
   if (handicapIndex != null) return calculatePlayingHandicap(handicapIndex, getCourseSettings(courseId, courses));
   const normalizedCourseId = String(courseId || "goethe").toLowerCase().trim();
+  if (normalizedCourseId === "hofhausen") return Number(player?.course_hcp_hofhausen ?? 0);
   if (normalizedCourseId === "feininger") return Number(player?.course_hcp_feininger ?? 0);
   return Number(player?.course_hcp_goethe ?? 0);
 }
@@ -2560,11 +2561,11 @@ function LordOfTheHolesApp() {
       const hcpIndexInput = cleanHandicapInput(localHandicaps[hcpIndexKey] ?? p.handicap_index ?? p.dgv_hcp ?? p.hcp_index ?? "");
       const handicapIndex = hcpIndexInput === "" || hcpIndexInput === "-" ? 0 : Number(hcpIndexInput);
       const nextPlayer = { ...p, handicap_index: handicapIndex };
-      return { ...nextPlayer, course_hcp_goethe: getCourseHandicap(nextPlayer, "goethe", courses), course_hcp_feininger: getCourseHandicap(nextPlayer, "feininger", courses) };
+      return { ...nextPlayer, course_hcp_goethe: getCourseHandicap(nextPlayer, "goethe", courses), course_hcp_feininger: getCourseHandicap(nextPlayer, "feininger", courses), course_hcp_hofhausen: getCourseHandicap(nextPlayer, "hofhausen", courses) };
     });
     if (!selectedActiveRoundId) { setError("Bitte zuerst eine Runde auswählen."); return; }
     try {
-      await callSheetApi({ action: "saveSetup", round_id: selectedActiveRoundId, course_id: selectedCourseId || "", players: nextAllPlayers.map((p) => ({ id: p.id, character_name: p.character_name, display_name: p.display_name, alias_name: p.alias_name || fallbackAliases[p.id] || "", sort_order: p.sort_order, handicap_index: p.handicap_index, course_hcp_goethe: p.course_hcp_goethe, course_hcp_feininger: p.course_hcp_feininger })) });
+      await callSheetApi({ action: "saveSetup", round_id: selectedActiveRoundId, course_id: selectedCourseId || "", players: nextAllPlayers.map((p) => ({ id: p.id, character_name: p.character_name, display_name: p.display_name, alias_name: p.alias_name || fallbackAliases[p.id] || "", sort_order: p.sort_order, handicap_index: p.handicap_index, course_hcp_goethe: p.course_hcp_goethe, course_hcp_feininger: p.course_hcp_feininger, course_hcp_hofhausen: p.course_hcp_hofhausen })) });
       setAllPlayers(nextAllPlayers.map(withFallbackAlias));
       setConnectionStatus("online");
       setError("");
@@ -2582,7 +2583,7 @@ function LordOfTheHolesApp() {
     setSetupSavedMessage("");
     setBackupSavedMessage("");
     try {
-      await callSheetApi({ action: "saveSetup", round_id: nextRoundId, course_id: nextCourseId || "", players: allPlayers.map((p) => ({ id: p.id, character_name: p.character_name, display_name: p.display_name, alias_name: p.alias_name || fallbackAliases[p.id] || "", sort_order: p.sort_order, handicap_index: p.handicap_index, course_hcp_goethe: p.course_hcp_goethe, course_hcp_feininger: p.course_hcp_feininger })) });
+      await callSheetApi({ action: "saveSetup", round_id: nextRoundId, course_id: nextCourseId || "", players: allPlayers.map((p) => ({ id: p.id, character_name: p.character_name, display_name: p.display_name, alias_name: p.alias_name || fallbackAliases[p.id] || "", sort_order: p.sort_order, handicap_index: p.handicap_index, course_hcp_goethe: p.course_hcp_goethe, course_hcp_feininger: p.course_hcp_feininger, course_hcp_hofhausen: p.course_hcp_hofhausen })) });
       setConnectionStatus("online");
       setError("");
       setSetupSavedMessage("Admin-Änderung wurde automatisch gespeichert.");
@@ -2949,7 +2950,7 @@ function LordOfTheHolesApp() {
             {!isAdminUnlocked ? <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Admin-Passwort</label><input type="password" value={adminPinInput} onChange={(e) => setAdminPinInput(e.target.value)} placeholder="Passwort eingeben" className="mb-3 w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" /><Button onClick={() => { if (adminPinInput === ADMIN_PASSWORD) { setIsAdminUnlocked(true); setError(""); } else { setError("Admin-Passwort ist falsch."); } }} className="w-full rounded-2xl bg-amber-600 py-2 text-amber-50">Admin entsperren</Button></div> : <div className="mb-2 rounded-2xl border border-emerald-700/30 bg-emerald-950/30 p-3 text-sm text-emerald-100">Admin entsperrt. Änderungen können gespeichert werden.</div>}
             <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Aktive Runde</label><select value={selectedActiveRoundId} onChange={(e) => { const nextRoundId = e.target.value; const nextRound = (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(nextRoundId)); const nextCourseId = nextRound?.course_id || selectedCourseId || ""; setAdminEditing(true); setSelectedActiveRoundId(nextRoundId); setSelectedCourseId(nextCourseId); setScoredPlayerId(""); setActiveHole(1); writeLastViewedHole(nextRoundId, 1); lastLoadedRoundRef.current = ""; setScoreEntryMode("player"); saveAdminRoundCourse(nextRoundId, nextCourseId); }} disabled={!isAdminUnlocked} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:opacity-60"><option value="">Runde auswählen</option>{(rounds.length ? rounds : fallbackRounds).map((round) => <option key={round.round_id} value={round.round_id}>{round.round_name}</option>)}</select></div>
             <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Kurs für aktive Runde</label><select value={selectedCourseId} onChange={(e) => { const nextCourseId = e.target.value; setAdminEditing(true); setSelectedCourseId(nextCourseId); if (isManualPlayerSelectionCourse(nextCourseId)) { setScoredPlayerId(""); setScoreEntryMode("player"); } saveAdminRoundCourse(selectedActiveRoundId, nextCourseId); }} disabled={!isAdminUnlocked} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:opacity-60"><option value="">Kurs auswählen</option>{(courses.length ? courses : fallbackCourses).map((course) => <option key={course.course_id} value={course.course_id}>{course.course_name}</option>)}</select></div>
-            <div className="space-y-2">{allPlayers.map((p) => { const hcpIndexKey = `hcp_index_${p.id}`; const hcpIndexValue = localHandicaps[hcpIndexKey] ?? String(p.handicap_index ?? p.dgv_hcp ?? p.hcp_index ?? ""); const previewPlayer = { ...p, handicap_index: hcpIndexValue === "" || hcpIndexValue === "-" ? 0 : Number(String(hcpIndexValue).replace(",", ".")) }; const goetheSpv = getCourseHandicap(previewPlayer, "goethe", courses); const feiningerSpv = getCourseHandicap(previewPlayer, "feininger", courses); return <div key={p.id} className="rounded-xl border border-amber-700/30 bg-black/25 p-2"><div className="mb-2 font-semibold text-amber-100">{getPlayerLabel(p)}</div><input inputMode="decimal" disabled={!isAdminUnlocked} value={hcpIndexValue} onChange={(e) => { setAdminEditing(true); setLocalHandicaps((current) => ({ ...current, [hcpIndexKey]: cleanHandicapInput(e.target.value) })); }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-center text-amber-50 disabled:opacity-60" /><div className="mt-2 grid grid-cols-2 gap-2 text-center text-xs text-amber-100/75"><div className="rounded-xl bg-amber-50/5 p-2"><div>Goethe SpV</div><b className="text-lg text-amber-200">{goetheSpv}</b></div><div className="rounded-xl bg-amber-50/5 p-2"><div>Feininger SpV</div><b className="text-lg text-amber-200">{feiningerSpv}</b></div></div></div>; })}</div>
+            <div className="space-y-2">{allPlayers.map((p) => { const hcpIndexKey = `hcp_index_${p.id}`; const hcpIndexValue = localHandicaps[hcpIndexKey] ?? String(p.handicap_index ?? p.dgv_hcp ?? p.hcp_index ?? ""); const previewPlayer = { ...p, handicap_index: hcpIndexValue === "" || hcpIndexValue === "-" ? 0 : Number(String(hcpIndexValue).replace(",", ".")) }; const goetheSpv = getCourseHandicap(previewPlayer, "goethe", courses); const feiningerSpv = getCourseHandicap(previewPlayer, "feininger", courses); const hofhausenSpv = getCourseHandicap(previewPlayer, "hofhausen", courses); return <div key={p.id} className="rounded-xl border border-amber-700/30 bg-black/25 p-2"><div className="mb-2 font-semibold text-amber-100">{getPlayerLabel(p)}</div><input inputMode="decimal" disabled={!isAdminUnlocked} value={hcpIndexValue} onChange={(e) => { setAdminEditing(true); setLocalHandicaps((current) => ({ ...current, [hcpIndexKey]: cleanHandicapInput(e.target.value) })); }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-center text-amber-50 disabled:opacity-60" /><div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs text-amber-100/75"><div className="rounded-xl bg-amber-50/5 p-2"><div>Goethe SpV</div><b className="text-lg text-amber-200">{goetheSpv}</b></div><div className="rounded-xl bg-amber-50/5 p-2"><div>Feininger SpV</div><b className="text-lg text-amber-200">{feiningerSpv}</b></div><div className="rounded-xl bg-amber-50/5 p-2"><div>Hofhausen SpV</div><b className="text-lg text-amber-200">{hofhausenSpv}</b></div></div></div>; })}</div>
             <Button disabled={!isAdminUnlocked} onClick={saveFullSetup} className="mt-2 w-full rounded-2xl bg-amber-600 py-2 text-amber-50 disabled:opacity-50">HCP-Werte speichern</Button>
             <Button disabled={!isAdminUnlocked} onClick={createRoundBackup} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-700/80 py-2 text-emerald-50 disabled:opacity-50">Backup für aktive Runde erstellen</Button>
             {appLocked ? <Button disabled={!isAdminUnlocked} onClick={() => { setGlobalAppLock(false); setLockAdminBypass(false); }} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-800/70 py-2 text-emerald-50 disabled:opacity-50">App für alle freigeben</Button> : <Button disabled={!isAdminUnlocked} onClick={() => { setMenuOpen(false); setLockAdminBypass(false); setGlobalAppLock(true); }} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">App für alle sperren</Button>}
