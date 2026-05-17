@@ -872,43 +872,6 @@ function mergeCoursesWithFallback(sheetCourses = [], fallbackCourseRows = []) {
   );
 }
 
-function getCourseShortName(courseId) {s = [], fallbackRows = [], getKey = (row) => row?.id) {
-  const merged = [];
-  const seen = new Set();
-
-  (sheetRows || []).forEach((row) => {
-    const key = String(getKey(row) || "").trim();
-    if (!key) return;
-    seen.add(key);
-    merged.push(row);
-  });
-
-  (fallbackRows || []).forEach((row) => {
-    const key = String(getKey(row) || "").trim();
-    if (!key || seen.has(key)) return;
-    seen.add(key);
-    merged.push(row);
-  });
-
-  return merged;
-}
-
-function mergeHolesWithFallback(sheetHoles = [], fallbackHoleRows = []) {
-  return mergeRowsWithFallback(
-    sheetHoles,
-    fallbackHoleRows,
-    (hole) => `${String(hole?.course_id || "").trim()}|${Number(hole?.hole_number || 0)}`
-  );
-}
-
-function mergeCoursesWithFallback(sheetCourses = [], fallbackCourseRows = []) {
-  return mergeRowsWithFallback(
-    sheetCourses,
-    fallbackCourseRows,
-    (course) => String(course?.course_id || "").trim()
-  );
-}
-
 function getCourseShortName(courseId) {
   const normalized = String(courseId || "").toLowerCase().trim();
   if (normalized === "goethe") return "Goethe";
@@ -1657,9 +1620,9 @@ function LordOfTheHolesApp() {
   const [roundSummaryDismissedKeys, setRoundSummaryDismissedKeys] = useState(() => readLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", []));
   const [flightDraw, setFlightDraw] = useState(() => readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null));
   const [flightDrawSaving, setFlightDrawSaving] = useState(false);
-  const [flightCeremonyRunning, setFlightCconst coursesForUse =coursesForUseourses);
-  const holesForUse = mergeHolesWithFallback(holes, fallbackHoles);
-  const activeCourse = coursesForUse.find((course) => String(course.course_id) === String(displayCourseId));mpleted, setFlightCeremonyCompleted] = useState(false);
+  const [flightCeremonyRunning, setFlightCeremonyRunning] = useState(false);
+  const [flightCeremonyStepIndex, setFlightCeremonyStepIndex] = useState(0);
+  const [flightCeremonyCompleted, setFlightCeremonyCompleted] = useState(false);
   const [flightSummaryOpen, setFlightSummaryOpen] = useState(() => readLocalJson("lordOfTheHoles.flightSummaryOpen", false));
   const [localHandicaps, setLocalHandicaps] = useState({});
   const scoresRef = useRef(scores);
@@ -1670,7 +1633,9 @@ function LordOfTheHolesApp() {
 
   const displayedActiveRound = (selectedActiveRoundId && (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(selectedActiveRoundId))) || activeRound || rounds.find((round) => String(round.status).toLowerCase() === "active") || fallbackRounds[0];
   const displayCourseId = selectedCourseId || displayedActiveRound?.course_id || "goethe";
-  const coursesForUse = mer
+  const coursesForUse = mergeCoursesWithFallback(courses, fallbackCourses);
+  const holesForUse = mergeHolesWithFallback(holes, fallbackHoles);
+  const activeCourse = coursesForUse.find((course) => String(course.course_id) === String(displayCourseId));
   const manualPlayerSelectionActive = isManualPlayerSelectionCourse(displayCourseId);
   const visiblePlayers = useMemo(() => getRoundPlayers(displayedActiveRound?.round_id, allPlayers, roundPlayers), [displayedActiveRound?.round_id, allPlayers, roundPlayers]);
   const effectiveFlightDraw = flightDraw || readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null);
@@ -2617,9 +2582,11 @@ function LordOfTheHolesApp() {
       setFlightDraw(savedDraw);
       writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, savedDraw);
       setConnectionStatus("online");
-      setSetupSavedMesgetCourseHandicap($1, $2, coursesForUse)gespeichert.");
-      awgetCourseHandicap($1, $2, coursesForUse)
-      setConnectionStatgetCourseHandicap($1, $2, coursesForUse)t-Ziehung konnte nicht gespeichert werden.");
+      setSetupSavedMessage("Die Flight-Ziehung wurde neu bestimmt und gespeichert.");
+      await loadData({ silent: true });
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Flight-Ziehung konnte nicht gespeichert werden.");
     } finally {
       setFlightDrawSaving(false);
     }
@@ -2633,7 +2600,7 @@ function LordOfTheHolesApp() {
       const hcpIndexInput = cleanHandicapInput(localHandicaps[hcpIndexKey] ?? p.handicap_index ?? p.dgv_hcp ?? p.hcp_index ?? "");
       const handicapIndex = hcpIndexInput === "" || hcpIndexInput === "-" ? 0 : Number(hcpIndexInput);
       const nextPlayer = { ...p, handicap_index: handicapIndex };
-      return { ...nextPlayer, course_hcp_goethe: getCourseHandicap(nextPlayer, "goethe", courses), course_hcp_feininger: getCourseHandicap(nextPlayer, "feininger", courses), course_hcp_hofhausen: getCourseHandicap(nextPlayer, "hofhausen", courses) };
+      return { ...nextPlayer, course_hcp_goethe: getCourseHandicap($1, $2, coursesForUse), course_hcp_feininger: getCourseHandicap($1, $2, coursesForUse), course_hcp_hofhausen: getCourseHandicap($1, $2, coursesForUse) };
     });
     if (!selectedActiveRoundId) { setError("Bitte zuerst eine Runde auswählen."); return; }
     try {
@@ -2863,7 +2830,7 @@ function LordOfTheHolesApp() {
                 <div className="mb-3"><PuttStepper value={currentScore.putts_count} disabled={!canEnterScores || currentEffectiveStrokes <= 1} max={maxPuttsForCurrentScore} onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })} /></div>
                 <div className="mb-3 rounded-2xl border border-[rgb(var(--score-accent)/0.30)] bg-black/25 p-2"><div className="flex items-center justify-between gap-2"><div><div className="text-xs font-semibold text-amber-100">Lady</div><div className="text-[10px] text-amber-100/65">Markiert eine Lady.</div></div><input type="checkbox" disabled={!canEnterScores} checked={normalizeBoolean(currentScore.lady)} onChange={(e) => saveScore({ lady: e.target.checked })} className="h-6 w-6 accent-amber-500 disabled:opacity-40" /></div></div>
                 {scoreHintMessage ? <div className="mb-2 rounded-xl border border-amber-500/40 bg-amber-950/50 p-1.5 text-center text-xs font-semibold text-amber-100">{scoreHintMessage}</div> : null}
-                <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 py-3 text-base font-bold text-amber-100">Zurück</Button>{activeHole === 18 ? <Button disabled={!canEnterScores || saving} onClick={completeCurrentRound} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-emerald-700" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>{saving ? "Synchronisiere ..." : coursesForUsebled={!canEnterScores || saving} onClick={goToNextHole} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>{`Loch ${Math.min(18, Number(activeHole || 1) + 1)}`}</Button>}</div>
+                <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 py-3 text-base font-bold text-amber-100">Zurück</Button>{activeHole === 18 ? <Button disabled={!canEnterScores || saving} onClick={completeCurrentRound} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-emerald-700" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>{saving ? "Synchronisiere ..." : "Runde abschließen"}</Button> : <Button disabled={!canEnterScores || saving} onClick={goToNextHole} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>{`Loch ${Math.min(18, Number(activeHole || 1) + 1)}`}</Button>}</div>
               </div>
             )}
           </CardContent>
@@ -2876,7 +2843,7 @@ function LordOfTheHolesApp() {
     const availableRounds = rounds.length ? rounds : fallbackRounds;
     const tableRound = availableRounds.find((round) => String(round.round_id) === String(roundTableRoundId)) || displayedActiveRound || availableRounds[0] || fallbackRounds[0];
     const tableCourseId = tableRound?.course_id || displayCourseId || "goethe";
-    const tableCourse = (courses.length ? courses : fallbackCourses).find((course) => String(course.course_id) === String(tableCourseId));
+    const tableCourse = coursesForUse.find((course) => String(course.course_id) === String(tableCourseId));
     const tableHoles = (allHoles.length ? allHoles : fallbackHoles).filter((hole) => String(hole.course_id) === String(tableCourseId)).sort((a, b) => Number(a.hole_number) - Number(b.hole_number));
     const tablePlayers = getPlayersForCourse(getRoundPlayers(tableRound?.round_id, allPlayers, roundPlayers), tableCourseId, courses);
     const tableScores = officialAllScores.filter((score) => String(score.round_id || "") === String(tableRound?.round_id || ""));
@@ -3020,9 +2987,9 @@ function LordOfTheHolesApp() {
           <CardContent className="p-3">
             <div className="mb-2"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Admin</p><h2 className="font-serif text-lg text-amber-200">Turnierverwaltung</h2></div>
             {!isAdminUnlocked ? <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Admin-Passwort</label><input type="password" value={adminPinInput} onChange={(e) => setAdminPinInput(e.target.value)} placeholder="Passwort eingeben" className="mb-3 w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" /><Button onClick={() => { if (adminPinInput === ADMIN_PASSWORD) { setIsAdminUnlocked(true); setError(""); } else { setError("Admin-Passwort ist falsch."); } }} className="w-full rounded-2xl bg-amber-600 py-2 text-amber-50">Admin entsperren</Button></div> : <div className="mb-2 rounded-2xl border border-emerald-700/30 bg-emerald-950/30 p-3 text-sm text-emerald-100">Admin entsperrt. Änderungen können gespeichert werden.</div>}
-            <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Aktive Runde</label><select value={selectedActiveRoundId} onChange={(e) => { const nextRoundId = e.target.value; const nextRound = (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(nextRoundId)); const nextCourseId = nextRound?.course_id || selectedCourseId || ""; setAdminEditing(true); setSelectedActiveRoundId(nextRoundId); setSelectedCourseId(nextCourseId); setScoredPlayerId(""); setActiveHole(1); writeLastViewedHole(nextRoundId, 1); lastLoadedRoundRef.current = ""; setScoreEntryMode("player"); saveAdminRoundCourse(nextRoundId, nextCourseId); }} disabled={!isAdminUnlocked} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:opacity-60"><option value=coursesForUse rounds : fallbackRounds).map((round) => <option key={round.round_id} value={round.round_id}>{round.round_name}</option>)}</select></div>
-            <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Kurs für aktive Runde</label><select value={selectedCourseId} onChange={(e) => { const nextCourseId = e.target.value; setAdminEditing(true); setSelectedCourseId(nextCourseId); if (isManualPlayerSelectionCourse(nextCourseIdgetCourseHandicap($1, $2, coursesForUse)er"); } saveAdminRoundCgetCourseHandicap($1, $2, coursesForUse)d={!isAdminUnlocked} clgetCourseHandicap($1, $2, coursesForUse) bg-stone-950 p-2 text-amber-50 disabled:opacity-60"><option value="">Kurs auswählen</option>{(courses.length ? courses : fallbackCourses).map((course) => <option key={course.course_id} value={course.course_id}>{course.course_name}</option>)}</select></div>
-            <div className="space-y-2">{allPlayers.map((p) => { const hcpIndexKey = `hcp_index_${p.id}`; const hcpIndexValue = localHandicaps[hcpIndexKey] ?? String(p.handicap_index ?? p.dgv_hcp ?? p.hcp_index ?? ""); const previewPlayer = { ...p, handicap_index: hcpIndexValue === "" || hcpIndexValue === "-" ? 0 : Number(String(hcpIndexValue).replace(",", ".")) }; const goetheSpv = getCourseHandicap(previewPlayer, "goethe", courses); const feiningerSpv = getCourseHandicap(previewPlayer, "feininger", courses); const hofhausenSpv = getCourseHandicap(previewPlayer, "hofhausen", courses); return <div key={p.id} className="rounded-xl border border-amber-700/30 bg-black/25 p-2"><div className="mb-2 font-semibold text-amber-100">{getPlayerLabel(p)}</div><input inputMode="decimal" disabled={!isAdminUnlocked} value={hcpIndexValue} onChange={(e) => { setAdminEditing(true); setLocalHandicaps((current) => ({ ...current, [hcpIndexKey]: cleanHandicapInput(e.target.value) })); }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-center text-amber-50 disabled:opacity-60" /><div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs text-amber-100/75"><div className="rounded-xl bg-amber-50/5 p-2"><div>Goethe SpV</div><b className="text-lg text-amber-200">{goetheSpv}</b></div><div className="rounded-xl bg-amber-50/5 p-2"><div>Feininger SpV</div><b className="text-lg text-amber-200">{feiningerSpv}</b></div><div className="rounded-xl bg-amber-50/5 p-2"><div>Hofhausen SpV</div><b className="text-lg text-amber-200">{hofhausenSpv}</b></div></div></div>; })}</div>
+            <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Aktive Runde</label><select value={selectedActiveRoundId} onChange={(e) => { const nextRoundId = e.target.value; const nextRound = (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(nextRoundId)); const nextCourseId = nextRound?.course_id || selectedCourseId || ""; setAdminEditing(true); setSelectedActiveRoundId(nextRoundId); setSelectedCourseId(nextCourseId); setScoredPlayerId(""); setActiveHole(1); writeLastViewedHole(nextRoundId, 1); lastLoadedRoundRef.current = ""; setScoreEntryMode("player"); saveAdminRoundCourse(nextRoundId, nextCourseId); }} disabled={!isAdminUnlocked} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:opacity-60"><option value="">Runde auswählen</option>{(rounds.length ? rounds : fallbackRounds).map((round) => <option key={round.round_id} value={round.round_id}>{round.round_name}</option>)}</select></div>
+            <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Kurs für aktive Runde</label><select value={selectedCourseId} onChange={(e) => { const nextCourseId = e.target.value; setAdminEditing(true); setSelectedCourseId(nextCourseId); if (isManualPlayerSelectionCourse(nextCourseId)) { setScoredPlayerId(""); setScoreEntryMode("player"); } saveAdminRoundCourse(selectedActiveRoundId, nextCourseId); }} disabled={!isAdminUnlocked} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:opacity-60"><option value="">Kurs auswählen</option>{coursesForUse.map((course) => <option key={course.course_id} value={course.course_id}>{course.course_name}</option>)}</select></div>
+            <div className="space-y-2">{allPlayers.map((p) => { const hcpIndexKey = `hcp_index_${p.id}`; const hcpIndexValue = localHandicaps[hcpIndexKey] ?? String(p.handicap_index ?? p.dgv_hcp ?? p.hcp_index ?? ""); const previewPlayer = { ...p, handicap_index: hcpIndexValue === "" || hcpIndexValue === "-" ? 0 : Number(String(hcpIndexValue).replace(",", ".")) }; const goetheSpv = getCourseHandicap($1, $2, coursesForUse); const feiningerSpv = getCourseHandicap($1, $2, coursesForUse); const hofhausenSpv = getCourseHandicap($1, $2, coursesForUse); return <div key={p.id} className="rounded-xl border border-amber-700/30 bg-black/25 p-2"><div className="mb-2 font-semibold text-amber-100">{getPlayerLabel(p)}</div><input inputMode="decimal" disabled={!isAdminUnlocked} value={hcpIndexValue} onChange={(e) => { setAdminEditing(true); setLocalHandicaps((current) => ({ ...current, [hcpIndexKey]: cleanHandicapInput(e.target.value) })); }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-center text-amber-50 disabled:opacity-60" /><div className="mt-2 grid grid-cols-3 gap-2 text-center text-xs text-amber-100/75"><div className="rounded-xl bg-amber-50/5 p-2"><div>Goethe SpV</div><b className="text-lg text-amber-200">{goetheSpv}</b></div><div className="rounded-xl bg-amber-50/5 p-2"><div>Feininger SpV</div><b className="text-lg text-amber-200">{feiningerSpv}</b></div><div className="rounded-xl bg-amber-50/5 p-2"><div>Hofhausen SpV</div><b className="text-lg text-amber-200">{hofhausenSpv}</b></div></div></div>; })}</div>
             <Button disabled={!isAdminUnlocked} onClick={saveFullSetup} className="mt-2 w-full rounded-2xl bg-amber-600 py-2 text-amber-50 disabled:opacity-50">HCP-Werte speichern</Button>
             <Button disabled={!isAdminUnlocked} onClick={createRoundBackup} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-700/80 py-2 text-emerald-50 disabled:opacity-50">Backup für aktive Runde erstellen</Button>
             {appLocked ? <Button disabled={!isAdminUnlocked} onClick={() => { setGlobalAppLock(false); setLockAdminBypass(false); }} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-800/70 py-2 text-emerald-50 disabled:opacity-50">App für alle freigeben</Button> : <Button disabled={!isAdminUnlocked} onClick={() => { setMenuOpen(false); setLockAdminBypass(false); setGlobalAppLock(true); }} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">App für alle sperren</Button>}
@@ -3043,7 +3010,7 @@ function LordOfTheHolesApp() {
 
   function getStrokesCellClass(score, hole) {
     if (!score || score.strokes === "" || score.strokes == null) return "bg-black/10 text-amber-100/55";
-    if (normalizeBoolean(score.picked_up)) return coursesForUse400/40";
+    if (normalizeBoolean(score.picked_up)) return "bg-red-900/65 text-red-100 ring-1 ring-red-400/40";
     const diff = Number(score.strokes || 0) - Number(hole?.par || 0);
     if (diff <= -1) return "bg-emerald-700/70 text-emerald-50 ring-1 ring-emerald-300/30";
     if (diff === 0) return "bg-amber-500/25 text-amber-100 ring-1 ring-amber-300/25";
@@ -3055,7 +3022,7 @@ function LordOfTheHolesApp() {
     const availableRounds = rounds.length ? rounds : fallbackRounds;
     const archiveRound = availableRounds.find((round) => String(round.round_id) === String(scorecardRoundId)) || displayedActiveRound || availableRounds[0] || fallbackRounds[0];
     const archiveCourseId = archiveRound?.course_id || displayCourseId || "goethe";
-    const archiveCourse = (courses.length ? courses : fallbackCourses).find((course) => String(course.course_id) === String(archiveCourseId));
+    const archiveCourse = coursesForUse.find((course) => String(course.course_id) === String(archiveCourseId));
     const scorecardHoles = (allHoles.length ? allHoles : fallbackHoles).filter((hole) => String(hole.course_id) === String(archiveCourseId)).sort((a, b) => Number(a.hole_number) - Number(b.hole_number));
     const scorecardPlayers = getPlayersForCourse(getRoundPlayers(archiveRound?.round_id, allPlayers, roundPlayers), archiveCourseId, courses);
     const scorecardScores = officialAllScores.filter((score) => String(score.round_id || "") === String(archiveRound?.round_id || ""));
@@ -3113,7 +3080,7 @@ function LordOfTheHolesApp() {
                         <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Strokes HCP adjusted</td>{playerScores.map(({ hole, hcpAdjustedStrokes }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hcpAdjustedStrokes ?? "–"}</td>)}<td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? totalHcpAdjustedStrokes : "–"}</td></tr>
                         <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">+/− HCP adjusted</td>{playerScores.map(({ hole, hcpAdjustedToPar }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hcpAdjustedToPar == null ? "–" : formatToPar(hcpAdjustedToPar, true)}</td>)}<td className="px-2 py-1.5 text-center font-bold text-amber-300">{totalHcpAdjustedToPar == null ? "–" : formatToPar(totalHcpAdjustedToPar, true)}</td></tr>
                         <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Netto Stblf.</td>{playerScores.map(({ hole, score, netStableford }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{score ? netStableford : "–"}</td>)}<td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? totalNetStableford : "–"}</td></tr>
-                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Brutto</td>{playerScores.map(({ hholes={holesForUse}rossStableford }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{score ? grossStableford : "–"}</td>)}<td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? totalGrossStableford : "–"}</td></tr>
+                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Brutto</td>{playerScores.map(({ hole, score, grossStableford }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{score ? grossStableford : "–"}</td>)}<td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? totalGrossStableford : "–"}</td></tr>
                       </tbody>
                     </table>
                   </div>
@@ -3127,7 +3094,7 @@ function LordOfTheHolesApp() {
   }
 
   function renderFunView() {
-    return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3"><div className="landscape:mx-auto landscape:max-w-none landscape:pb-6"><MiddleEarthTables players={playersWithCurrentHandicaps} holes={holes} scores={officialScores} mismatches={roundMismatches} /></div></motion.section>;
+    return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3"><div className="landscape:mx-auto landscape:max-w-none landscape:pb-6"><MiddleEarthTables players={playersWithCurrentHandicaps} holes={holesForUse} scores={officialScores} mismatches={roundMismatches} /></div></motion.section>;
   }
 
   function renderRulesView() {
