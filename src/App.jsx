@@ -1598,61 +1598,37 @@ function LordOfTheHolesApp() {
     return true;
   }
 
-  async function fetchAtomicTimeSample(sequenceId, sampleIndex = 0) {
-    const requestStartedAt = Date.now();
-    const url = `https://itime.live/api/time?cacheBust=${requestStartedAt}_${sampleIndex}`;
-    const response = await fetch(url, {
-      method: "GET",
-      cache: "no-store",
-      headers: { "Cache-Control": "no-cache" },
-    });
-    const responseReceivedAt = Date.now();
-    if (sequenceId !== atomicSyncSequenceRef.current) return null;
-    if (!response.ok) throw new Error(`Atomzeit HTTP ${response.status}`);
-    const data = await response.json();
-    const parseAtomicTimeMs = (value) => {
-      if (value === "" || value == null) return NaN;
-      if (typeof value === "number") return value < 1000000000000 ? value * 1000 : value;
-      const text = String(value).trim();
-      const numeric = Number(text);
-      if (!Number.isNaN(numeric) && text.length >= 9) return numeric < 1000000000000 ? numeric * 1000 : numeric;
-      return Date.parse(text);
-    };
-    const candidates = [data?.utc, data?.iso, data?.datetime, data?.timestamp, data?.time]
-      .map(parseAtomicTimeMs)
-      .filter((value) => !Number.isNaN(value));
-    const sourceNowMs = candidates.find((value) => Math.abs(value - responseReceivedAt) < 5 * 60 * 1000);
-    if (!sourceNowMs) return null;
-    const rttMs = Math.max(0, responseReceivedAt - requestStartedAt);
-    const estimatedNowAtReceive = sourceNowMs + rttMs / 2;
-    const offsetMs = estimatedNowAtReceive - responseReceivedAt;
-    return { offsetMs, rttMs, sourceNowMs, requestStartedAt, responseReceivedAt };
-  }
-
   async function syncAtomicTime() {
     const sequenceId = atomicSyncSequenceRef.current + 1;
     atomicSyncSequenceRef.current = sequenceId;
+    const requestStartedAt = Date.now();
+
     try {
       setAtomicTimeStatus("syncing");
-      const samples = [];
-      for (let index = 0; index < 3; index += 1) {
-        const sample = await fetchAtomicTimeSample(sequenceId, index);
-        if (sample) samples.push(sample);
-        await new Promise((resolve) => window.setTimeout(resolve, 120));
-      }
+
+      const response = await fetch("https://itime.live/api/time");
+      const responseReceivedAt = Date.now();
       if (sequenceId !== atomicSyncSequenceRef.current) return false;
-      const bestSample = samples
-        .filter((sample) => sample.rttMs <= 5000 && Math.abs(sample.offsetMs) < 5 * 60 * 1000)
-        .sort((a, b) => a.rttMs - b.rttMs)[0];
-      if (!bestSample) {
+      if (!response.ok) throw new Error(`Atomzeit HTTP ${response.status}`);
+
+      const data = await response.json();
+      const atomicMs = Number(data?.timestamp || Date.parse(data?.utc || data?.time || ""));
+      const plausible = !Number.isNaN(atomicMs) && Math.abs(atomicMs - responseReceivedAt) < 5 * 60 * 1000;
+
+      if (!plausible) {
         setAtomicTimeStatus("invalid");
         return false;
       }
-      setServerTimeOffsetMs(bestSample.offsetMs);
+
+      const rttMs = Math.max(0, responseReceivedAt - requestStartedAt);
+      const estimatedAtomicNowAtReceive = atomicMs + rttMs / 2;
+      const nextOffset = estimatedAtomicNowAtReceive - responseReceivedAt;
+
+      setServerTimeOffsetMs(nextOffset);
       setLastServerSync({
-        offsetMs: bestSample.offsetMs,
-        rttMs: bestSample.rttMs,
-        syncedAt: new Date(bestSample.responseReceivedAt).toISOString(),
+        offsetMs: nextOffset,
+        rttMs,
+        syncedAt: new Date(responseReceivedAt).toISOString(),
         source: "itime.live",
       });
       setAtomicTimeStatus("online");
