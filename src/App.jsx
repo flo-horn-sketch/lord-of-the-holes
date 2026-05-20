@@ -1380,7 +1380,9 @@ function LordOfTheHolesApp() {
       ? (currentStep.roundPlan?.flights || []).reduce((sum, flight) => sum + (flight.players || []).length, 0)
       : 0;
     const revealIsComplete = currentStep?.type === "reveal" && Number(currentStep.revealCount || 0) >= completedRevealPlayers;
-    const delay = currentStep?.type === "reveal" ? (revealIsComplete ? 4200 : 1700) : 5200;
+    const textLength = String(currentStep?.text || "").length;
+    const relaxedReadingDelay = Math.max(6500, Math.min(15000, 3200 + textLength * 55));
+    const delay = currentStep?.type === "reveal" ? (revealIsComplete ? 5600 : 1900) : relaxedReadingDelay;
     const timer = window.setTimeout(() => {
       if (isLastStep) {
         setFlightCeremonyRunning(false);
@@ -2635,6 +2637,11 @@ function LordOfTheHolesApp() {
         steps.push({ type: "text", title: "Flightziehung - Das Öffnen der Pergamente", text, waitLabel: "Die Gemeinschaft wartet ...", chapter });
       });
 
+      const totalPlayers = (roundPlan.flights || []).reduce((sum, flight) => sum + (flight.players || []).length, 0);
+      for (let revealCount = 0; revealCount <= totalPlayers; revealCount += 1) {
+        steps.push({ type: "reveal", roundPlan, revealCount, chapter });
+      }
+
       if (!bogeymirGimmeShown && roundHasPairInFlight(roundPlan, ["andreas", "bogeymir"], ["mucky", "gimme"])) {
         bogeymirGimmeShown = true;
         steps.push({
@@ -2655,11 +2662,6 @@ function LordOfTheHolesApp() {
           waitLabel: "Foredo sammelt innere Kraft ...",
           chapter,
         });
-      }
-
-      const totalPlayers = (roundPlan.flights || []).reduce((sum, flight) => sum + (flight.players || []).length, 0);
-      for (let revealCount = 0; revealCount <= totalPlayers; revealCount += 1) {
-        steps.push({ type: "reveal", roundPlan, revealCount, chapter });
       }
     });
     [
