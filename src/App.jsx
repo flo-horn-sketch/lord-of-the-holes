@@ -1337,7 +1337,7 @@ function LordOfTheHolesApp() {
     const seconds = totalSeconds % 60;
     return { days, hours, minutes, seconds };
   }, [lockCountdownNow, serverTimeOffsetMs]);
-  const atomicTimeActive = lastServerSync?.source === "itime.live" && atomicTimeStatus === "online";
+  const atomicTimeActive = ["itime.live", "itime.live-vercel"].includes(String(lastServerSync?.source || "")) && atomicTimeStatus === "online";
   const syncedNow = useMemo(() => new Date(lockCountdownNow.getTime() + (atomicTimeActive ? serverTimeOffsetMs : 0)), [lockCountdownNow, serverTimeOffsetMs, atomicTimeActive]);
   const getSyncedNowMs = () => Date.now() + (atomicTimeActive ? serverTimeOffsetMs : 0);
   const flightDrawUnlocked = atomicTimeActive && syncedNow.getTime() >= FLIGHT_DRAW_TARGET.getTime();
@@ -1598,6 +1598,21 @@ function LordOfTheHolesApp() {
     return true;
   }
 
+  function readAtomicTimePayload(data, requestStartedAt, responseReceivedAt, source = "itime.live") {
+    const timestampValue = data?.timestamp;
+    const timestampMs = Number(timestampValue);
+    const fallbackMs = Date.parse(data?.utc || data?.time || data?.atomic_now || data?.atomicNow || "");
+    const atomicMs = !Number.isNaN(timestampMs) && timestampMs > 1000000000000 ? timestampMs : fallbackMs;
+    const plausible = !Number.isNaN(atomicMs) && Math.abs(atomicMs - responseReceivedAt) < 5 * 60 * 1000;
+    if (!plausible) {
+      setAtomicTimeStatus("invalid");
+      return false;
+    }
+    const ok = applyTimeSyncOffset(source, atomicMs, requestStartedAt, responseReceivedAt);
+    setAtomicTimeStatus(ok ? "online" : "invalid");
+    return ok;
+  }
+
   async function syncAtomicTime() {
     const sequenceId = atomicSyncSequenceRef.current + 1;
     atomicSyncSequenceRef.current = sequenceId;
@@ -1605,34 +1620,12 @@ function LordOfTheHolesApp() {
 
     try {
       setAtomicTimeStatus("syncing");
-
-      const response = await fetch("https://itime.live/api/time");
+      const response = await fetch("/api/atomic-time", { method: "GET", cache: "no-store" });
       const responseReceivedAt = Date.now();
       if (sequenceId !== atomicSyncSequenceRef.current) return false;
       if (!response.ok) throw new Error(`Atomzeit HTTP ${response.status}`);
-
       const data = await response.json();
-      const atomicMs = Number(data?.timestamp || Date.parse(data?.utc || data?.time || ""));
-      const plausible = !Number.isNaN(atomicMs) && Math.abs(atomicMs - responseReceivedAt) < 5 * 60 * 1000;
-
-      if (!plausible) {
-        setAtomicTimeStatus("invalid");
-        return false;
-      }
-
-      const rttMs = Math.max(0, responseReceivedAt - requestStartedAt);
-      const estimatedAtomicNowAtReceive = atomicMs + rttMs / 2;
-      const nextOffset = estimatedAtomicNowAtReceive - responseReceivedAt;
-
-      setServerTimeOffsetMs(nextOffset);
-      setLastServerSync({
-        offsetMs: nextOffset,
-        rttMs,
-        syncedAt: new Date(responseReceivedAt).toISOString(),
-        source: "itime.live",
-      });
-      setAtomicTimeStatus("online");
-      return true;
+      return readAtomicTimePayload(data, requestStartedAt, responseReceivedAt, "itime.live-vercel");
     } catch (err) {
       if (sequenceId === atomicSyncSequenceRef.current) setAtomicTimeStatus("fallback");
       return false;
@@ -1650,10 +1643,11 @@ function LordOfTheHolesApp() {
     if (!response.ok) throw new Error("Datenbank nicht erreichbar.");
     const responseReceivedAt = Date.now();
     const data = await response.json();
+    const atomicSynced = false;
     const serverNowValue = data?.server_now || data?.serverNow || "";
     const serverNowMs = Date.parse(serverNowValue);
-    if (!Number.isNaN(serverNowMs) && atomicTimeStatus !== "online") {
-      setLastServerSync((current) => current?.source === "itime.live" ? current : { ...(current || {}), source: "apps-script-available", syncedAt: new Date(responseReceivedAt).toISOString() });
+    if (!atomicSynced && !Number.isNaN(serverNowMs) && atomicTimeStatus !== "online") {
+      setLastServerSync((current) => String(current?.source || "").startsWith("itime.live") ? current : { ...(current || {}), source: "apps-script-available", syncedAt: new Date(responseReceivedAt).toISOString() });
     }
     if (data && data.ok === false) throw new Error(data.error || "Datenbank meldet einen Fehler.");
     return data;
@@ -3070,7 +3064,7 @@ function LordOfTheHolesApp() {
   }
 
   function getTimeSourceLabel() {
-    if (atomicTimeActive) return "Atomzeit aktiv";
+    if (atomicTimeActive) return lastServerSync?.source === "itime.live-vercel" ? "Atomzeit aktiv · über Vercel" : "Atomzeit aktiv";
     if (atomicTimeStatus === "syncing") return "Atomzeit wird synchronisiert ...";
     if (atomicTimeStatus === "fallback") return "Atomzeit nicht erreichbar — Countdown pausiert.";
     if (lastServerSync?.source === "apps-script-available") return "Apps-Script-Zeit verfügbar, aber Countdown wartet auf Atomzeit.";
