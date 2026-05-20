@@ -48,11 +48,17 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
-const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycby3ck7nl5JkIfWZLSQ6Q9RRZ9OSFxrM_O-_Kk4q8jnekci9rP6exk6-nP-JvEnk5jrl/exec";
+const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbyZh7wjYprotHypz0SCcuL_436PyJBuPyMKr2qPOQo-bq6iH_FjBliLCPRX2aN_Rtod/exec";
 const ADMIN_PASSWORD = "weimar";
 const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T10:00:00+02:00");
 const FLIGHT_DRAW_TARGET = new Date("2026-05-21T20:00:00+02:00");
 const FLIGHT_DRAW_STORAGE_KEY = "lordOfTheHoles.flightDraw";
+const TEAM_DRAW_STORAGE_KEY = "lordOfTheHoles.teamDraw";
+const TEAM_DRAW_TARGETS = {
+  r1: new Date("2026-05-22T20:30:00+02:00"),
+  r2: new Date("2026-05-23T20:30:00+02:00"),
+  r3: new Date("2026-05-24T20:30:00+02:00"),
+};
 
 const fallbackAliases = {
   florian: "Sliceron",
@@ -1136,6 +1142,12 @@ function LordOfTheHolesApp() {
   const [scorecardRoundId, setScorecardRoundId] = useState(() => readLocalJson("lordOfTheHoles.scorecardRoundId", ""));
   const [roundTableRoundId, setRoundTableRoundId] = useState(() => readLocalJson("lordOfTheHoles.roundTableRoundId", ""));
   const [dailyTeamSelections, setDailyTeamSelections] = useState(() => readLocalJson("lordOfTheHoles.dailyTeamSelections", {}));
+  const [teamDrawRows, setTeamDrawRows] = useState(cachedState?.teamDrawRows || []);
+  const [teamDrawSaving, setTeamDrawSaving] = useState(false);
+  const [teamCeremonyRunning, setTeamCeremonyRunning] = useState(false);
+  const [teamCeremonyRoundId, setTeamCeremonyRoundId] = useState("");
+  const [teamCeremonyStepIndex, setTeamCeremonyStepIndex] = useState(0);
+  const [teamCeremonyDismissedKeys, setTeamCeremonyDismissedKeys] = useState(() => readLocalJson("lordOfTheHoles.teamCeremonyDismissedKeys", []));
   const [prizeSettings, setPrizeSettings] = useState(() => readLocalJson("lordOfTheHoles.prizeSettings", { topGreenfee: "" }));
   const [roundSummaryDismissedKeys, setRoundSummaryDismissedKeys] = useState(() => readLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", []));
   const [flightDraw, setFlightDraw] = useState(() => readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null));
@@ -1321,6 +1333,8 @@ function LordOfTheHolesApp() {
   }, [lockCountdownNow]);
   const flightDrawUnlocked = lockCountdownNow.getTime() >= FLIGHT_DRAW_TARGET.getTime();
   const flightCeremonyTimeline = useMemo(() => buildFlightCeremonyTimeline(flightDraw), [flightDraw]);
+  const unlockedTeamDrawRoundIds = useMemo(() => Object.entries(TEAM_DRAW_TARGETS).filter(([, target]) => lockCountdownNow.getTime() >= target.getTime()).map(([roundId]) => roundId), [lockCountdownNow]);
+  const teamCeremonyTimeline = useMemo(() => buildTeamCeremonyTimeline(teamCeremonyRoundId), [teamCeremonyRoundId, teamDrawRows, allPlayers]);
 
   useEffect(() => { writeLocalJson("lordOfTheHoles.myPlayerId", myPlayerId); }, [myPlayerId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerId", scoredPlayerId); }, [scoredPlayerId]);
@@ -1350,14 +1364,15 @@ function LordOfTheHolesApp() {
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundTableRoundId", roundTableRoundId); }, [roundTableRoundId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.dailyTeamSelections", dailyTeamSelections); }, [dailyTeamSelections]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.openMenuGroups", openMenuGroups); }, [openMenuGroups]);
+  useEffect(() => { writeLocalJson("lordOfTheHoles.teamCeremonyDismissedKeys", teamCeremonyDismissedKeys); }, [teamCeremonyDismissedKeys]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.prizeSettings", prizeSettings); }, [prizeSettings]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", roundSummaryDismissedKeys); }, [roundSummaryDismissedKeys]);
   useEffect(() => { writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, flightDraw); }, [flightDraw]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.flightCeremonyCompleted", flightCeremonyCompleted); }, [flightCeremonyCompleted]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.flightSummaryOpen", flightSummaryOpen); }, [flightSummaryOpen]);
   useEffect(() => {
-    writeLocalJson("lordOfTheHoles.cachedState", { players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId, flightDraw, cachedAt: new Date().toISOString() });
-  }, [players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId, flightDraw]);
+    writeLocalJson("lordOfTheHoles.cachedState", { players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId, flightDraw, teamDrawRows, cachedAt: new Date().toISOString() });
+  }, [players, allPlayers, courses, rounds, roundPlayers, activeRound, holes, allHoles, scores, allScores, pendingScores, selectedCourseId, selectedActiveRoundId, flightDraw, teamDrawRows]);
   useEffect(() => { introAudioRef.current = new Audio("/intro-sound.mp3"); introAudioRef.current.preload = "auto"; introAudioRef.current.loop = false; }, []);
   useEffect(() => { if (!autoSync) return undefined; loadData({ silent: true }); const timer = setInterval(() => loadData({ silent: true }), 30000); return () => clearInterval(timer); }, [autoSync]);
   // Scores werden bewusst nicht mehr laufend synchronisiert.
@@ -1403,12 +1418,47 @@ function LordOfTheHolesApp() {
       setFlightCeremonyStepIndex((index) => Math.min(index + 1, timeline.length - 1));
     }, delay);
     return () => window.clearTimeout(timer);
-  }, [flightCeremonyRunning, flightCeremonyStepIndex, flightDraw]);
+  }, [flightCeremonyRunning, flightCeremonyStepIndex, flightCeremonyTimeline]);
+
+  useEffect(() => {
+    if (!teamCeremonyRunning) return undefined;
+    const timeline = teamCeremonyTimeline;
+    if (!timeline.length) return undefined;
+    const isLastStep = teamCeremonyStepIndex >= timeline.length - 1;
+    const currentStep = timeline[Math.min(teamCeremonyStepIndex, timeline.length - 1)];
+    const textLength = String(currentStep?.text || "").length + (currentStep?.type === "team" ? 110 : 0);
+    const delay = Math.max(4200, Math.min(9000, 2500 + textLength * 28));
+    const timer = window.setTimeout(() => {
+      if (isLastStep) {
+        const key = `team_ceremony_${teamCeremonyRoundId}`;
+        setTeamCeremonyDismissedKeys((current) => Array.from(new Set([...(current || []), key])));
+        setTeamCeremonyRunning(false);
+        setTeamCeremonyRoundId("");
+        setTeamCeremonyStepIndex(0);
+        return;
+      }
+      setTeamCeremonyStepIndex((index) => Math.min(index + 1, timeline.length - 1));
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [teamCeremonyRunning, teamCeremonyStepIndex, teamCeremonyTimeline, teamCeremonyRoundId]);
   useEffect(() => {
     if (!appLocked || lockAdminBypass || flightCeremonyRunning || flightCeremonyCompleted) return;
     if (!flightDrawUnlocked || !flightDraw?.rounds?.length) return;
     startFlightCeremony();
   }, [appLocked, lockAdminBypass, flightCeremonyRunning, flightCeremonyCompleted, flightDrawUnlocked, flightDraw]);
+
+  useEffect(() => {
+    if (teamCeremonyRunning || flightCeremonyRunning || showSplash || appLocked) return;
+    const nextRoundId = ["r1", "r2", "r3"].find((roundId) => {
+      const target = TEAM_DRAW_TARGETS[roundId];
+      const key = `team_ceremony_${roundId}`;
+      return target && lockCountdownNow.getTime() >= target.getTime() && !(teamCeremonyDismissedKeys || []).includes(key) && getTeamDrawRowsForRound(roundId).length;
+    });
+    if (!nextRoundId) return;
+    setTeamCeremonyRoundId(nextRoundId);
+    setTeamCeremonyStepIndex(0);
+    setTeamCeremonyRunning(true);
+  }, [teamCeremonyRunning, flightCeremonyRunning, showSplash, appLocked, lockCountdownNow, teamCeremonyDismissedKeys, teamDrawRows]);
   useEffect(() => {
     if (!myPlayerId && scoreEntryMode === "scorer") setScoreEntryMode("player");
     if (Number(activeHole) < 1 || Number(activeHole) > 18) setActiveHole(1);
@@ -1520,6 +1570,13 @@ function LordOfTheHolesApp() {
       } else if (nextDeviceAssignmentsResetAt && nextDeviceAssignmentsResetAt !== deviceAssignmentsResetAt) {
         setDeviceAssignmentsResetAt(nextDeviceAssignmentsResetAt);
       }
+      const serverTeamDrawRows = data.team_draw_rows || data.teamDrawRows || [];
+      if (Array.isArray(serverTeamDrawRows)) {
+        setTeamDrawRows(serverTeamDrawRows);
+        const selectionsFromTeamDraw = buildDailyTeamSelectionsFromRows(serverTeamDrawRows, true);
+        if (Object.keys(selectionsFromTeamDraw).length) setDailyTeamSelections((current) => ({ ...(current || {}), ...selectionsFromTeamDraw }));
+      }
+
       const serverFlightDraw = data.flight_draw || data.flightDraw || null;
       const serverSentFlightDraw = Object.prototype.hasOwnProperty.call(data, "flight_draw") || Object.prototype.hasOwnProperty.call(data, "flightDraw");
       if (serverFlightDraw && (serverFlightDraw.rounds?.length || serverFlightDraw.rows?.length || serverFlightDraw.flight_draw_rows?.length || serverFlightDraw.flightDrawRows?.length || Array.isArray(serverFlightDraw))) {
@@ -2522,7 +2579,16 @@ function LordOfTheHolesApp() {
             <Button disabled={!isAdminUnlocked || flightDrawSaving || connectionStatus !== "online"} onClick={saveFlightDrawFromAdmin} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-amber-800/70 py-2 text-amber-50 disabled:opacity-50">{flightDrawSaving ? "Flights werden bestimmt ..." : "Flights neu bestimmen"}</Button>
             <Button disabled={!isAdminUnlocked || connectionStatus !== "online"} onClick={resetDeviceAssignmentsForAll} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">Spieler-/Zähler-Zuordnungen zurücksetzen</Button>
             <Button disabled={!isAdminUnlocked} onClick={clearLocalCache} className="mt-2 w-full rounded-2xl border border-sky-500/40 bg-sky-950/60 py-2 text-sky-100 disabled:opacity-50">Lokalen Cache dieses Geräts löschen</Button>
-            <Button disabled={!isAdminUnlocked || connectionStatus !== "online"} onClick={fullResetForAllDevices} className="mt-2 w-full rounded-2xl border border-red-400/60 bg-red-950/80 py-2 text-red-100 disabled:opacity-50">Runde beginnen</Button>
+            <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
+              <div className="mb-2 text-sm font-bold text-amber-200">Team-Zeremonie testen</div>
+              <div className="grid grid-cols-3 gap-2">
+                <Button disabled={!isAdminUnlocked} onClick={() => startTeamCeremonyTest("r1")} className="rounded-2xl border border-amber-500/40 bg-amber-950/60 py-2 text-xs font-bold text-amber-100 disabled:opacity-50">R1</Button>
+                <Button disabled={!isAdminUnlocked} onClick={() => startTeamCeremonyTest("r2")} className="rounded-2xl border border-amber-500/40 bg-amber-950/60 py-2 text-xs font-bold text-amber-100 disabled:opacity-50">R2</Button>
+                <Button disabled={!isAdminUnlocked} onClick={() => startTeamCeremonyTest("r3")} className="rounded-2xl border border-amber-500/40 bg-amber-950/60 py-2 text-xs font-bold text-amber-100 disabled:opacity-50">R3</Button>
+              </div>
+              <div className="mt-1 text-[11px] text-amber-100/45">Startet die jeweilige Teamdraw-Zeremonie sofort auf diesem Gerät.</div>
+            </div>
+            <Button disabled={!isAdminUnlocked || connectionStatus !== "online" || teamDrawSaving} onClick={async () => { await generateAndSaveTeamDrawToSheet(); await fullResetForAllDevices(); }} className="mt-2 w-full rounded-2xl border border-red-400/60 bg-red-950/80 py-2 text-red-100 disabled:opacity-50">Runde beginnen</Button>
             </> : null}
           </CardContent>
         </Card>
@@ -2663,6 +2729,251 @@ function LordOfTheHolesApp() {
     return { value, detail: `${value} Netto-Punkte` };
   }
 
+  function normalizeTeamDrawRow(row) {
+    return {
+      draw_key: String(row?.draw_key || "").trim(),
+      round_id: String(row?.round_id || "").trim(),
+      round_name: String(row?.round_name || "").trim(),
+      team_number: String(row?.team_number || row?.teamNumber || "").trim(),
+      player_id: String(row?.player_id || row?.playerId || "").trim(),
+      player_name: String(row?.player_name || row?.playerName || "").trim(),
+      player_alias: String(row?.player_alias || row?.playerAlias || "").trim(),
+      sort_order: Number(row?.sort_order || row?.sortOrder || 0),
+      created_at: String(row?.created_at || row?.createdAt || "").trim(),
+      updated_at: String(row?.updated_at || row?.updatedAt || "").trim(),
+      is_test: normalizeBoolean(row?.is_test || row?.isTest),
+    };
+  }
+
+  function buildDailyTeamSelectionsFromRows(rows = [], onlyUnlocked = false) {
+    const next = {};
+    const allowedRoundIds = onlyUnlocked ? unlockedTeamDrawRoundIds : ["r1", "r2", "r3"];
+    (rows || []).map(normalizeTeamDrawRow).filter((row) => allowedRoundIds.includes(row.round_id) && row.round_id && row.team_number && row.player_id).sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0)).forEach((row) => {
+      const roundId = row.round_id;
+      const teamId = String(row.team_number || "").replace(/^team/i, "").trim().toUpperCase();
+      if (!["A", "B", "C"].includes(teamId)) return;
+      if (!next[roundId]) next[roundId] = { teams: { A: ["", ""], B: ["", ""], C: ["", ""] } };
+      const emptyIndex = next[roundId].teams[teamId].findIndex((value) => !value);
+      if (emptyIndex >= 0) next[roundId].teams[teamId][emptyIndex] = row.player_id;
+    });
+    return next;
+  }
+
+  function buildGeneratedTeamDrawRows() {
+    const createdAt = new Date().toISOString();
+    const drawKey = `teamdraw_${createdAt.replace(/[-:.TZ]/g, "").slice(0, 14)}`;
+    const usedPairs = new Set();
+    const rows = [];
+    const makePairKey = (a, b) => [String(a || ""), String(b || "")].sort().join("|");
+    const teamLabels = ["A", "B", "C"];
+
+    ["r1", "r2", "r3"].forEach((roundId, roundIndex) => {
+      const round = (rounds.length ? rounds : fallbackRounds).find((item) => String(item.round_id) === String(roundId));
+      const roundPlayersList = getRoundPlayers(roundId, allPlayers, roundPlayers);
+      const playerIds = roundPlayersList.map((player) => String(player.id)).filter(Boolean);
+      let bestTeams = null;
+      let bestScore = Infinity;
+
+      for (let attempt = 0; attempt < 900; attempt += 1) {
+        const random = seededRandom(`${drawKey}-${roundId}-${attempt}`);
+        const shuffled = shuffleWithRandom(playerIds, random);
+        const expanded = roundId === "r1" && shuffled.length === 5 ? [...shuffled, shuffled[Math.floor(random() * shuffled.length)]] : shuffled.slice(0, 6);
+        const teams = [expanded.slice(0, 2), expanded.slice(2, 4), expanded.slice(4, 6)].filter((team) => team.length === 2);
+        let score = 0;
+        teams.forEach((team) => {
+          const key = makePairKey(team[0], team[1]);
+          if (team[0] === team[1]) score += 50;
+          if (usedPairs.has(key)) score += 200;
+        });
+        if (score < bestScore) {
+          bestScore = score;
+          bestTeams = teams;
+          if (score === 0) break;
+        }
+      }
+
+      (bestTeams || []).forEach((team, teamIndex) => {
+        const pair = makePairKey(team[0], team[1]);
+        if (pair) usedPairs.add(pair);
+        team.forEach((playerId, slotIndex) => {
+          const player = allPlayers.find((item) => String(item.id) === String(playerId)) || {};
+          rows.push({
+            draw_key: drawKey,
+            round_id: roundId,
+            round_name: round?.round_name || getRoundChapterLabel(round),
+            team_number: teamLabels[teamIndex] || String(teamIndex + 1),
+            player_id: playerId,
+            player_name: player.character_name || player.display_name || playerId,
+            player_alias: player.alias_name || "",
+            sort_order: Number(roundIndex + 1) * 1000 + Number(teamIndex + 1) * 100 + Number(slotIndex + 1),
+            created_at: createdAt,
+            updated_at: createdAt,
+            is_test: false,
+          });
+        });
+      });
+    });
+
+    return rows;
+  }
+
+  function buildTeamDrawRowsFromSelections() {
+    const createdAt = new Date().toISOString();
+    const drawKey = `teamdraw_${createdAt.replace(/[-:.TZ]/g, "").slice(0, 14)}`;
+    const rows = [];
+    ["r1", "r2", "r3"].forEach((roundId, roundIndex) => {
+      const round = (rounds.length ? rounds : fallbackRounds).find((item) => String(item.round_id) === String(roundId));
+      const slots = getDailyTeamSlots(roundId);
+      ["A", "B", "C"].forEach((teamId, teamIndex) => {
+        (slots?.[teamId] || []).forEach((playerId, slotIndex) => {
+          const player = allPlayers.find((item) => String(item.id) === String(playerId));
+          if (!playerId || !player) return;
+          rows.push({
+            draw_key: drawKey,
+            round_id: roundId,
+            round_name: round?.round_name || getRoundChapterLabel(round),
+            team_number: teamId,
+            player_id: player.id,
+            player_name: player.character_name || player.display_name || player.id,
+            player_alias: player.alias_name || "",
+            sort_order: Number(roundIndex + 1) * 1000 + Number(teamIndex + 1) * 100 + Number(slotIndex + 1),
+            created_at: createdAt,
+            updated_at: createdAt,
+            is_test: false,
+          });
+        });
+      });
+    });
+    return rows;
+  }
+
+  async function saveTeamDrawToSheet() {
+    setTeamDrawSaving(true);
+    setError("");
+    try {
+      const rows = buildTeamDrawRowsFromSelections();
+      const result = await callSheetApi({ action: "saveTeamDraw", rows });
+      const nextRows = result?.team_draw_rows || result?.teamDrawRows || rows;
+      setTeamDrawRows(nextRows);
+      setSetupSavedMessage("Team-Ziehung wurde in der Datenbank gespeichert.");
+      setConnectionStatus("online");
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Team-Ziehung konnte nicht gespeichert werden.");
+    } finally {
+      setTeamDrawSaving(false);
+    }
+  }
+
+  function startTeamCeremonyTest(roundId) {
+    const key = `team_ceremony_${roundId}`;
+    setTeamCeremonyDismissedKeys((current) => (current || []).filter((item) => item !== key));
+    setTeamCeremonyRoundId(roundId);
+    setTeamCeremonyStepIndex(0);
+    setShowSplash(false);
+    setTeamCeremonyRunning(true);
+  }
+
+  async function generateAndSaveTeamDrawToSheet() {
+    setTeamDrawSaving(true);
+    setError("");
+    try {
+      const rows = buildGeneratedTeamDrawRows();
+      const result = await callSheetApi({ action: "saveTeamDraw", rows });
+      const nextRows = result?.team_draw_rows || result?.teamDrawRows || rows;
+      setTeamDrawRows(nextRows);
+      setDailyTeamSelections(buildDailyTeamSelectionsFromRows(nextRows, true));
+      setSetupSavedMessage("Team-Ziehung wurde neu ausgelost und gespeichert.");
+      setConnectionStatus("online");
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Team-Ziehung konnte nicht ausgelost werden.");
+    } finally {
+      setTeamDrawSaving(false);
+    }
+  }
+
+  async function clearTeamDrawInSheet() {
+    setTeamDrawSaving(true);
+    setError("");
+    try {
+      await callSheetApi({ action: "clearTeamDraw" });
+      setTeamDrawRows([]);
+      setDailyTeamSelections({});
+      setSetupSavedMessage("Team-Ziehung wurde gelöscht.");
+      setConnectionStatus("online");
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Team-Ziehung konnte nicht gelöscht werden.");
+    } finally {
+      setTeamDrawSaving(false);
+    }
+  }
+
+  function getTeamDrawRowsForRound(roundId) {
+    return (teamDrawRows || []).map(normalizeTeamDrawRow).filter((row) => String(row.round_id) === String(roundId)).sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
+  }
+
+  function buildTeamCeremonyTimeline(roundId) {
+    const rows = getTeamDrawRowsForRound(roundId);
+    if (!roundId || !rows.length) return [];
+    const round = (rounds.length ? rounds : fallbackRounds).find((item) => String(item.round_id) === String(roundId));
+    const title = roundId === "r1" ? "Die Bündnisse des ersten Tages" : roundId === "r2" ? "Die Bündnisse aus den Minen" : "Die Bündnisse vor Mordor";
+    const teamMap = { A: [], B: [], C: [] };
+    rows.forEach((row) => {
+      const teamId = String(row.team_number || "").toUpperCase();
+      if (!teamMap[teamId]) teamMap[teamId] = [];
+      teamMap[teamId].push(row);
+    });
+    const steps = [
+      { type: "text", title, text: `${getRoundChapterLabel(round)} ist geschlagen. Nun öffnet der Rat das versiegelte Pergament der Tageswertung.`, waitLabel: "Das Pergament wird entrollt ..." },
+      { type: "text", title: "Die Mannschaften werden offenbart", text: "Kein Gefährte kann nun noch fliehen. Das Schicksal hat Teams geschmiedet — und mindestens einer wird behaupten, das sei statistisch verdächtig.", waitLabel: "Die Runen glimmen ..." },
+    ];
+    ["A", "B", "C"].forEach((teamId) => {
+      steps.push({ type: "team", title: `Team ${teamId}`, teamId, players: teamMap[teamId] || [] });
+    });
+    steps.push({ type: "text", title: "Die Teams sind gesprochen", text: "Die Bündnisse stehen. Wer nun klagt, möge dies mit Netto-Punkten widerlegen.", waitLabel: "Die Chronik wird versiegelt ..." });
+    return steps;
+  }
+
+  function renderTeamCeremonyView() {
+    const timeline = teamCeremonyTimeline;
+    const step = timeline[Math.min(teamCeremonyStepIndex, Math.max(0, timeline.length - 1))];
+    if (!step) return null;
+    const playerLabel = (row) => row.player_alias ? `${row.player_alias} (${row.player_name || row.player_id})` : (row.player_name || row.player_id);
+    return (
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="min-h-[70vh]">
+        <Card className="relative overflow-hidden rounded-3xl border-amber-500/45 bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.28),transparent_44%),linear-gradient(180deg,rgba(32,23,15,0.96),rgba(12,10,9,0.96))] shadow-2xl">
+          <CardContent className="p-4 text-center">
+            <div className="mx-auto mb-3 h-1.5 w-24 rounded-full bg-amber-400/70 shadow-[0_0_18px_rgba(251,191,36,0.35)]" />
+            <p className="text-[10px] uppercase tracking-[0.28em] text-amber-300/75">Team-Zeremonie</p>
+            <h2 className="mt-1 font-serif text-2xl font-black text-amber-200">{step.title}</h2>
+            {step.type === "team" ? (
+              <motion.div key={`${step.teamId}-${teamCeremonyStepIndex}`} initial={{ opacity: 0, scale: 0.94 }} animate={{ opacity: 1, scale: 1 }} className="mt-5 rounded-3xl border border-amber-500/35 bg-black/28 p-4">
+                <div className="mb-3 font-serif text-5xl font-black text-amber-300 drop-shadow-[0_0_18px_rgba(251,191,36,0.22)]">{step.teamId}</div>
+                <div className="space-y-2">
+                  {(step.players || []).map((row, index) => (
+                    <motion.div key={`${row.player_id}-${index}`} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.45 }} className="rounded-2xl border border-amber-700/35 bg-stone-950/65 px-3 py-2 font-serif text-xl font-bold text-amber-100">
+                      {playerLabel(row)}
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            ) : (
+              <motion.p key={teamCeremonyStepIndex} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="mx-auto mt-5 max-w-md text-lg leading-relaxed text-amber-100/85">
+                {step.text}
+              </motion.p>
+            )}
+            <div className="mt-5 text-xs uppercase tracking-[0.18em] text-amber-100/45">{step.waitLabel || "Die Chronik schreibt ..."}</div>
+            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-black/35">
+              <div className="h-full rounded-full bg-amber-400/80" style={{ width: `${Math.round(((teamCeremonyStepIndex + 1) / Math.max(1, timeline.length)) * 100)}%` }} />
+            </div>
+          </CardContent>
+        </Card>
+      </motion.section>
+    );
+  }
+
   function getDailyTeamSlots(roundId) {
     const legacySelection = dailyTeamSelections?.[roundId] || {};
     if (legacySelection?.teams) return legacySelection.teams;
@@ -2763,6 +3074,12 @@ function LordOfTheHolesApp() {
               <p className="text-xs uppercase tracking-[0.22em] text-amber-300/75">Tageswertungen</p>
               <h2 className="font-serif text-xl font-black text-amber-200">Teams eintragen & Tageswertung berechnen</h2>
               <p className="mt-1 text-sm text-amber-100/70">Pro Runde gibt es drei 2er-Teams. In Runde 1 darf ein Spieler doppelt gewählt werden, falls Gangolf noch über die Autobahn donnert.</p>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <Button disabled={teamDrawSaving || connectionStatus !== "online"} onClick={saveTeamDrawToSheet} className="rounded-2xl bg-amber-600 py-2 text-sm font-bold text-amber-50 disabled:opacity-50">{teamDrawSaving ? "Speichert ..." : "Teamdraw speichern"}</Button>
+                <Button disabled={teamDrawSaving || connectionStatus !== "online"} onClick={generateAndSaveTeamDrawToSheet} className="rounded-2xl border border-amber-400/50 bg-amber-950/50 py-2 text-sm font-bold text-amber-100 disabled:opacity-50">Neu auslosen</Button>
+                <Button disabled={teamDrawSaving || connectionStatus !== "online"} onClick={clearTeamDrawInSheet} className="rounded-2xl border border-red-400/50 bg-red-950/45 py-2 text-sm font-bold text-red-100 disabled:opacity-50">Teamdraw löschen</Button>
+              </div>
+              {teamDrawRows?.length ? <div className="mt-2 text-xs text-amber-100/55">Geladen aus TeamDraw: {teamDrawRows.length} Einträge.</div> : null}
             </div>
             <div className="space-y-3 landscape:space-y-2">
               {roundIds.map((roundId) => {
@@ -3049,6 +3366,7 @@ function LordOfTheHolesApp() {
   }
 
   function renderActiveView() {
+    if (teamCeremonyRunning) return renderTeamCeremonyView();
     if (loading) return <Card className="rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm"><CardContent className="flex items-center gap-2 p-3 text-amber-100">⟳ Lade Datenbank ...</CardContent></Card>;
     if (view === "admin") return renderAdminView();
     if (view === "handicaps") return renderSettingsView();
