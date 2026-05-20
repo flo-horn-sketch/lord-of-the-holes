@@ -647,7 +647,9 @@ function buildPlayerStats(players, holes, scores) {
     const total = playerScores.reduce((sum, s) => sum + Number(s.strokes || 0), 0);
     const parPlayed = playerScores.reduce((sum, s) => sum + Number((holes || []).find((h) => Number(h.hole_number) === Number(s.hole_number))?.par || 0), 0);
     const threePutts = playerScores.filter((s) => normalizeBoolean(s.over_two_putts) && Number(s.putts_count) === 3).length;
-    const fourPlusPutts = playerScores.filter((s) => normalizeBoolean(s.over_two_putts) && Number(s.putts_count) >= 4).length;
+    const fourPutts = playerScores.filter((s) => normalizeBoolean(s.over_two_putts) && Number(s.putts_count) === 4).length;
+    const fivePlusPutts = playerScores.filter((s) => normalizeBoolean(s.over_two_putts) && Number(s.putts_count) >= 5).length;
+    const fourPlusPutts = fourPutts + fivePlusPutts;
     const netStableford = playerScores.reduce((sum, s) => {
       const hole = (holes || []).find((h) => Number(h.hole_number) === Number(s.hole_number));
       return sum + getScoreStablefordPoints(s, hole?.par, getShotsOnHole(p.course_hcp, hole?.hcp));
@@ -663,7 +665,7 @@ function buildPlayerStats(players, holes, scores) {
     const hcpAdjustedTotal = total - hcpShotsUsed;
     const hcpAdjustedToPar = hcpAdjustedTotal - parPlayed;
     const ladyCount = playerScores.filter((s) => normalizeBoolean(s.lady)).length;
-    return { ...withFallbackAlias(p), played, total, toPar: total - parPlayed, hcpShotsUsed, hcpAdjustedTotal, hcpAdjustedToPar, overTwoPutts: threePutts + fourPlusPutts, threePutts, fourPlusPutts, puttPenaltyEuro: threePutts * 2 + fourPlusPutts * 4, ladyCount, netStableford, grossStableford };
+    return { ...withFallbackAlias(p), played, total, toPar: total - parPlayed, hcpShotsUsed, hcpAdjustedTotal, hcpAdjustedToPar, overTwoPutts: threePutts + fourPlusPutts, threePutts, fourPutts, fivePlusPutts, fourPlusPutts, puttPenaltyEuro: threePutts * 2 + fourPutts * 4 + fivePlusPutts * 10, ladyCount, netStableford, grossStableford };
   });
 }
 
@@ -733,7 +735,7 @@ function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", sta
 function PuttStepper({ value, disabled = false, max = 6, onChange }) {
   const hasValue = value !== "" && value != null;
   const selected = hasValue ? Number(value || 0) : Math.min(2, Number(max || 0));
-  const snakeLabel = selected >= 4 ? "4+ · 4 €" : selected === 3 ? "3 · 2 €" : "keine Snake";
+  const snakeLabel = selected >= 5 ? "5+ · 10 €" : selected === 4 ? "4 · 4 €" : selected === 3 ? "3 · 2 €" : "keine Snake";
   return <TouchStepper label="Putts" value={value === 0 ? 0 : value || ""} min={0} max={Math.max(0, Number(max || 0))} emptyLabel={String(Math.min(2, Math.max(0, Number(max || 0))))} defaultValue={Math.min(2, Math.max(0, Number(max || 0)))} status={snakeLabel} disabled={disabled} onChange={onChange} />;
 }
 
@@ -794,8 +796,10 @@ function getCourseShortName(courseId) {
 
 function getPuttBuckets(playerScores) {
   const threePutts = playerScores.filter((score) => normalizeBoolean(score.over_two_putts) && Number(score.putts_count) === 3).length;
-  const fourPlusPutts = playerScores.filter((score) => normalizeBoolean(score.over_two_putts) && Number(score.putts_count) >= 4).length;
-  return { threePutts, fourPlusPutts, overTwoPutts: threePutts + fourPlusPutts };
+  const fourPutts = playerScores.filter((score) => normalizeBoolean(score.over_two_putts) && Number(score.putts_count) === 4).length;
+  const fivePlusPutts = playerScores.filter((score) => normalizeBoolean(score.over_two_putts) && Number(score.putts_count) >= 5).length;
+  const fourPlusPutts = fourPutts + fivePlusPutts;
+  return { threePutts, fourPutts, fivePlusPutts, fourPlusPutts, overTwoPutts: threePutts + fourPlusPutts, puttPenaltyEuro: threePutts * 2 + fourPutts * 4 + fivePlusPutts * 10 };
 }
 
 function getScoreDiffToPar(score, hole) {
@@ -830,12 +834,12 @@ function buildFunPlayerStats(players, holes, scores) {
     const greenAttempts = enrichedScores.filter((item) => item.score.putts_count !== "" && item.score.putts_count != null && !normalizeBoolean(item.score.picked_up));
     const greenInRegulation = greenAttempts.filter((item) => Number(item.score.strokes || 0) - Number(item.score.putts_count || 0) <= Number(item.hole.par || 0) - 2).length;
     const underRegulation = greenAttempts.filter((item) => Number(item.score.strokes || 0) - Number(item.score.putts_count || 0) <= Number(item.hole.par || 0) - 3).length;
-    const { threePutts, fourPlusPutts } = getPuttBuckets(playerScores);
+    const { threePutts, fourPutts, fivePlusPutts, fourPlusPutts, puttPenaltyEuro } = getPuttBuckets(playerScores);
     const grossStableford = enrichedScores.reduce((sum, item) => sum + getScoreStablefordPoints(item.score, item.hole.par, 0), 0);
     const netStableford = enrichedScores.reduce((sum, item) => sum + getScoreStablefordPoints(item.score, item.hole.par, getShotsOnHole(player.course_hcp, item.hole.hcp)), 0);
     const hcpBonus = netStableford - grossStableford;
     const hcpShotsUsed = enrichedScores.reduce((sum, item) => sum + getShotsOnHole(player.course_hcp, item.hole.hcp), 0);
-    return { ...withFallbackAlias(player), played: enrichedScores.length, birdies, eaglesOrBetter, pars, parOrBetter, doubleBogeyPlus, triplePlus, pickedUpCount, ladyCount, greenAttempts: greenAttempts.length, greenInRegulation, underRegulation, threePutts, fourPlusPutts, puttPenaltyEuro: threePutts * 2 + fourPlusPutts * 4, frontTotal, backTotal, frontToPar, backToPar, backMinusFront, grossStableford, netStableford, hcpBonus, hcpShotsUsed, pointsPerHcpShot: hcpShotsUsed ? Number((netStableford / hcpShotsUsed).toFixed(2)) : 0 };
+    return { ...withFallbackAlias(player), played: enrichedScores.length, birdies, eaglesOrBetter, pars, parOrBetter, doubleBogeyPlus, triplePlus, pickedUpCount, ladyCount, greenAttempts: greenAttempts.length, greenInRegulation, underRegulation, threePutts, fourPutts, fivePlusPutts, fourPlusPutts, puttPenaltyEuro, frontTotal, backTotal, frontToPar, backToPar, backMinusFront, grossStableford, netStableford, hcpBonus, hcpShotsUsed, pointsPerHcpShot: hcpShotsUsed ? Number((netStableford / hcpShotsUsed).toFixed(2)) : 0 };
   });
 }
 
@@ -950,7 +954,7 @@ function MiddleEarthTables({ players, holes, scores, mismatches }) {
     <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm landscape:rounded-xl">
       <CardContent className="p-2">
         <div className="mb-2"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Mittelerde</p><h2 className="font-serif text-lg text-amber-200">Die Chroniken der Runde</h2><p className="mt-1 text-sm text-amber-100/65">Fun-Tabellen aus den Scores der aktuellen Runde.</p></div>
-        <FunTable title="Shelobs Putt-Kammer" subtitle="Snake-König der Runde" players={snakeLords} columns={[{ label: "3P", render: (p) => p.threePutts }, { label: "4+P", render: (p) => p.fourPlusPutts }, { label: "€", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} />
+        <FunTable title="Shelobs Putt-Kammer" subtitle="Snake-König der Runde" players={snakeLords} columns={[{ label: "3P", render: (p) => p.threePutts }, { label: "4P", render: (p) => p.fourPutts }, { label: "5+P", render: (p) => p.fivePlusPutts }, { label: "€", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} />
         <FunTable title="Galadriels Spiegel" subtitle="Lady-Liga" players={ladies} columns={[{ label: "Ladys", render: (p) => p.ladyCount, emphasize: true }, { label: "Quote", render: (p) => p.played ? `${Math.round((p.ladyCount / p.played) * 100)} %` : "–" }]} />
         <FunTable title="Die weißen Fahnen von Minas Tirith" subtitle="Gestrichene Löcher" players={whiteFlags} columns={[{ label: "X", render: (p) => p.pickedUpCount, emphasize: true }, { label: "Quote", render: (p) => p.played ? `${Math.round((p.pickedUpCount / p.played) * 100)} %` : "–" }]} />
         <FunTable title="Die Ents der Fairways" subtitle="Par oder besser" players={parMachines} columns={[{ label: "Par+", render: (p) => p.parOrBetter, emphasize: true }, { label: "Pars", render: (p) => p.pars }, { label: "Birdie+", render: (p) => p.birdies + p.eaglesOrBetter }]} />
@@ -1130,6 +1134,7 @@ function LordOfTheHolesApp() {
   const [roundHonorDismissedKeys, setRoundHonorDismissedKeys] = useState(() => readLocalJson("lordOfTheHoles.roundHonorDismissedKeys", []));
   const [scorecardRoundId, setScorecardRoundId] = useState(() => readLocalJson("lordOfTheHoles.scorecardRoundId", ""));
   const [roundTableRoundId, setRoundTableRoundId] = useState(() => readLocalJson("lordOfTheHoles.roundTableRoundId", ""));
+  const [dailyTeamSelections, setDailyTeamSelections] = useState(() => readLocalJson("lordOfTheHoles.dailyTeamSelections", {}));
   const [roundSummaryDismissedKeys, setRoundSummaryDismissedKeys] = useState(() => readLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", []));
   const [flightDraw, setFlightDraw] = useState(() => readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null));
   const [flightDrawSaving, setFlightDrawSaving] = useState(false);
@@ -1341,6 +1346,7 @@ function LordOfTheHolesApp() {
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundHonorDismissedKeys", roundHonorDismissedKeys); }, [roundHonorDismissedKeys]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scorecardRoundId", scorecardRoundId); }, [scorecardRoundId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundTableRoundId", roundTableRoundId); }, [roundTableRoundId]);
+  useEffect(() => { writeLocalJson("lordOfTheHoles.dailyTeamSelections", dailyTeamSelections); }, [dailyTeamSelections]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", roundSummaryDismissedKeys); }, [roundSummaryDismissedKeys]);
   useEffect(() => { writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, flightDraw); }, [flightDraw]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.flightCeremonyCompleted", flightCeremonyCompleted); }, [flightCeremonyCompleted]);
@@ -2183,6 +2189,7 @@ function LordOfTheHolesApp() {
     if (value === "current") setView("score");
     if (value === "roundTables") setView("leaderboard");
     if (value === "tournament") setView("tournament");
+    if (value === "dailyTeams") setView("dailyTeams");
     if (value === "archive") setView("archive");
     if (value === "fun") setView("fun");
     if (value === "flights") setView("flights");
@@ -2192,7 +2199,7 @@ function LordOfTheHolesApp() {
   }
 
   function renderHeader() {
-    const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "flights" ? "Flights" : mainMenu === "rules" ? "Regeln" : mainMenu === "admin" ? "Admin" : "Einstellungen";
+    const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "flights" ? "Flights" : mainMenu === "rules" ? "Regeln" : mainMenu === "dailyTeams" ? "Tageswertungen" : mainMenu === "admin" ? "Admin" : "Einstellungen";
     return (
       <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-1 pt-1">
         <div className="relative flex h-8 items-center justify-center">
@@ -2203,7 +2210,7 @@ function LordOfTheHolesApp() {
           <button type="button" onClick={() => setMenuOpen((value) => !value)} className="ml-auto rounded-xl border border-amber-500/35 bg-[linear-gradient(180deg,rgba(48,35,22,0.82),rgba(12,10,9,0.82))] px-2.5 py-1 text-base leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.12),0_8px_18px_rgba(0,0,0,0.35)] backdrop-blur-sm transition active:scale-[0.96]" aria-label="Menü öffnen">☰</button>
           {menuOpen ? (
             <div className="absolute right-0 top-[34px] z-30 w-64 overflow-hidden rounded-2xl border border-amber-700/40 bg-stone-950/95 text-left shadow-2xl shadow-black/70 backdrop-blur">
-              {[["current", "Scoring"], ["roundTables", "Tabellen Runde"], ["tournament", "Turnier"], ["archive", "Scorekarten"], ["fun", "Mittelerde"], ["flights", "Flights"], ["rules", "Regeln"], ["settings", "Einstellungen"], ["admin", "Admin"]].map(([value, label]) => (
+              {[["current", "Scoring"], ["roundTables", "Tabellen Runde"], ["tournament", "Turnier"], ["dailyTeams", "Tageswertungen"], ["archive", "Scorekarten"], ["fun", "Mittelerde"], ["flights", "Flights"], ["rules", "Regeln"], ["settings", "Einstellungen"], ["admin", "Admin"]].map(([value, label]) => (
                 <button
                   key={value}
                   type="button"
@@ -2600,6 +2607,188 @@ function LordOfTheHolesApp() {
     return <span className="inline-flex rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.12em] text-amber-200">{children}</span>;
   }
 
+  function getDailyTeamValue(round, teamPlayers, roundHoles, roundScores, mode) {
+    if (!round || !teamPlayers.length || !roundHoles.length) return { value: 0, detail: "–" };
+
+    if (mode === "bestBallMatchplay") {
+      let won = 0;
+      let shared = 0;
+      const opponentTeamValues = [];
+      return { value: 0, detail: "Match Play wird unten direkt je Team verglichen." };
+    }
+
+    const holeValues = roundHoles.map((hole) => {
+      const playerPoints = teamPlayers.map((player) => {
+        const playerForRound = getPlayerForCourse(player, round.course_id || "goethe", courses);
+        const score = roundScores.find((item) => String(item.player_id) === String(player.id) && Number(item.hole_number) === Number(hole.hole_number));
+        const shots = getShotsOnHole(playerForRound?.course_hcp, hole.hcp);
+        return getScoreStablefordPoints(score, hole.par, shots);
+      });
+      return mode === "bestBallNetto" ? Math.max(0, ...playerPoints) : playerPoints.reduce((sum, points) => sum + points, 0);
+    });
+
+    const value = holeValues.reduce((sum, points) => sum + points, 0);
+    return { value, detail: `${value} Netto-Punkte` };
+  }
+
+  function getDailyTeamSlots(roundId) {
+    const legacySelection = dailyTeamSelections?.[roundId] || {};
+    if (legacySelection?.teams) return legacySelection.teams;
+    const nextTeams = { A: ["", ""], B: ["", ""], C: ["", ""] };
+    Object.entries(legacySelection || {}).forEach(([playerId, teamId]) => {
+      if (!nextTeams[teamId]) return;
+      const emptyIndex = nextTeams[teamId].findIndex((value) => !value);
+      if (emptyIndex >= 0) nextTeams[teamId][emptyIndex] = playerId;
+    });
+    return nextTeams;
+  }
+
+  function buildDailyTeamStandings(roundId) {
+    const round = (rounds.length ? rounds : fallbackRounds).find((item) => String(item.round_id) === String(roundId));
+    if (!round) return { round: null, teams: [], mode: "nettoTeam", title: "" };
+    const mode = String(roundId) === "r2" ? "bestBallNetto" : String(roundId) === "r3" ? "bestBallMatchplay" : "nettoTeam";
+    const title = String(roundId) === "r2" ? "Tag 2 · Best Ball Netto" : String(roundId) === "r3" ? "Tag 3 · Best Ball Match Play" : "Tag 1 · Netto-Team";
+    const roundHoles = getRoundHoles(round, allHoles);
+    const roundScores = officialAllScores.filter((score) => String(score.round_id) === String(roundId));
+    const roundPlayerList = getRoundPlayers(roundId, allPlayers, roundPlayers);
+    const playerMap = new Map(roundPlayerList.map((player) => [String(player.id), player]));
+    const teamSlots = getDailyTeamSlots(roundId);
+    const teamIds = ["A", "B", "C"];
+    const teams = teamIds.map((teamId) => {
+      const playerIds = (teamSlots?.[teamId] || ["", ""]).slice(0, 2);
+      const teamPlayers = playerIds.map((playerId) => playerMap.get(String(playerId))).filter(Boolean);
+      return { teamId, label: `Team ${teamId}`, playerIds, players: teamPlayers, isComplete: teamPlayers.length === 2 };
+    });
+
+    if (mode === "bestBallMatchplay") {
+      const enrichedTeams = teams.map((team) => ({ ...team, holesWon: 0, holesShared: 0, points: 0, value: 0, detail: "0 Löcher" }));
+      roundHoles.forEach((hole) => {
+        const values = enrichedTeams.map((team) => {
+          const best = Math.max(0, ...team.players.map((player) => {
+            const playerForRound = getPlayerForCourse(player, round.course_id || "goethe", courses);
+            const score = roundScores.find((item) => String(item.player_id) === String(player.id) && Number(item.hole_number) === Number(hole.hole_number));
+            const shots = getShotsOnHole(playerForRound?.course_hcp, hole.hcp);
+            return getScoreStablefordPoints(score, hole.par, shots);
+          }));
+          return { team, best };
+        });
+        const bestValue = Math.max(0, ...values.map((item) => item.best));
+        const winners = values.filter((item) => item.best === bestValue && bestValue > 0);
+        if (winners.length === 1) {
+          winners[0].team.holesWon += 1;
+          winners[0].team.points += 1;
+        } else if (winners.length > 1) {
+          winners.forEach((item) => {
+            item.team.holesShared += 1;
+            item.team.points += 1 / winners.length;
+          });
+        }
+      });
+      enrichedTeams.forEach((team) => {
+        team.value = team.points;
+        team.detail = `${Number(team.points.toFixed(2)).toLocaleString("de-DE")} Löcher`;
+      });
+      return { round, mode, title, teams: enrichedTeams.sort((a, b) => Number(b.value || 0) - Number(a.value || 0)) };
+    }
+
+    const enrichedTeams = teams.map((team) => {
+      const result = getDailyTeamValue(round, team.players, roundHoles, roundScores, mode);
+      return { ...team, value: result.value, detail: result.detail };
+    }).sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
+    return { round, mode, title, teams: enrichedTeams };
+  }
+
+  function updateDailyTeamSlot(roundId, teamId, slotIndex, playerId) {
+    setDailyTeamSelections((current) => {
+      const currentRound = current?.[roundId]?.teams || getDailyTeamSlots(roundId);
+      const nextTeams = {
+        A: [...(currentRound.A || ["", ""]).slice(0, 2)],
+        B: [...(currentRound.B || ["", ""]).slice(0, 2)],
+        C: [...(currentRound.C || ["", ""]).slice(0, 2)],
+      };
+      while (nextTeams[teamId].length < 2) nextTeams[teamId].push("");
+      nextTeams[teamId][slotIndex] = playerId;
+      return {
+        ...(current || {}),
+        [roundId]: { teams: nextTeams },
+      };
+    });
+  }
+
+  function isDailyTeamPlayerAlreadySelected(roundId, playerId, currentTeamId, currentSlotIndex) {
+    if (!playerId || String(roundId) === "r1") return false;
+    const teams = getDailyTeamSlots(roundId);
+    return ["A", "B", "C"].some((teamId) => (teams?.[teamId] || []).some((selectedPlayerId, slotIndex) => String(selectedPlayerId || "") === String(playerId) && !(teamId === currentTeamId && slotIndex === currentSlotIndex)));
+  }
+
+  function renderDailyTeamsView() {
+    const roundIds = ["r1", "r2", "r3"];
+    return (
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
+        <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm">
+          <CardContent className="p-2">
+            <div className="mb-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3">
+              <p className="text-xs uppercase tracking-[0.22em] text-amber-300/75">Tageswertungen</p>
+              <h2 className="font-serif text-xl font-black text-amber-200">Teams eintragen & Tageswertung berechnen</h2>
+              <p className="mt-1 text-sm text-amber-100/70">Pro Runde gibt es drei 2er-Teams. In Runde 1 darf ein Spieler doppelt gewählt werden, falls Gangolf noch über die Autobahn donnert.</p>
+            </div>
+            <div className="space-y-3">
+              {roundIds.map((roundId) => {
+                const standings = buildDailyTeamStandings(roundId);
+                const roundPlayersForSelection = getRoundPlayers(roundId, allPlayers, roundPlayers);
+                const teamSlots = getDailyTeamSlots(roundId);
+                return (
+                  <div key={roundId} className="overflow-hidden rounded-2xl border border-amber-700/35 bg-black/24">
+                    <div className="border-b border-amber-700/25 bg-amber-500/10 px-3 py-2">
+                      <div className="font-serif text-lg font-black text-amber-200">{standings.title}</div>
+                      <div className="text-xs text-amber-100/60">{getRoundChapterLabel(standings.round)}</div>
+                    </div>
+                    <div className="space-y-3 p-3">
+                      <div className="grid gap-2">
+                        {["A", "B", "C"].map((teamId) => (
+                          <div key={teamId} className="rounded-xl border border-amber-700/25 bg-stone-950/45 p-2">
+                            <div className="mb-1.5 font-serif text-base font-bold text-amber-200">Team {teamId}</div>
+                            <div className="grid grid-cols-2 gap-2">
+                              {[0, 1].map((slotIndex) => (
+                                <select key={slotIndex} value={teamSlots?.[teamId]?.[slotIndex] || ""} onChange={(event) => updateDailyTeamSlot(roundId, teamId, slotIndex, event.target.value)} className="min-w-0 rounded-xl border border-amber-700/40 bg-stone-950 px-2 py-2 text-sm text-amber-50">
+                                  <option value="">Spieler {slotIndex + 1}</option>
+                                  {roundPlayersForSelection.map((player) => {
+                                    const disabled = isDailyTeamPlayerAlreadySelected(roundId, player.id, teamId, slotIndex);
+                                    return <option key={player.id} value={player.id} disabled={disabled}>{player.character_name || player.display_name || player.id}{disabled ? " · bereits gewählt" : ""}</option>;
+                                  })}
+                                </select>
+                              ))}
+                            </div>
+                            {roundId !== "r1" ? <div className="mt-1 text-[11px] text-amber-100/45">Runde 2/3: jeder Spieler nur einmal.</div> : <div className="mt-1 text-[11px] text-amber-100/45">Runde 1: Doppelwahl erlaubt.</div>}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="overflow-hidden rounded-xl border border-amber-700/25 bg-black/20">
+                        <table className="w-full border-collapse text-sm text-amber-50">
+                          <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100/75"><th className="px-2 py-1.5">#</th><th className="px-2 py-1.5">Team</th><th className="px-2 py-1.5">Spieler</th><th className="px-2 py-1.5 text-right">Wertung</th></tr></thead>
+                          <tbody>
+                            {standings.teams.map((team, index) => (
+                              <tr key={team.teamId} className="border-t border-amber-700/20">
+                                <td className="px-2 py-1.5 text-amber-200/70">{index + 1}</td>
+                                <td className="px-2 py-1.5 font-bold text-amber-200">{team.label}</td>
+                                <td className="px-2 py-1.5 text-amber-100/80">{team.players.map((player) => player.character_name || player.display_name || player.id).join(" · ") || "–"}{!team.isComplete ? <span className="ml-2 text-xs text-red-200/75">unvollständig</span> : null}</td>
+                                <td className="px-2 py-1.5 text-right font-serif text-lg font-black text-amber-300">{team.detail}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.section>
+    );
+  }
+
   function renderRulesView() {
     return (
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
@@ -2686,6 +2875,7 @@ function LordOfTheHolesApp() {
     if (view === "tournament") return renderTournamentView();
     if (view === "archive") return renderArchiveView();
     if (view === "fun") return renderFunView();
+    if (view === "dailyTeams") return renderDailyTeamsView();
     if (view === "flights") return renderFlightsView();
     if (view === "rules") return renderRulesView();
     return renderScoreView();
