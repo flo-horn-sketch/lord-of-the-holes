@@ -2757,32 +2757,32 @@ function LordOfTheHolesApp() {
     const roundIds = ["r1", "r2", "r3"];
     return (
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
-        <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm">
-          <CardContent className="p-2">
-            <div className="mb-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3">
+        <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm landscape:-mx-2 landscape:rounded-xl">
+          <CardContent className="p-2 landscape:p-1.5">
+            <div className="mb-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 landscape:mb-1.5 landscape:rounded-xl landscape:p-2">
               <p className="text-xs uppercase tracking-[0.22em] text-amber-300/75">Tageswertungen</p>
               <h2 className="font-serif text-xl font-black text-amber-200">Teams eintragen & Tageswertung berechnen</h2>
               <p className="mt-1 text-sm text-amber-100/70">Pro Runde gibt es drei 2er-Teams. In Runde 1 darf ein Spieler doppelt gewählt werden, falls Gangolf noch über die Autobahn donnert.</p>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-3 landscape:space-y-2">
               {roundIds.map((roundId) => {
                 const standings = buildDailyTeamStandings(roundId);
                 const roundPlayersForSelection = getRoundPlayers(roundId, allPlayers, roundPlayers);
                 const teamSlots = getDailyTeamSlots(roundId);
                 return (
-                  <div key={roundId} className="overflow-hidden rounded-2xl border border-amber-700/35 bg-black/24">
-                    <div className="border-b border-amber-700/25 bg-amber-500/10 px-3 py-2">
-                      <div className="font-serif text-lg font-black text-amber-200">{standings.title}</div>
+                  <div key={roundId} className="overflow-hidden rounded-2xl border border-amber-700/35 bg-black/24 landscape:rounded-xl">
+                    <div className="border-b border-amber-700/25 bg-amber-500/10 px-3 py-2 landscape:px-2 landscape:py-1.5">
+                      <div className="font-serif text-lg font-black text-amber-200 landscape:text-base">{standings.title}</div>
                       <div className="text-xs text-amber-100/60">{getRoundChapterLabel(standings.round)}</div>
                     </div>
-                    <div className="space-y-3 p-3">
-                      <div className="grid gap-2">
+                    <div className="space-y-3 p-3 landscape:space-y-2 landscape:p-2">
+                      <div className="grid gap-2 landscape:grid-cols-3 landscape:gap-1.5">
                         {["A", "B", "C"].map((teamId) => (
-                          <div key={teamId} className="rounded-xl border border-amber-700/25 bg-stone-950/45 p-2">
-                            <div className="mb-1.5 font-serif text-base font-bold text-amber-200">Team {teamId}</div>
-                            <div className="grid grid-cols-2 gap-2">
+                          <div key={teamId} className="rounded-xl border border-amber-700/25 bg-stone-950/45 p-2 landscape:p-1.5">
+                            <div className="mb-1.5 font-serif text-base font-bold text-amber-200 landscape:mb-1 landscape:text-sm">Team {teamId}</div>
+                            <div className="grid grid-cols-2 gap-2 landscape:gap-1">
                               {[0, 1].map((slotIndex) => (
-                                <select key={slotIndex} value={teamSlots?.[teamId]?.[slotIndex] || ""} onChange={(event) => updateDailyTeamSlot(roundId, teamId, slotIndex, event.target.value)} className="min-w-0 rounded-xl border border-amber-700/40 bg-stone-950 px-2 py-2 text-sm text-amber-50">
+                                <select key={slotIndex} value={teamSlots?.[teamId]?.[slotIndex] || ""} onChange={(event) => updateDailyTeamSlot(roundId, teamId, slotIndex, event.target.value)} className="min-w-0 rounded-xl border border-amber-700/40 bg-stone-950 px-2 py-2 text-sm text-amber-50 landscape:px-1.5 landscape:py-1.5 landscape:text-[11px]">
                                   <option value="">Spieler {slotIndex + 1}</option>
                                   {roundPlayersForSelection.map((player) => {
                                     const disabled = isDailyTeamPlayerAlreadySelected(roundId, player.id, teamId, slotIndex);
@@ -2795,15 +2795,15 @@ function LordOfTheHolesApp() {
                           </div>
                         ))}
                       </div>
-                      <div className="overflow-hidden rounded-xl border border-amber-700/25 bg-black/20">
-                        <table className="w-full border-collapse text-sm text-amber-50">
-                          <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100/75"><th className="px-2 py-1.5">#</th><th className="px-2 py-1.5">Team</th><th className="px-2 py-1.5">Spieler</th><th className="px-2 py-1.5 text-right">Wertung</th></tr></thead>
+                      <div className="w-full overflow-x-auto rounded-xl border border-amber-700/25 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                        <table className="w-full min-w-[560px] border-collapse text-sm text-amber-50 landscape:min-w-full landscape:table-fixed landscape:text-[11px]">
+                          <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100/75"><th className="w-[10%] px-2 py-1.5">#</th><th className="w-[18%] px-2 py-1.5">Team</th><th className="w-[47%] px-2 py-1.5">Spieler</th><th className="w-[25%] px-2 py-1.5 text-right">Wertung</th></tr></thead>
                           <tbody>
                             {standings.teams.map((team, index) => (
                               <tr key={team.teamId} className="border-t border-amber-700/20">
                                 <td className="px-2 py-1.5 text-amber-200/70">{index + 1}</td>
                                 <td className="px-2 py-1.5 font-bold text-amber-200">{team.label}</td>
-                                <td className="px-2 py-1.5 text-amber-100/80">{team.players.map((player) => player.character_name || player.display_name || player.id).join(" · ") || "–"}{!team.isComplete ? <span className="ml-2 text-xs text-red-200/75">unvollständig</span> : null}</td>
+                                <td className="px-2 py-1.5 text-amber-100/80 landscape:break-words">{team.players.map((player) => player.character_name || player.display_name || player.id).join(" · ") || "–"}{!team.isComplete ? <span className="ml-2 text-xs text-red-200/75">unvollständig</span> : null}</td>
                                 <td className="px-2 py-1.5 text-right font-serif text-lg font-black text-amber-300">{team.detail}</td>
                               </tr>
                             ))}
