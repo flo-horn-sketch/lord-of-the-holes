@@ -2588,7 +2588,7 @@ function LordOfTheHolesApp() {
               </div>
               <div className="mt-1 text-[11px] text-amber-100/45">Startet die jeweilige Teamdraw-Zeremonie sofort auf diesem Gerät.</div>
             </div>
-            <Button disabled={!isAdminUnlocked || connectionStatus !== "online" || teamDrawSaving} onClick={async () => { await generateAndSaveTeamDrawToSheet(); await fullResetForAllDevices(); }} className="mt-2 w-full rounded-2xl border border-red-400/60 bg-red-950/80 py-2 text-red-100 disabled:opacity-50">Runde beginnen</Button>
+            <Button disabled={!isAdminUnlocked || connectionStatus !== "online" || teamDrawSaving} onClick={async () => { await fullResetForAllDevices(); await generateAndSaveTeamDrawToSheet(); }} className="mt-2 w-full rounded-2xl border border-red-400/60 bg-red-950/80 py-2 text-red-100 disabled:opacity-50">Runde beginnen</Button>
             </> : null}
           </CardContent>
         </Card>
