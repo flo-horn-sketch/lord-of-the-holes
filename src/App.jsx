@@ -51,7 +51,7 @@ class AppErrorBoundary extends React.Component {
 const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycby3ck7nl5JkIfWZLSQ6Q9RRZ9OSFxrM_O-_Kk4q8jnekci9rP6exk6-nP-JvEnk5jrl/exec";
 const ADMIN_PASSWORD = "weimar";
 const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T10:00:00+02:00");
-const FLIGHT_DRAW_TARGET = new Date("2026-05-21T20:00:00+02:00");
+const FLIGHT_DRAW_TARGET = new Date("2026-05-20T09:27:00+02:00");
 const FLIGHT_DRAW_STORAGE_KEY = "lordOfTheHoles.flightDraw";
 
 const fallbackAliases = {
@@ -2110,15 +2110,19 @@ function LordOfTheHolesApp() {
   }
 
   async function enterRoundFromSplash() {
-    if (appLocked || splashEntering) return;
     setSplashEntering(true);
-    const data = await loadData({ silent: true });
-    setSplashEntering(false);
-    const nextAppLocked = normalizeBoolean(data?.app_locked ?? data?.appLocked);
-    if (!data || nextAppLocked) return;
-    if (!myPlayerId && !readLocalJson("lordOfTheHoles.myPlayerId", "")) setForceMyPlayerPromptOpen(true);
+
+    try {
+      if (introAudioRef.current) {
+        introAudioRef.current.currentTime = 0;
+        introAudioRef.current.play().catch(() => {});
+      }
+    } catch {}
+
     setShowSplash(false);
-    try { await introAudioRef.current?.play(); } catch {}
+    setLockAdminBypass(false);
+    setSplashEntering(false);
+    loadData({ silent: true });
   }
 
   async function setGlobalAppLock(nextLocked) {
