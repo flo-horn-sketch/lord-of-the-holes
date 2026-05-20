@@ -2535,13 +2535,13 @@ function LordOfTheHolesApp() {
   }
 
   function getStrokesCellClass(score, hole) {
-    if (!score || score.strokes === "" || score.strokes == null) return "bg-black/10 text-amber-100/55";
-    if (normalizeBoolean(score.picked_up)) return "bg-red-900/65 text-red-100 ring-1 ring-red-400/40";
+    if (!score || score.strokes === "" || score.strokes == null) return "bg-stone-900/70 text-amber-100/45 ring-1 ring-stone-600/35";
+    if (normalizeBoolean(score.picked_up)) return "bg-red-700 text-white ring-2 ring-red-200/70 shadow-[0_0_14px_rgba(248,113,113,0.22)]";
     const diff = Number(score.strokes || 0) - Number(hole?.par || 0);
-    if (diff <= -1) return "bg-emerald-700/70 text-emerald-50 ring-1 ring-emerald-300/30";
-    if (diff === 0) return "bg-amber-500/25 text-amber-100 ring-1 ring-amber-300/25";
-    if (diff === 1) return "bg-orange-800/65 text-orange-100 ring-1 ring-orange-300/25";
-    return "bg-red-900/65 text-red-100 ring-1 ring-red-400/40";
+    if (diff <= -1) return "bg-emerald-500 text-emerald-950 ring-2 ring-emerald-100/70 shadow-[0_0_14px_rgba(16,185,129,0.22)]";
+    if (diff === 0) return "bg-sky-500 text-sky-950 ring-2 ring-sky-100/70 shadow-[0_0_14px_rgba(14,165,233,0.20)]";
+    if (diff === 1) return "bg-yellow-400 text-yellow-950 ring-2 ring-yellow-100/75 shadow-[0_0_14px_rgba(250,204,21,0.20)]";
+    return "bg-red-700 text-white ring-2 ring-red-200/70 shadow-[0_0_14px_rgba(248,113,113,0.22)]";
   }
 
   function renderArchiveView() {
@@ -2568,10 +2568,10 @@ function LordOfTheHolesApp() {
                 ))}
               </div>
               <div className="mt-3 grid grid-cols-2 gap-1.5 text-[10px] text-amber-100/70 sm:grid-cols-4">
-                <div className="rounded-lg bg-emerald-700/50 px-2 py-1 text-emerald-50">Birdie oder besser</div>
-                <div className="rounded-lg bg-amber-500/20 px-2 py-1 text-amber-100">Par</div>
-                <div className="rounded-lg bg-orange-800/55 px-2 py-1 text-orange-100">Bogey</div>
-                <div className="rounded-lg bg-red-900/60 px-2 py-1 text-red-100">Doppelbogey+ / X</div>
+                <div className="rounded-lg bg-emerald-500 px-2 py-1 font-bold text-emerald-950">Birdie oder besser</div>
+                <div className="rounded-lg bg-sky-500 px-2 py-1 font-bold text-sky-950">Par</div>
+                <div className="rounded-lg bg-yellow-400 px-2 py-1 font-bold text-yellow-950">Bogey</div>
+                <div className="rounded-lg bg-red-700 px-2 py-1 font-bold text-white">Doppelbogey+ / X</div>
               </div>
             </CardContent>
           </Card>
@@ -2757,7 +2757,7 @@ function LordOfTheHolesApp() {
     const roundIds = ["r1", "r2", "r3"];
     return (
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
-        <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm landscape:-mx-2 landscape:rounded-xl">
+        <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm landscape:relative landscape:left-1/2 landscape:w-[calc(100vw-0.75rem)] landscape:max-w-none landscape:-translate-x-1/2 landscape:rounded-xl">
           <CardContent className="p-2 landscape:p-1.5">
             <div className="mb-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 landscape:mb-1.5 landscape:rounded-xl landscape:p-2">
               <p className="text-xs uppercase tracking-[0.22em] text-amber-300/75">Tageswertungen</p>
@@ -2926,7 +2926,7 @@ function LordOfTheHolesApp() {
     const prizeLedger = buildPrizeLedger();
     return (
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
-        <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm landscape:-mx-2 landscape:rounded-xl">
+        <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm landscape:relative landscape:left-1/2 landscape:w-[calc(100vw-0.75rem)] landscape:max-w-none landscape:-translate-x-1/2 landscape:rounded-xl">
           <CardContent className="p-2 landscape:p-1.5">
             <div className="mb-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 landscape:mb-1.5 landscape:rounded-xl landscape:p-2">
               <p className="text-xs uppercase tracking-[0.22em] text-amber-300/75">Punkt 6 · Ehre, Strafen, Preise</p>
