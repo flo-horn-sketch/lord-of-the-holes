@@ -1101,6 +1101,7 @@ function LordOfTheHolesApp() {
   const [view, setView] = useState("score");
   const [mainMenu, setMainMenu] = useState("current");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [openMenuGroups, setOpenMenuGroups] = useState(() => readLocalJson("lordOfTheHoles.openMenuGroups", { tournament: true, round: false, info: false, system: false }));
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [scoreSyncCount, setScoreSyncCount] = useState(0);
@@ -1348,6 +1349,7 @@ function LordOfTheHolesApp() {
   useEffect(() => { writeLocalJson("lordOfTheHoles.scorecardRoundId", scorecardRoundId); }, [scorecardRoundId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundTableRoundId", roundTableRoundId); }, [roundTableRoundId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.dailyTeamSelections", dailyTeamSelections); }, [dailyTeamSelections]);
+  useEffect(() => { writeLocalJson("lordOfTheHoles.openMenuGroups", openMenuGroups); }, [openMenuGroups]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.prizeSettings", prizeSettings); }, [prizeSettings]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", roundSummaryDismissedKeys); }, [roundSummaryDismissedKeys]);
   useEffect(() => { writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, flightDraw); }, [flightDraw]);
@@ -2202,7 +2204,7 @@ function LordOfTheHolesApp() {
   }
 
   function renderHeader() {
-    const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "flights" ? "Flights" : mainMenu === "rules" ? "Regeln" : mainMenu === "dailyTeams" ? "Tageswertungen" : mainMenu === "prizes" ? "Kasse & Ehre" : mainMenu === "admin" ? "Admin" : "Einstellungen";
+    const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "flights" ? "Flights" : mainMenu === "rules" ? "Regeln" : mainMenu === "dailyTeams" ? "Tageswertungen" : mainMenu === "prizes" ? "Kasse & Ehre" : mainMenu === "admin" ? "Admin & HCPs" : mainMenu === "settings" ? "HCP" : "Scoring"coring";
     return (
       <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-1 pt-1">
         <div className="relative flex h-8 items-center justify-center">
@@ -2213,36 +2215,62 @@ function LordOfTheHolesApp() {
           <button type="button" onClick={() => setMenuOpen((value) => !value)} className="ml-auto rounded-xl border border-amber-500/35 bg-[linear-gradient(180deg,rgba(48,35,22,0.82),rgba(12,10,9,0.82))] px-2.5 py-1 text-base leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.12),0_8px_18px_rgba(0,0,0,0.35)] backdrop-blur-sm transition active:scale-[0.96]" aria-label="Menü öffnen">☰</button>
           {menuOpen ? (
             <div className="absolute right-0 top-[34px] z-30 w-64 overflow-hidden rounded-2xl border border-amber-700/40 bg-stone-950/95 text-left shadow-2xl shadow-black/70 backdrop-blur">
-              {[["current", "Scoring"], ["roundTables", "Tabellen Runde"], ["tournament", "Turnier"], ["dailyTeams", "Tageswertungen"], ["prizes", "Kasse & Ehre"], ["archive", "Scorekarten"], ["fun", "Mittelerde"], ["flights", "Flights"], ["rules", "Regeln"], ["settings", "Einstellungen"], ["admin", "Admin"]].map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setMainMenuAndView(value)}
-                  className={cls(
-                    "block w-full border-b border-amber-700/20 text-left last:border-b-0",
-                    value === "current" ? "px-4 py-4 text-base font-black" : "px-4 py-2.5 text-sm",
-                    mainMenu === value
-                      ? value === "current"
-                        ? "bg-[linear-gradient(180deg,rgba(217,119,6,0.98),rgba(146,64,14,0.96))] text-amber-50 shadow-[inset_0_1px_0_rgba(251,191,36,0.28)]"
-                        : "bg-amber-700/55 text-amber-50"
-                      : value === "current"
-                        ? "bg-amber-500/10 text-amber-200"
-                        : "bg-transparent text-amber-100/85"
-                  )}
-                >
-                  {value === "current" ? (
-                    <span className="flex items-center justify-between gap-3">
-                      <span>
-                        <span className="block font-serif text-lg leading-tight">Scoring</span>
-                        <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-100/65">Score eingeben</span>
+              {(() => {
+                const renderMenuButton = (value, label, featured = false) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setMainMenuAndView(value)}
+                    className={cls(
+                      "block w-full border-b border-amber-700/20 text-left last:border-b-0",
+                      featured ? "px-4 py-4 text-base font-black" : "px-4 py-2.5 text-sm",
+                      mainMenu === value
+                        ? featured
+                          ? "bg-[linear-gradient(180deg,rgba(217,119,6,0.98),rgba(146,64,14,0.96))] text-amber-50 shadow-[inset_0_1px_0_rgba(251,191,36,0.28)]"
+                          : "bg-amber-700/55 text-amber-50"
+                        : featured
+                          ? "bg-amber-500/10 text-amber-200"
+                          : "bg-transparent text-amber-100/85"
+                    )}
+                  >
+                    {featured ? (
+                      <span className="flex items-center justify-between gap-3">
+                        <span>
+                          <span className="block font-serif text-lg leading-tight">Scoring</span>
+                          <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-100/65">Score eingeben</span>
+                        </span>
+                        <span className="text-xl drop-shadow-[0_0_10px_rgba(251,191,36,0.35)]">➜</span>
                       </span>
-                      <span className="text-xl drop-shadow-[0_0_10px_rgba(251,191,36,0.35)]">➜</span>
-                    </span>
-                  ) : (
-                    <span className="pl-2">{label}</span>
-                  )}
-                </button>
-              ))}
+                    ) : (
+                      <span className="pl-2">{label}</span>
+                    )}
+                  </button>
+                );
+                const renderMenuGroup = (groupKey, title, items) => {
+                  const isOpen = Boolean(openMenuGroups?.[groupKey]);
+                  return (
+                    <div key={groupKey} className="border-b border-amber-700/20 last:border-b-0">
+                      <button
+                        type="button"
+                        onClick={() => setOpenMenuGroups((current) => ({ ...(current || {}), [groupKey]: !isOpen }))}
+                        className="flex w-full items-center justify-between bg-black/18 px-4 py-2 text-left text-[11px] font-black uppercase tracking-[0.18em] text-amber-300/80"
+                      >
+                        <span>{title}</span>
+                        <span className="text-amber-100/60">{isOpen ? "−" : "+"}</span>
+                      </button>
+                      {isOpen ? <div>{items.map(([value, label]) => renderMenuButton(value, label))}</div> : null}
+                    </div>
+                  );
+                };
+                return (
+                  <>
+                    {renderMenuButton("current", "Scoring", true)}
+                    {renderMenuGroup("tournament", "Turnier", [["tournament", "Turnierstand"], ["dailyTeams", "Tageswertungen"], ["prizes", "Kasse & Ehre"], ["archive", "Scorekarten"]])}
+                    {renderMenuGroup("round", "Runde", [["roundTables", "Tabellen Runde"], ["fun", "Mittelerde"], ["flights", "Flights"]])}
+                    {renderMenuGroup("info", "Regeln & HCP", [["rules", "Regeln"], ])}
+                    {renderMenuGroup("system", "System", [])}
+        ["admin", "Admin & HCPs"]            );
+              })()}
             </div>
           ) : null}
         </div>
@@ -2601,7 +2629,7 @@ function LordOfTheHolesApp() {
           <div className="font-serif text-lg font-black text-amber-200">{title}</div>
           {subtitle ? <div className="mt-0.5 text-xs text-amber-100/60">{subtitle}</div> : null}
         </div>
-        <div className="space-y-2 p-3 text-sm leading-relaxed text-amber-100/82">{children}</div>
+        <div className="min-w-0 space-y-2 overflow-hidden p-3 text-sm leading-relaxed text-amber-100/82 [&_*]:break-words">{children}</div>
       </div>
     );
   }
@@ -2803,11 +2831,23 @@ function LordOfTheHolesApp() {
     return `${prefix}${Math.abs(number).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
   }
 
-  function addPrizeLedgerEntry(ledger, playerId, amount, label, type = "money") {
+  function addPrizeLedgerEntry(ledger, playerId, amount, label, type = "money", category = "other") {
     if (!playerId || (!amount && type === "money")) return;
     const key = String(playerId);
-    if (!ledger[key]) ledger[key] = { playerId: key, player: allPlayers.find((player) => String(player.id) === key) || { id: key, character_name: key }, money: 0, notes: [] };
-    if (type === "money") ledger[key].money += Number(amount || 0);
+    const inferredCategory = category !== "other"
+      ? category
+      : String(label || "").includes("Snake") ? "snake"
+        : String(label || "").includes("Tag ") || String(label || "").includes("Tages") ? "daily"
+          : String(label || "").includes("Pokal") || String(label || "").includes("Ring") || String(label || "").includes("Brutto") ? "honor"
+            : "final";
+    if (!ledger[key]) ledger[key] = { playerId: key, player: allPlayers.find((player) => String(player.id) === key) || { id: key, character_name: key }, money: 0, categories: { daily: 0, snake: 0, final: 0, honor: [], other: 0 }, notes: [] };
+    if (type === "money") {
+      const nextAmount = Number(amount || 0);
+      ledger[key].money += nextAmount;
+      ledger[key].categories[inferredCategory] = Number(ledger[key].categories[inferredCategory] || 0) + nextAmount;
+    } else if (inferredCategory === "honor") {
+      ledger[key].categories.honor.push(label);
+    }
     ledger[key].notes.push(label);
   }
 
@@ -2827,14 +2867,14 @@ function LordOfTheHolesApp() {
       const winnerShare = winner.players.length ? 100 / winner.players.length : 0;
       const loserShare = loser.players.length ? -100 / loser.players.length : 0;
 
-      winner.players.forEach((player) => addPrizeLedgerEntry(ledger, player.id, winnerShare, `${standings.title}: Siegermannschaft ${formatEuroValue(winnerShare)}`));
-      loser.players.forEach((player) => addPrizeLedgerEntry(ledger, player.id, loserShare, `${standings.title}: letzter Platz ${formatEuroValue(loserShare)}`));
+      winner.players.forEach((player) => addPrizeLedgerEntry(ledger, player.id, winnerShare, `${standings.title}: Siegermannschaft ${formatEuroValue(winnerShare)}`, "money", "daily"));
+      loser.players.forEach((player) => addPrizeLedgerEntry(ledger, player.id, loserShare, `${standings.title}: letzter Platz ${formatEuroValue(loserShare)}`, "money", "daily"));
     });
 
     const snakeStats = buildFunPlayerStats(getPlayersForCourse(allPlayers, displayCourseId, courses), allHoles, officialAllScores);
     const snakePot = snakeStats.reduce((sum, player) => sum + Number(player.puttPenaltyEuro || 0), 0);
     snakeStats.forEach((player) => {
-      if (Number(player.puttPenaltyEuro || 0) > 0) addPrizeLedgerEntry(ledger, player.id, -Number(player.puttPenaltyEuro || 0), `Snake-Kasse: ${formatEuroValue(-Number(player.puttPenaltyEuro || 0))}`);
+      if (Number(player.puttPenaltyEuro || 0) > 0) addPrizeLedgerEntry(ledger, player.id, -Number(player.puttPenaltyEuro || 0), `Snake-Kasse: ${formatEuroValue(-Number(player.puttPenaltyEuro || 0))}`, "money", "snake");
     });
 
     const finalStandings = buildFinalNetStandings(allPlayers, rounds, allHoles, officialAllScores, courses);
@@ -2843,16 +2883,16 @@ function LordOfTheHolesApp() {
     const winner = finalStandings.find((player) => Number(player.finalRank) === 1) || finalStandings[0];
     const second = finalStandings.find((player) => Number(player.finalRank) === 2);
     if (winner?.id) {
-      if (topGreenfee) addPrizeLedgerEntry(ledger, winner.id, topGreenfee, `Gesamtsieger: teuerste Greenfee ${formatEuroValue(topGreenfee)}`);
-      if (snakePot) addPrizeLedgerEntry(ledger, winner.id, snakePot, `Snake-Pott an den Turniersieger ${formatEuroValue(snakePot)}`);
-      addPrizeLedgerEntry(ledger, winner.id, 0, "Pokal des Lord of the Holes", "note");
+      if (topGreenfee) addPrizeLedgerEntry(ledger, winner.id, topGreenfee, `Gesamtsieger: teuerste Greenfee ${formatEuroValue(topGreenfee)}`, "money", "final");
+      if (snakePot) addPrizeLedgerEntry(ledger, winner.id, snakePot, `Snake-Pott an den Turniersieger ${formatEuroValue(snakePot)}`, "money", "snake");
+      addPrizeLedgerEntry(ledger, winner.id, 0, "Pokal des Lord of the Holes", "note", "honor");
     }
-    if (second?.id && finalGreenfee) addPrizeLedgerEntry(ledger, second.id, finalGreenfee * 0.5, `Platz 2: 50 % Greenfee Tag 4 ${formatEuroValue(finalGreenfee * 0.5)}`);
+    if (second?.id && finalGreenfee) addPrizeLedgerEntry(ledger, second.id, finalGreenfee * 0.5, `Platz 2: 50 % teuerste Greenfee ${formatEuroValue(finalGreenfee * 0.5)}`, "money", "final");
 
     const placementPenalties = { 4: -0.35, 5: -0.5, 6: -0.65 };
     Object.entries(placementPenalties).forEach(([rank, factor]) => {
       const player = finalStandings.find((item) => Number(item.finalRank) === Number(rank));
-      if (player?.id && finalGreenfee) addPrizeLedgerEntry(ledger, player.id, finalGreenfee * factor, `Platz ${rank}: Strafzahlung ${formatEuroValue(finalGreenfee * factor)}`);
+      if (player?.id && finalGreenfee) addPrizeLedgerEntry(ledger, player.id, finalGreenfee * factor, `Platz ${rank}: Strafzahlung ${formatEuroValue(finalGreenfee * factor)}`, "money", "final");
     });
 
     const grossRows = allPlayers.map((player) => {
@@ -2861,7 +2901,7 @@ function LordOfTheHolesApp() {
       return { ...withFallbackAlias(player), gross, played: playerScores.length };
     }).filter((player) => player.played > 0).sort((a, b) => Number(a.gross || 0) - Number(b.gross || 0));
     const grossWinner = grossRows[0];
-    if (grossWinner?.id) addPrizeLedgerEntry(ledger, grossWinner.id, 0, "Bruttosieger: Championship-Ring", "note");
+    if (grossWinner?.id) addPrizeLedgerEntry(ledger, grossWinner.id, 0, "Bruttosieger: Championship-Ring", "note", "honor");
 
     return {
       rows: Object.values(ledger).sort((a, b) => Number(b.money || 0) - Number(a.money || 0) || Number(a.player.sort_order || 0) - Number(b.player.sort_order || 0)),
@@ -2895,15 +2935,18 @@ function LordOfTheHolesApp() {
               <div className="rounded-2xl border border-amber-700/30 bg-black/25 p-3"><div className="text-xs uppercase tracking-wide text-amber-100/50">Bruttosieger</div><div className="font-serif text-lg font-black text-amber-300">{prizeLedger.grossWinner ? getPlayerLabel(prizeLedger.grossWinner) : "–"}</div></div>
             </div>
 
-            <div className="overflow-hidden rounded-2xl border border-amber-700/30 bg-black/20">
-              <table className="w-full min-w-[620px] border-collapse text-sm text-amber-50">
-                <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100/75"><th className="px-2 py-1.5">Spieler</th><th className="px-2 py-1.5 text-right">Saldo</th><th className="px-2 py-1.5">Details</th></tr></thead>
+            <div className="overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <table className="w-full min-w-[860px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">
+                <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100/75"><th className="sticky left-0 z-10 bg-[#1b130c] px-2 py-1.5">Spieler</th><th className="px-2 py-1.5 text-right">Tage 1–3</th><th className="px-2 py-1.5 text-right">Snake</th><th className="px-2 py-1.5 text-right">Finale</th><th className="px-2 py-1.5">Ehre</th><th className="px-2 py-1.5 text-right">Saldo</th></tr></thead>
                 <tbody>
                   {prizeLedger.rows.map((row) => (
                     <tr key={row.playerId} className="border-t border-amber-700/20 align-top">
-                      <td className="px-2 py-2 font-semibold text-amber-100">{getPlayerLabel(row.player)}</td>
+                      <td className="sticky left-0 z-10 bg-[#1b130c] px-2 py-2 font-semibold text-amber-100">{getPlayerLabel(row.player)}</td>
+                      <td className="px-2 py-2 text-right text-amber-100/85">{formatEuroValue(row.categories?.daily || 0)}</td>
+                      <td className="px-2 py-2 text-right text-amber-100/85">{formatEuroValue(row.categories?.snake || 0)}</td>
+                      <td className="px-2 py-2 text-right text-amber-100/85">{formatEuroValue(row.categories?.final || 0)}</td>
+                      <td className="max-w-[220px] px-2 py-2 text-xs text-amber-100/70">{row.categories?.honor?.length ? row.categories.honor.join(" · ") : "–"}</td>
                       <td className={cls("px-2 py-2 text-right font-serif text-lg font-black", row.money > 0 ? "text-emerald-300" : row.money < 0 ? "text-red-200" : "text-amber-200")}>{formatEuroValue(row.money)}</td>
-                      <td className="px-2 py-2 text-xs text-amber-100/70">{row.notes.length ? row.notes.join(" · ") : "–"}</td>
                     </tr>
                   ))}
                 </tbody>
