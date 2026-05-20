@@ -3033,17 +3033,29 @@ function LordOfTheHolesApp() {
       ...(hasLoanPlayer ? [{ type: "text", title: "Sonderregel des ersten Tages", text: "Da Gangolf noch über die Straßen Mittelerdes jagte, erhält ein Team einen Leihspieler. Dessen Punkte zählen für dieses Team mit — seine eigene Wertung bleibt aber bei seinem Stammteam.", waitLabel: "Die Sonderregel wird ins Pergament gekratzt ..." }] : []),
     ];
 
-    teamsByLetter.forEach((team) => {
-      steps.push({
-        type: "team",
-        title: `${teamLabel(team.teamId)}`,
-        teamId: team.teamId,
-        rank: null,
-        detail: "",
-        players: (team.players || []).slice(0, 1),
-        revealLine: revealLines[0] || "Das erste Siegel bricht. Ein Name tritt aus dem Pergament.",
-        waitLabel: "Der zweite Name bleibt noch verborgen ...",
-      });
+    steps.push({
+      type: "teamBoard",
+      title: "Die ersten Namen fallen",
+      teams: teamsByLetter,
+      revealCounts: { A: 1, B: 0, C: 0 },
+      revealLine: revealLines[0] || "Das erste Siegel bricht. Ein Name tritt aus dem Pergament.",
+      waitLabel: "Team A erhält den ersten Gefährten ...",
+    });
+    steps.push({
+      type: "teamBoard",
+      title: "Die ersten Namen fallen",
+      teams: teamsByLetter,
+      revealCounts: { A: 1, B: 1, C: 0 },
+      revealLine: "Das Pergament wandert weiter. Auch Team B wird berufen.",
+      waitLabel: "Team B erhält den ersten Gefährten ...",
+    });
+    steps.push({
+      type: "teamBoard",
+      title: "Die ersten Namen fallen",
+      teams: teamsByLetter,
+      revealCounts: { A: 1, B: 1, C: 1 },
+      revealLine: "Das dritte Fenster glimmt. Team C bekommt seinen ersten Namen.",
+      waitLabel: "Team C erhält den ersten Gefährten ...",
     });
 
     steps.push({
@@ -3053,17 +3065,29 @@ function LordOfTheHolesApp() {
       waitLabel: "Die zweiten Siegel werden vorbereitet ...",
     });
 
-    teamsByLetter.forEach((team) => {
-      steps.push({
-        type: "team",
-        title: `${teamLabel(team.teamId)}`,
-        teamId: team.teamId,
-        rank: null,
-        detail: "",
-        players: team.players || [],
-        revealLine: revealLines[1] || "Das zweite Siegel glimmt. Der Partner wird offenbart.",
-        waitLabel: "Das Bündnis ist vollständig ...",
-      });
+    steps.push({
+      type: "teamBoard",
+      title: "Die Bündnisse schließen sich",
+      teams: teamsByLetter,
+      revealCounts: { A: 2, B: 1, C: 1 },
+      revealLine: revealLines[1] || "Das zweite Siegel glimmt. Der Partner wird offenbart.",
+      waitLabel: "Team A wird vollständig ...",
+    });
+    steps.push({
+      type: "teamBoard",
+      title: "Die Bündnisse schließen sich",
+      teams: teamsByLetter,
+      revealCounts: { A: 2, B: 2, C: 1 },
+      revealLine: "Ein weiterer Name fällt. Team B ist nun vollständig.",
+      waitLabel: "Team B wird vollständig ...",
+    });
+    steps.push({
+      type: "teamBoard",
+      title: "Die Bündnisse schließen sich",
+      teams: teamsByLetter,
+      revealCounts: { A: 2, B: 2, C: 2 },
+      revealLine: "Das letzte Siegel bricht. Auch Team C steht nun vollständig im Licht.",
+      waitLabel: "Alle Bündnisse sind offenbart ...",
     });
 
     steps.push({
@@ -3118,7 +3142,35 @@ function LordOfTheHolesApp() {
             <div className="mx-auto mb-3 h-1.5 w-24 rounded-full bg-amber-400/70 shadow-[0_0_18px_rgba(251,191,36,0.35)]" />
             <p className="text-[10px] uppercase tracking-[0.28em] text-amber-300/75">Team-Zeremonie</p>
             <h2 className="mt-1 font-serif text-2xl font-black text-amber-200">{step.title}</h2>
-            {step.type === "team" ? (
+            {step.type === "teamBoard" ? (
+              <motion.div key={`team-board-${teamCeremonyStepIndex}`} initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="mt-5 rounded-3xl border border-amber-500/35 bg-black/28 p-3">
+                <p className="mb-3 text-sm italic text-amber-100/70">{step.revealLine}</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 landscape:grid-cols-3">
+                  {(step.teams || []).map((team) => {
+                    const revealCount = Number(step.revealCounts?.[team.teamId] || 0);
+                    const shownPlayers = (team.players || []).slice(0, revealCount);
+                    return (
+                      <div key={team.teamId} className="rounded-2xl border border-amber-700/35 bg-stone-950/65 p-2 text-center">
+                        <div className="mb-2 font-serif text-4xl font-black text-amber-300 drop-shadow-[0_0_14px_rgba(251,191,36,0.2)]">{team.teamId}</div>
+                        <div className="space-y-1.5">
+                          {[0, 1].map((slotIndex) => {
+                            const row = shownPlayers[slotIndex];
+                            return row ? (
+                              <motion.div key={`${team.teamId}-${row.player_id}-${slotIndex}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-amber-700/30 bg-black/35 px-2 py-2 font-serif text-base font-bold text-amber-100">
+                                <div>{playerLabel(row)}</div>
+                                {playerMetaLabel(row, team.teamId, slotIndex) ? <div className="mt-1 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-amber-300/70">{playerMetaLabel(row, team.teamId, slotIndex)}</div> : null}
+                              </motion.div>
+                            ) : (
+                              <div key={`${team.teamId}-empty-${slotIndex}`} className="rounded-xl border border-dashed border-amber-700/25 bg-black/20 px-2 py-2 text-sm text-amber-100/35">versiegelt</div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            ) : step.type === "team" ? (
               <motion.div key={`${step.teamId}-${teamCeremonyStepIndex}`} initial={{ opacity: 0, scale: 0.94 }} animate={{ opacity: 1, scale: 1 }} className="mt-5 rounded-3xl border border-amber-500/35 bg-black/28 p-4">
                 {step.rank ? <div className="mb-1 text-xs uppercase tracking-[0.2em] text-amber-100/50">Rang {step.rank} · {step.detail}</div> : null}
                 <div className="mb-3 font-serif text-5xl font-black text-amber-300 drop-shadow-[0_0_18px_rgba(251,191,36,0.22)]">{step.teamId}</div>
@@ -3411,11 +3463,16 @@ function LordOfTheHolesApp() {
       if (player?.id && finalGreenfee) addPrizeLedgerEntry(ledger, player.id, finalGreenfee * factor, `Platz ${rank}: Strafzahlung ${formatEuroValue(finalGreenfee * factor)}`, "money", "final");
     });
 
+    const scoredRoundIds = (rounds.length ? rounds : fallbackRounds).map((round) => String(round.round_id || "")).filter(Boolean);
+    const expectedGrossHoles = scoredRoundIds.reduce((sum, roundId) => {
+      const round = (rounds.length ? rounds : fallbackRounds).find((item) => String(item.round_id) === String(roundId));
+      return sum + getRoundHoles(round, allHoles).length;
+    }, 0);
     const grossRows = allPlayers.map((player) => {
-      const playerScores = officialAllScores.filter((score) => String(score.player_id) === String(player.id) && score.strokes !== "" && score.strokes != null);
+      const playerScores = officialAllScores.filter((score) => String(score.player_id) === String(player.id) && scoredRoundIds.includes(String(score.round_id)) && score.strokes !== "" && score.strokes != null);
       const gross = playerScores.reduce((sum, score) => sum + Number(score.strokes || 0), 0);
-      return { ...withFallbackAlias(player), gross, played: playerScores.length };
-    }).filter((player) => player.played > 0).sort((a, b) => Number(a.gross || 0) - Number(b.gross || 0));
+      return { ...withFallbackAlias(player), gross, played: playerScores.length, expected: expectedGrossHoles, isCompleteGross: expectedGrossHoles > 0 && playerScores.length >= expectedGrossHoles };
+    }).filter((player) => player.isCompleteGross).sort((a, b) => Number(a.gross || 0) - Number(b.gross || 0));
     const grossWinner = grossRows[0];
     if (grossWinner?.id) addPrizeLedgerEntry(ledger, grossWinner.id, 0, "Bruttosieger: Championship-Ring", "note", "honor");
 
