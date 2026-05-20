@@ -1135,6 +1135,7 @@ function LordOfTheHolesApp() {
   const [scorecardRoundId, setScorecardRoundId] = useState(() => readLocalJson("lordOfTheHoles.scorecardRoundId", ""));
   const [roundTableRoundId, setRoundTableRoundId] = useState(() => readLocalJson("lordOfTheHoles.roundTableRoundId", ""));
   const [dailyTeamSelections, setDailyTeamSelections] = useState(() => readLocalJson("lordOfTheHoles.dailyTeamSelections", {}));
+  const [prizeSettings, setPrizeSettings] = useState(() => readLocalJson("lordOfTheHoles.prizeSettings", { topGreenfee: "" }));
   const [roundSummaryDismissedKeys, setRoundSummaryDismissedKeys] = useState(() => readLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", []));
   const [flightDraw, setFlightDraw] = useState(() => readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null));
   const [flightDrawSaving, setFlightDrawSaving] = useState(false);
@@ -1347,6 +1348,7 @@ function LordOfTheHolesApp() {
   useEffect(() => { writeLocalJson("lordOfTheHoles.scorecardRoundId", scorecardRoundId); }, [scorecardRoundId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundTableRoundId", roundTableRoundId); }, [roundTableRoundId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.dailyTeamSelections", dailyTeamSelections); }, [dailyTeamSelections]);
+  useEffect(() => { writeLocalJson("lordOfTheHoles.prizeSettings", prizeSettings); }, [prizeSettings]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", roundSummaryDismissedKeys); }, [roundSummaryDismissedKeys]);
   useEffect(() => { writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, flightDraw); }, [flightDraw]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.flightCeremonyCompleted", flightCeremonyCompleted); }, [flightCeremonyCompleted]);
@@ -2190,6 +2192,7 @@ function LordOfTheHolesApp() {
     if (value === "roundTables") setView("leaderboard");
     if (value === "tournament") setView("tournament");
     if (value === "dailyTeams") setView("dailyTeams");
+    if (value === "prizes") setView("prizes");
     if (value === "archive") setView("archive");
     if (value === "fun") setView("fun");
     if (value === "flights") setView("flights");
@@ -2199,7 +2202,7 @@ function LordOfTheHolesApp() {
   }
 
   function renderHeader() {
-    const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "flights" ? "Flights" : mainMenu === "rules" ? "Regeln" : mainMenu === "dailyTeams" ? "Tageswertungen" : mainMenu === "admin" ? "Admin" : "Einstellungen";
+    const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "flights" ? "Flights" : mainMenu === "rules" ? "Regeln" : mainMenu === "dailyTeams" ? "Tageswertungen" : mainMenu === "prizes" ? "Kasse & Ehre" : mainMenu === "admin" ? "Admin" : "Einstellungen";
     return (
       <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-1 pt-1">
         <div className="relative flex h-8 items-center justify-center">
@@ -2210,7 +2213,7 @@ function LordOfTheHolesApp() {
           <button type="button" onClick={() => setMenuOpen((value) => !value)} className="ml-auto rounded-xl border border-amber-500/35 bg-[linear-gradient(180deg,rgba(48,35,22,0.82),rgba(12,10,9,0.82))] px-2.5 py-1 text-base leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.12),0_8px_18px_rgba(0,0,0,0.35)] backdrop-blur-sm transition active:scale-[0.96]" aria-label="Menü öffnen">☰</button>
           {menuOpen ? (
             <div className="absolute right-0 top-[34px] z-30 w-64 overflow-hidden rounded-2xl border border-amber-700/40 bg-stone-950/95 text-left shadow-2xl shadow-black/70 backdrop-blur">
-              {[["current", "Scoring"], ["roundTables", "Tabellen Runde"], ["tournament", "Turnier"], ["dailyTeams", "Tageswertungen"], ["archive", "Scorekarten"], ["fun", "Mittelerde"], ["flights", "Flights"], ["rules", "Regeln"], ["settings", "Einstellungen"], ["admin", "Admin"]].map(([value, label]) => (
+              {[["current", "Scoring"], ["roundTables", "Tabellen Runde"], ["tournament", "Turnier"], ["dailyTeams", "Tageswertungen"], ["prizes", "Kasse & Ehre"], ["archive", "Scorekarten"], ["fun", "Mittelerde"], ["flights", "Flights"], ["rules", "Regeln"], ["settings", "Einstellungen"], ["admin", "Admin"]].map(([value, label]) => (
                 <button
                   key={value}
                   type="button"
@@ -2789,6 +2792,130 @@ function LordOfTheHolesApp() {
     );
   }
 
+  function parseEuroValue(value) {
+    const parsed = Number(String(value ?? "").replace(",", "."));
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
+  function formatEuroValue(value) {
+    const number = Number(value || 0);
+    const prefix = number > 0 ? "+" : number < 0 ? "−" : "";
+    return `${prefix}${Math.abs(number).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
+  }
+
+  function addPrizeLedgerEntry(ledger, playerId, amount, label, type = "money") {
+    if (!playerId || (!amount && type === "money")) return;
+    const key = String(playerId);
+    if (!ledger[key]) ledger[key] = { playerId: key, player: allPlayers.find((player) => String(player.id) === key) || { id: key, character_name: key }, money: 0, notes: [] };
+    if (type === "money") ledger[key].money += Number(amount || 0);
+    ledger[key].notes.push(label);
+  }
+
+  function buildPrizeLedger() {
+    const ledger = {};
+    allPlayers.forEach((player) => {
+      ledger[String(player.id)] = { playerId: String(player.id), player: withFallbackAlias(player), money: 0, notes: [] };
+    });
+
+    ["r1", "r2", "r3"].forEach((roundId) => {
+      const standings = buildDailyTeamStandings(roundId);
+      const completeTeams = (standings.teams || []).filter((team) => team.players.length > 0);
+      if (completeTeams.length < 2) return;
+
+      const winner = completeTeams[0];
+      const loser = completeTeams[completeTeams.length - 1];
+      const winnerShare = winner.players.length ? 100 / winner.players.length : 0;
+      const loserShare = loser.players.length ? -100 / loser.players.length : 0;
+
+      winner.players.forEach((player) => addPrizeLedgerEntry(ledger, player.id, winnerShare, `${standings.title}: Siegermannschaft ${formatEuroValue(winnerShare)}`));
+      loser.players.forEach((player) => addPrizeLedgerEntry(ledger, player.id, loserShare, `${standings.title}: letzter Platz ${formatEuroValue(loserShare)}`));
+    });
+
+    const snakeStats = buildFunPlayerStats(getPlayersForCourse(allPlayers, displayCourseId, courses), allHoles, officialAllScores);
+    const snakePot = snakeStats.reduce((sum, player) => sum + Number(player.puttPenaltyEuro || 0), 0);
+    snakeStats.forEach((player) => {
+      if (Number(player.puttPenaltyEuro || 0) > 0) addPrizeLedgerEntry(ledger, player.id, -Number(player.puttPenaltyEuro || 0), `Snake-Kasse: ${formatEuroValue(-Number(player.puttPenaltyEuro || 0))}`);
+    });
+
+    const finalStandings = buildFinalNetStandings(allPlayers, rounds, allHoles, officialAllScores, courses);
+    const topGreenfee = parseEuroValue(prizeSettings.topGreenfee);
+    const finalGreenfee = topGreenfee;
+    const winner = finalStandings.find((player) => Number(player.finalRank) === 1) || finalStandings[0];
+    const second = finalStandings.find((player) => Number(player.finalRank) === 2);
+    if (winner?.id) {
+      if (topGreenfee) addPrizeLedgerEntry(ledger, winner.id, topGreenfee, `Gesamtsieger: teuerste Greenfee ${formatEuroValue(topGreenfee)}`);
+      if (snakePot) addPrizeLedgerEntry(ledger, winner.id, snakePot, `Snake-Pott an den Turniersieger ${formatEuroValue(snakePot)}`);
+      addPrizeLedgerEntry(ledger, winner.id, 0, "Pokal des Lord of the Holes", "note");
+    }
+    if (second?.id && finalGreenfee) addPrizeLedgerEntry(ledger, second.id, finalGreenfee * 0.5, `Platz 2: 50 % Greenfee Tag 4 ${formatEuroValue(finalGreenfee * 0.5)}`);
+
+    const placementPenalties = { 4: -0.35, 5: -0.5, 6: -0.65 };
+    Object.entries(placementPenalties).forEach(([rank, factor]) => {
+      const player = finalStandings.find((item) => Number(item.finalRank) === Number(rank));
+      if (player?.id && finalGreenfee) addPrizeLedgerEntry(ledger, player.id, finalGreenfee * factor, `Platz ${rank}: Strafzahlung ${formatEuroValue(finalGreenfee * factor)}`);
+    });
+
+    const grossRows = allPlayers.map((player) => {
+      const playerScores = officialAllScores.filter((score) => String(score.player_id) === String(player.id) && score.strokes !== "" && score.strokes != null);
+      const gross = playerScores.reduce((sum, score) => sum + Number(score.strokes || 0), 0);
+      return { ...withFallbackAlias(player), gross, played: playerScores.length };
+    }).filter((player) => player.played > 0).sort((a, b) => Number(a.gross || 0) - Number(b.gross || 0));
+    const grossWinner = grossRows[0];
+    if (grossWinner?.id) addPrizeLedgerEntry(ledger, grossWinner.id, 0, "Bruttosieger: Championship-Ring", "note");
+
+    return {
+      rows: Object.values(ledger).sort((a, b) => Number(b.money || 0) - Number(a.money || 0) || Number(a.player.sort_order || 0) - Number(b.player.sort_order || 0)),
+      snakePot,
+      finalStandings,
+      grossWinner,
+    };
+  }
+
+  function renderPrizesView() {
+    const prizeLedger = buildPrizeLedger();
+    return (
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
+        <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm">
+          <CardContent className="p-2">
+            <div className="mb-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3">
+              <p className="text-xs uppercase tracking-[0.22em] text-amber-300/75">Punkt 6 · Ehre, Strafen, Preise</p>
+              <h2 className="font-serif text-xl font-black text-amber-200">Kasse & Ehre</h2>
+              <p className="mt-1 text-sm text-amber-100/70">Gesamtübersicht aus Tageswertungen, Snake-Kasse, Finalpreisen und Ehrenpreisen.</p>
+            </div>
+
+            <div className="mb-3 grid grid-cols-1 gap-2">
+              <label className="rounded-2xl border border-amber-700/30 bg-black/25 p-2 text-sm text-amber-100/75">Teuerste Greenfee / Preisbasis (€)
+                <input value={prizeSettings.topGreenfee || ""} onChange={(event) => setPrizeSettings((current) => ({ ...(current || {}), topGreenfee: event.target.value }))} inputMode="decimal" placeholder="z. B. 150" className="mt-1 w-full rounded-xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" />
+                <span className="mt-1 block text-[11px] text-amber-100/50">Dieser Betrag wird für Platz 1, Platz 2 und die Strafzahlungen Platz 4–6 verwendet.</span>
+              </label>
+            </div>
+
+            <div className="mb-3 grid grid-cols-2 gap-2 text-sm">
+              <div className="rounded-2xl border border-amber-700/30 bg-black/25 p-3"><div className="text-xs uppercase tracking-wide text-amber-100/50">Snake-Pott</div><div className="font-serif text-2xl font-black text-amber-300">{formatEuroValue(prizeLedger.snakePot)}</div></div>
+              <div className="rounded-2xl border border-amber-700/30 bg-black/25 p-3"><div className="text-xs uppercase tracking-wide text-amber-100/50">Bruttosieger</div><div className="font-serif text-lg font-black text-amber-300">{prizeLedger.grossWinner ? getPlayerLabel(prizeLedger.grossWinner) : "–"}</div></div>
+            </div>
+
+            <div className="overflow-hidden rounded-2xl border border-amber-700/30 bg-black/20">
+              <table className="w-full min-w-[620px] border-collapse text-sm text-amber-50">
+                <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100/75"><th className="px-2 py-1.5">Spieler</th><th className="px-2 py-1.5 text-right">Saldo</th><th className="px-2 py-1.5">Details</th></tr></thead>
+                <tbody>
+                  {prizeLedger.rows.map((row) => (
+                    <tr key={row.playerId} className="border-t border-amber-700/20 align-top">
+                      <td className="px-2 py-2 font-semibold text-amber-100">{getPlayerLabel(row.player)}</td>
+                      <td className={cls("px-2 py-2 text-right font-serif text-lg font-black", row.money > 0 ? "text-emerald-300" : row.money < 0 ? "text-red-200" : "text-amber-200")}>{formatEuroValue(row.money)}</td>
+                      <td className="px-2 py-2 text-xs text-amber-100/70">{row.notes.length ? row.notes.join(" · ") : "–"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-2 rounded-xl border border-amber-500/25 bg-amber-500/10 p-2 text-xs text-amber-100/65">Hinweis: Tagespreise werden auf die Teamspieler verteilt. Die teuerste Greenfee ist die gemeinsame Preisbasis für Platz 1, Platz 2 und die Strafzahlungen Platz 4–6. Nicht-monetäre Ehren wie Pokal und Championship-Ring erscheinen in den Details.</p>
+          </CardContent>
+        </Card>
+      </motion.section>
+    );
+  }
+
   function renderRulesView() {
     return (
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
@@ -2801,14 +2928,14 @@ function LordOfTheHolesApp() {
             </div>
 
             <RulesSection title="1. Handicap & Fairness" subtitle="Die Vorgaben sind gesetzt — die Ausreden nicht.">
-              <p>Für das Turnier gelten die festgelegten DGV-Handicaps. Die Spielleitung darf Vorgaben prüfen und anpassen, wenn es der Fairness dient. Während des Turniers bleiben die Handicaps unverändert.</p>
+              <p>Für das Turnier gelten die festgelegten DGV-Handicaps. Ausländische Teilnehmer müssen rechtzeitig belastbare Runden bzw. RPR-Runden nachweisen; falls keine RPR-Runden möglich sind, legt die Turnierleitung anhand eingereichter Runden ein faires HCP fest. Die Spielleitung darf Vorgaben prüfen und anpassen, wenn es der Fairness dient. Während des Turniers bleiben die Handicaps unverändert.</p>
             </RulesSection>
 
             <RulesSection title="2. Turniermodus" subtitle="Vier Tage. Drei Kapitel. Ein Schicksalsberg.">
               <div className="space-y-2">
-                <div><RulesPill>Runden 1–3</RulesPill><p className="mt-1">Die ersten drei Tagesrunden bilden die Qualifikation. Teams und Flights werden nach dem Prinzip des Schicksals bestimmt; Wiederholungen sollen vermieden werden.</p></div>
-                <div><RulesPill>Cut</RulesPill><p className="mt-1">Nach der Qualifikation ziehen die besten drei Gefährten in den Kampf um die Plätze 1–3. Die übrigen Spieler treten in der Platzierungsgruppe um die Plätze 4–6 an.</p></div>
-                <div><RulesPill>Finaltag</RulesPill><p className="mt-1">Am Finaltag zählt das Netto-Zählspiel: Bruttoschläge minus Spielvorgabe. Niedriger ist besser. Bei Gleichstand entscheidet ein Putt-Wettbewerb.</p></div>
+                <div><RulesPill>Runden 1–3</RulesPill><p className="mt-1">Die ersten drei Tagesrunden bilden die Qualifikation. Die Mannschaften werden nach den Tagesrunden ausgelost. Keine Mannschaft darf sich wiederholen; das Schicksal darf launisch sein, aber nicht faul.</p></div>
+                <div><RulesPill>Cut</RulesPill><p className="mt-1">Nach der Qualifikation ziehen die besten drei Gefährten gemessen am Zählspiel minus Vorgabe in den Kampf um die Plätze 1–3. Die übrigen Spieler treten in der Platzierungsgruppe um die Plätze 4–6 an.</p></div>
+                <div><RulesPill>Finaltag</RulesPill><p className="mt-1">Am Finaltag zählt das Netto-Zählspiel: Bruttoschläge minus Spielvorgabe. Niedriger ist besser. Bei Gleichstand um Cut, Gesamtsieg, Tagesentscheidung oder Butler-Rollen entscheidet ein Putt-Wettbewerb.</p></div>
               </div>
             </RulesSection>
 
@@ -2824,28 +2951,28 @@ function LordOfTheHolesApp() {
             <RulesSection title="4. Side Bets" subtitle="Kleine Spiele, große Narben.">
               <div className="space-y-2">
                 <div className="rounded-xl border border-amber-700/25 bg-black/20 p-2"><b className="text-amber-200">Shelobs Putt-Kammer / Snake</b><p className="mt-1">3 Putts: 2 €. 4 Putts: 4 €. 5 oder mehr Putts: 10 €. Der Snake-Pott geht an den Turniersieger.</p></div>
-                <div className="rounded-xl border border-amber-700/25 bg-black/20 p-2"><b className="text-amber-200">Weiße Fahne</b><p className="mt-1">Bei einem gestrichenen Loch wird die Ehre kurz beerdigt. Sonderrituale nach Beschluss der Gründerväter bleiben möglich.</p></div>
-                <div className="rounded-xl border border-amber-700/25 bg-black/20 p-2"><b className="text-amber-200">Nearest to the Pin</b><p className="mt-1">Der Ball muss auf dem Grün liegen. Der Gewinner erhält 5 € von seinen Flight-Partnern; Sonderwertung kann einen Schlag Abzug für den Finaltag bringen.</p></div>
-                <div className="rounded-xl border border-amber-700/25 bg-black/20 p-2"><b className="text-amber-200">Longest Drive</b><p className="mt-1">Nur Fairway zählt. Wer den längsten gültigen Drive schlägt, erhält 5 € von jedem Flight-Partner.</p></div>
+                <div className="rounded-xl border border-amber-700/25 bg-black/20 p-2"><b className="text-amber-200">Weiße Fahne</b><p className="mt-1">Bei einem gestrichenen Loch mit 0 Nettopunkten muss ein Kurzer getrunken werden. Die Achim-Rule bleibt als Sonderritual bestehen: Kniebeuge-Hock-Strecksprung mit Händen am Boden.</p></div>
+                <div className="rounded-xl border border-amber-700/25 bg-black/20 p-2"><b className="text-amber-200">Nearest to the Pin</b><p className="mt-1">Die NttP-Löcher werden bis zum ersten Abschlag festgelegt. Der Ball muss auf dem Grün liegen. Beim gewählten NttP erhält der Gewinner 5 € von seinen Flight-Partnern. Das Signature-Hole bringt zusätzlich 1 Schlag Abzug für den Finaltag.</p></div>
+                <div className="rounded-xl border border-amber-700/25 bg-black/20 p-2"><b className="text-amber-200">Longest Drive</b><p className="mt-1">Das Longest-Drive-Loch wird bis zum ersten Abschlag festgelegt. Nur Fairway zählt. Wer den längsten gültigen Drive schlägt, erhält 5 € von jedem Flight-Partner.</p></div>
               </div>
             </RulesSection>
 
             <RulesSection title="5. Herren von Gondor & Schildträger" subtitle="Butlerdienst ist Ehrendienst. Angeblich.">
-              <p>Die schlechtesten Spieler der Tagesrunde dienen den Bestplatzierten als Schildträger. Der Dienst beginnt nach Ende der Runde und endet vor dem ersten Abschlag des nächsten Tages.</p>
+              <p>Die schlechtesten Spieler der Tagesrunde dienen den Bestplatzierten als Schildträger. Platz 1 darf seinen Butler wählen. Der Dienst beginnt nach Ende der Runde und endet vor dem ersten Abschlag des nächsten Tages. Bekommt ein Butler frei, heißt das nicht automatisch, dass auch der andere Schildträger seine Ketten ablegen darf.</p>
               <ul className="list-disc space-y-1 pl-5">
                 <li>Schläger putzen und spielfertig machen.</li>
                 <li>Rangebälle organisieren und Bag bereitstellen.</li>
                 <li>Frühstückstisch, Getränke und Wohlbefinden des Herren sichern.</li>
-                <li>Verweigerung oder schlampiger Dienst kann sanktioniert werden.</li>
+                <li>Verweigerung, unsaubere Schläger oder sonstige Pflichtverletzungen können durch die Gründerväter mit 75 € sanktioniert werden; im schlimmsten Fall droht Ausschluss vom Turnier.</li>
               </ul>
             </RulesSection>
 
             <RulesSection title="6. Preise, Strafen & Ehre" subtitle="Am Ende gewinnt einer. Zahlen tun mehrere.">
               <ul className="list-disc space-y-1 pl-5">
-                <li><b>Team-Tageswertung:</b> Siegermannschaft +100 €, Platz 3 -100 €, bei Gleichstand wird geteilt.</li>
+                <li><b>Team-Tageswertung:</b> Siegermannschaft +100 €, Platz 3 −100 €, Platz 2 neutral. Bei Gleichstand werden Preise bzw. Schulden geteilt.</li>
                 <li><b>Gesamtsieger:</b> teuerste Greenfee, Pokal und Snake-Pott.</li>
-                <li><b>Platz 2:</b> 50 % der Greenfee von Tag 4.</li>
-                <li><b>Plätze 4–6:</b> abgestufte Strafzahlungen nach Charta.</li>
+                <li><b>Platz 2:</b> 50 % der teuersten Greenfee.</li>
+                <li><b>Plätze 4–6:</b> Strafzahlungen auf Basis der teuersten Greenfee: Platz 4 = −35 %, Platz 5 = −50 %, Platz 6 = −65 %.</li>
                 <li><b>Bruttosieger:</b> Championship-Ring für den besten Bruttospieler des Turniers.</li>
               </ul>
             </RulesSection>
@@ -2853,7 +2980,7 @@ function LordOfTheHolesApp() {
             <RulesSection title="7. Heilige Ordnung" subtitle="Keine Gimmies. Keine Ausreden. Kein Ring ohne Regeln.">
               <ul className="list-disc space-y-1 pl-5">
                 <li>Es werden keine Putts oder Schläge geschenkt.</li>
-                <li>Gespielt wird nach DGV-Regelwerk und Golfetikette.</li>
+                <li>Gespielt wird nach DGV-Regelwerk und Golfetikette. Da die Runden offiziell bzw. RPR-relevant sind, sind Regelverstöße keine Folklore, sondern werden geahndet.</li>
                 <li>Lautes Fluchen oder Beleidigen: 10 €.</li>
                 <li>Schlägerwurf: 30 €.</li>
                 <li>Schläger brechen oder Gegenstände beschädigen: 50 €.</li>
@@ -2876,6 +3003,7 @@ function LordOfTheHolesApp() {
     if (view === "archive") return renderArchiveView();
     if (view === "fun") return renderFunView();
     if (view === "dailyTeams") return renderDailyTeamsView();
+    if (view === "prizes") return renderPrizesView();
     if (view === "flights") return renderFlightsView();
     if (view === "rules") return renderRulesView();
     return renderScoreView();
