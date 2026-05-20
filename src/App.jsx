@@ -2934,47 +2934,96 @@ function LordOfTheHolesApp() {
       return { ...standing, teamId, players: teamMap[teamId] || [] };
     }).sort((a, b) => Number(a.ceremonyRank || 99) - Number(b.ceremonyRank || 99));
 
-    const modeText = roundId === "r1"
-      ? "Heute zählt die rohe Macht der Netto-Punkte. Zwei Gefährten, ein gemeinsames Konto der Hoffnung."
-      : roundId === "r2"
-        ? "Heute zählt pro Loch nur der bessere Ball. Der schwächere Score wird höflich in den Schatten Mordors gestellt."
-        : "Heute wird Loch für Loch gerichtet. Wer das bessere Netto-Ergebnis bringt, nimmt das Loch — bei Gleichstand wird geteilt, wie Brot in Bruchtal.";
-
-    const rankTexts = {
-      1: "Die Hörner Gondors klingen heller. Dieses Bündnis führt die Tageswertung an.",
-      2: "Nicht ganz der Thron, aber noch lange kein Ork-Futter. Dieses Bündnis hält die Mitte.",
-      3: "Der Pfad ist steinig. Dieses Bündnis trägt die Last des Tages — und vermutlich die besseren Ausreden.",
+    const roundCeremonyTexts = {
+      r1: {
+        mode: "Der erste Tag ist geschlagen. Heute zählt die rohe Macht der Netto-Punkte: Zwei Gefährten, ein gemeinsames Konto der Hoffnung — und genug Raum für frühe Schuldzuweisungen.",
+        rankTexts: {
+          1: "Ein Auftakt wie ein Hornstoß aus Minas Tirith. Dieses Bündnis führt den ersten Tag an und darf so tun, als sei alles genau geplant gewesen.",
+          2: "Solider Beginn, keine Heldensage, aber auch kein Ork-Lager. Dieses Bündnis steht in Lauerstellung.",
+          3: "Der erste Marsch war hart. Dieses Bündnis trägt die Laterne am Ende der Karawane — immerhin sieht man dort die Ausreden zuerst.",
+        },
+      },
+      r2: {
+        mode: "Runde zwei führt durch die Minen. Heute zählt pro Loch nur der bessere Ball: Der schwächere Score wird wortlos in die Tiefe Morias gestoßen.",
+        rankTexts: {
+          1: "Aus den Minen steigt dieses Bündnis mit erhobenem Haupt. Der bessere Ball hat gesprochen, und er sprach erstaunlich freundlich.",
+          2: "Dieses Bündnis hat Moria überlebt, ohne komplett vom Balrog der Mittelmäßigkeit verschlungen zu werden.",
+          3: "Hier hallt noch ein Echo aus den Tiefen: Nicht jedes Best-Ball war wirklich best. Aber Mut ist auch eine Währung.",
+        },
+      },
+      r3: {
+        mode: "Vor den Toren Mordors wird Loch für Loch gerichtet. Wer das bessere Netto-Ergebnis bringt, nimmt das Loch — bei Gleichstand wird geteilt, wie letztes Brot in Bruchtal.",
+        rankTexts: {
+          1: "Dieses Bündnis steht vor Mordor und schaut nicht weg. Loch um Loch wurde genommen, als hätte jemand heimlich Mut gefrühstückt.",
+          2: "Noch nicht der Schicksalsberg, aber nah genug, um Rauch zu riechen. Dieses Bündnis bleibt gefährlich.",
+          3: "Die Tore Mordors waren schwer. Dieses Bündnis hat gekämpft — und der Palantír wird die Details gnädig verschweigen.",
+        },
+      },
+    };
+    const modeText = roundCeremonyTexts[roundId]?.mode || "Die Tageswertung wird offenbart.";
+    const rankTexts = roundCeremonyTexts[roundId]?.rankTexts || {
+      1: "Dieses Bündnis führt die Tageswertung an.",
+      2: "Dieses Bündnis hält die Mitte.",
+      3: "Dieses Bündnis trägt die Last des Tages.",
     };
 
-    const revealLines = [
-      "Das erste Siegel bricht. Ein Name tritt aus dem Pergament.",
-      "Das zweite Siegel glimmt. Der Partner wird offenbart.",
-    ];
+    const revealLines = roundId === "r1"
+      ? [
+        "Das erste Siegel bricht. Ein Name tritt aus dem Pergament — noch glaubt jeder, es könne gut ausgehen.",
+        "Das zweite Siegel glimmt. Der Partner wird offenbart, und mit ihm die erste echte Belastungsprobe der Freundschaft.",
+      ]
+      : roundId === "r2"
+        ? [
+          "Aus der Dunkelheit Morias tritt der erste Name hervor.",
+          "Ein zweiter Name hallt durch die Tiefe. Das Bündnis ist geschmiedet — ob aus Mithril oder Panik, wird sich zeigen.",
+        ]
+        : [
+          "Vor den Toren Mordors erscheint der erste Gefährte im roten Licht.",
+          "Der zweite Name fällt. Nun ist klar, wer gemeinsam Richtung Schicksalsberg marschiert.",
+        ];
 
+    const teamHasAny = (team, aliases) => {
+      const normalizedAliases = aliases.map((item) => String(item || "").toLowerCase().trim());
+      return (team.players || []).some((row) => {
+        const haystack = [row.player_id, row.player_name, row.player_alias].map((item) => String(item || "").toLowerCase().trim());
+        return haystack.some((value) => normalizedAliases.includes(value));
+      });
+    };
+
+    const getSpecialTeamComboText = (team) => {
+      const hasGimme = teamHasAny(team, ["mucky", "gimme"]);
+      const hasForedo = teamHasAny(team, ["kio", "foredo"]);
+      const hasBogeymir = teamHasAny(team, ["andreas", "bogeymir"]);
+      const rank = Number(team.ceremonyRank || 0);
+      if (hasGimme && hasForedo) {
+        if (rank === 1) return `Foredo und Gimme führen auf Rang ${rank}. Foredo freut sich natürlich über den Sieg — bleibt aber innerlich erstaunlich sicher, dass Gimme dafür nicht hauptverantwortlich war.`;
+        if (rank === 2) return `Foredo und Gimme auf Rang ${rank}. Foredo nennt es solide und hofft, dass damit alles gesagt ist. Gimme hat vermutlich noch drei Ergänzungen.`;
+        return `Foredo und Gimme auf Rang ${rank}. Foredo schaut in die Ferne. Nicht nach Mordor — nur irgendwohin, wo er Gimme nicht sehen muss.`;
+      }
+      if (hasGimme && hasBogeymir) {
+        if (rank === 1) return `Bogeymir und Gimme führen auf Rang ${rank}. Gimme hält es für verdient. Bogeymir auch. Irritiert sind beide nur darüber, dass der jeweils andere offenbar tatsächlich geholfen hat.`;
+        if (rank === 2) return `Bogeymir und Gimme auf Rang ${rank}. Gimme nennt es solide. Bogeymir nennt es vermeidbar. Beide meinen wahrscheinlich denselben Spieler — nur nicht sich selbst.`;
+        return `Bogeymir und Gimme auf Rang ${rank}. Zum ersten Mal sind sie sich völlig einig: Genau das hatte jeder dem anderen zugetraut.`;
+      }
+      return "";
+    };
+
+    const hasLoanPlayer = roundId === "r1" && rankedTeams.some((team) => (team.players || []).some((row, index) => getDailyTeamPlayerMeta(roundId, team.teamId, row.player_id, index).isLoanPlayer));
     const steps = [
       { type: "text", title, text: `${getRoundChapterLabel(round)} ist geschlagen. Der Abend senkt sich über Mittelerde, und der Rat öffnet das versiegelte Pergament der Tageswertung.`, waitLabel: "Das Pergament wird entrollt ..." },
       { type: "text", title: "Die Mannschaften werden gerichtet", text: `${modeText} Die Teams erscheinen nun in der Reihenfolge ihrer aktuellen Wertung. Wer oben steht, darf kurz würdevoll schauen. Wer unten steht, bitte ebenfalls — nur leiser.`, waitLabel: "Der Palantír sortiert die Bündnisse ..." },
+      ...(hasLoanPlayer ? [{ type: "text", title: "Sonderregel des ersten Tages", text: "Da Gangolf noch über die Straßen Mittelerdes jagte, erhält ein Team einen Leihspieler. Dessen Punkte zählen für dieses Team mit — seine eigene Wertung bleibt aber bei seinem Stammteam.", waitLabel: "Die Sonderregel wird ins Pergament gekratzt ..." }] : []),
     ];
 
     rankedTeams.forEach((team) => {
-      const rank = Number(team.ceremonyRank || 0);
-      steps.push({
-        type: "teamIntro",
-        title: `${rank}. Platz · ${teamLabel(team.teamId)}`,
-        text: rankTexts[rank] || "Das Schicksal hat gesprochen. Das Bündnis tritt vor den Rat.",
-        teamId: team.teamId,
-        rank,
-        detail: team.detail,
-        waitLabel: "Die Fackeln werden gehoben ...",
-      });
       steps.push({
         type: "team",
-        title: `${teamLabel(team.teamId)} · ${rank}. Platz`,
+        title: `${teamLabel(team.teamId)}`,
         teamId: team.teamId,
-        rank,
-        detail: team.detail,
+        rank: null,
+        detail: "",
         players: (team.players || []).slice(0, 1),
-        revealLine: "Das erste Siegel bricht. Ein Name tritt aus dem Pergament.",
+        revealLine: revealLines[0] || "Das erste Siegel bricht. Ein Name tritt aus dem Pergament.",
         waitLabel: "Der zweite Name bleibt noch verborgen ...",
       });
     });
@@ -2987,27 +3036,52 @@ function LordOfTheHolesApp() {
     });
 
     rankedTeams.forEach((team) => {
-      const rank = Number(team.ceremonyRank || 0);
       steps.push({
         type: "team",
-        title: `${teamLabel(team.teamId)} · ${rank}. Platz`,
+        title: `${teamLabel(team.teamId)}`,
         teamId: team.teamId,
-        rank,
-        detail: team.detail,
+        rank: null,
+        detail: "",
         players: team.players || [],
-        revealLine: "Das zweite Siegel glimmt. Der Partner wird offenbart.",
+        revealLine: revealLines[1] || "Das zweite Siegel glimmt. Der Partner wird offenbart.",
         waitLabel: "Das Bündnis ist vollständig ...",
       });
+    });
+
+    steps.push({
+      type: "text",
+      title: "Alle Bündnisse sind offenbart",
+      text: "Die Namen sind gefallen. Nun richtet der Palantír die Teams nach ihrer Tageswertung — und plötzlich wird aus einer Ziehung ein Urteil.",
+      waitLabel: "Die Rangfolge wird enthüllt ...",
+    });
+
+    rankedTeams.forEach((team) => {
+      const rank = Number(team.ceremonyRank || 0);
       steps.push({
         type: "teamResult",
-        title: `${teamLabel(team.teamId)} ist vollständig`,
-        text: `${teamLabel(team.teamId)} steht aktuell auf Rang ${rank} mit ${team.detail}. ${rank === 1 ? "Der Rat nickt anerkennend, doch Hochmut kommt bekanntlich vor dem Drei-Putt." : rank === 2 ? "Solide wie ein Zwergentor. Nicht glänzend, aber schwer einzureißen." : "Ein ehrenvoller Rang für Gefährten, die Charakter offenbar höher bewerten als Punkte."}`,
+        title: `${rank}. Platz · ${teamLabel(team.teamId)}`,
+        text: `${teamLabel(team.teamId)} steht auf Rang ${rank} mit ${team.detail}. ${rankTexts[rank] || "Das Schicksal hat gesprochen."}`,
         teamId: team.teamId,
         rank,
         detail: team.detail,
         waitLabel: "Die Chronisten notieren ...",
       });
     });
+
+    rankedTeams.forEach((team) => {
+      const specialText = getSpecialTeamComboText(team);
+      if (!specialText) return;
+      steps.push({
+        type: "teamResult",
+        title: `Sondervermerk des Rates · Team ${team.teamId}`,
+        text: specialText,
+        teamId: team.teamId,
+        rank: team.ceremonyRank,
+        detail: team.detail,
+        waitLabel: "Der Rat sortiert seine Gefühle ...",
+      });
+    });
+
     steps.push({ type: "text", title: "Die Teams sind gesprochen", text: "Die Bündnisse stehen. Die Rangfolge ist bekannt. Wer nun klagt, möge dies mit Netto-Punkten widerlegen — oder wenigstens mit einer sehr guten Geschichte.", waitLabel: "Die Chronik wird versiegelt ..." });
     return steps;
   }
@@ -3017,6 +3091,10 @@ function LordOfTheHolesApp() {
     const step = timeline[Math.min(teamCeremonyStepIndex, Math.max(0, timeline.length - 1))];
     if (!step) return null;
     const playerLabel = (row) => row.player_alias ? `${row.player_alias} (${row.player_name || row.player_id})` : (row.player_name || row.player_id);
+    const playerMetaLabel = (row, teamId, index) => {
+      const meta = getDailyTeamPlayerMeta(teamCeremonyRoundId, teamId, row.player_id, index);
+      return meta.isLoanPlayer ? `Leihspieler · zählt hier mit, Stammteam ${meta.homeTeamId}` : "";
+    };
     return (
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="min-h-[70vh]">
         <Card className="relative overflow-hidden rounded-3xl border-amber-500/45 bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.28),transparent_44%),linear-gradient(180deg,rgba(32,23,15,0.96),rgba(12,10,9,0.96))] shadow-2xl">
@@ -3032,7 +3110,8 @@ function LordOfTheHolesApp() {
                 <div className="space-y-2">
                   {(step.players || []).map((row, index) => (
                     <motion.div key={`${row.player_id}-${index}`} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.25 }} className="rounded-2xl border border-amber-700/35 bg-stone-950/65 px-3 py-2 font-serif text-xl font-bold text-amber-100">
-                      {playerLabel(row)}
+                      <div>{playerLabel(row)}</div>
+                      {playerMetaLabel(row, step.teamId, index) ? <div className="mt-1 font-sans text-[11px] font-bold uppercase tracking-[0.16em] text-amber-300/70">{playerMetaLabel(row, step.teamId, index)}</div> : null}
                     </motion.div>
                   ))}
                 </div>
@@ -3056,6 +3135,27 @@ function LordOfTheHolesApp() {
         </Card>
       </motion.section>
     );
+  }
+
+  function getDailyTeamPlayerMeta(roundId, teamId, playerId, slotIndex = 0) {
+    if (String(roundId) !== "r1" || !playerId) return { isLoanPlayer: false, homeTeamId: teamId, label: "" };
+    const slots = getDailyTeamSlots(roundId);
+    const appearances = [];
+    ["A", "B", "C"].forEach((currentTeamId) => {
+      (slots?.[currentTeamId] || []).forEach((currentPlayerId, currentSlotIndex) => {
+        if (String(currentPlayerId || "") === String(playerId)) {
+          appearances.push({ teamId: currentTeamId, slotIndex: currentSlotIndex });
+        }
+      });
+    });
+    if (appearances.length <= 1) return { isLoanPlayer: false, homeTeamId: teamId, label: "" };
+    const firstAppearance = appearances[0];
+    const isCurrentFirst = firstAppearance.teamId === teamId && firstAppearance.slotIndex === slotIndex;
+    return {
+      isLoanPlayer: !isCurrentFirst,
+      homeTeamId: firstAppearance.teamId,
+      label: isCurrentFirst ? "Stammteam" : `Leihspieler aus Team ${firstAppearance.teamId}`,
+    };
   }
 
   function getDailyTeamSlots(roundId) {
@@ -3190,7 +3290,7 @@ function LordOfTheHolesApp() {
                                 </select>
                               ))}
                             </div>
-                            {roundId !== "r1" ? <div className="mt-1 text-[11px] text-amber-100/45">Runde 2/3: jeder Spieler nur einmal.</div> : <div className="mt-1 text-[11px] text-amber-100/45">Runde 1: Doppelwahl in verschiedenen Teams erlaubt; nie zweimal im selben Team.</div>}
+                            {roundId !== "r1" ? <div className="mt-1 text-[11px] text-amber-100/45">Runde 2/3: jeder Spieler nur einmal.</div> : <div className="mt-1 text-[11px] text-amber-100/45">Runde 1: Ein Leihspieler darf ein zweites Team auffüllen; nie zweimal im selben Team.</div>}
                           </div>
                         ))}
                       </div>
@@ -3202,7 +3302,7 @@ function LordOfTheHolesApp() {
                               <tr key={team.teamId} className="border-t border-amber-700/20">
                                 <td className="hidden px-2 py-1.5 text-amber-200/70 landscape:table-cell">{index + 1}</td>
                                 <td className="px-2 py-1.5 font-bold text-amber-200">{team.label}</td>
-                                <td className="px-2 py-1.5 text-amber-100/80 landscape:break-words">{team.players.map((player) => player.character_name || player.display_name || player.id).join(" · ") || "–"}{!team.isComplete ? <span className="ml-1 text-[10px] text-red-200/75">offen</span> : null}</td>
+                                <td className="px-2 py-1.5 text-amber-100/80 landscape:break-words">{team.players.map((player, playerIndex) => { const meta = getDailyTeamPlayerMeta(roundId, team.teamId, player.id, playerIndex); return `${player.character_name || player.display_name || player.id}${meta.isLoanPlayer ? " (Leihspieler)" : ""}`; }).join(" · ") || "–"}{!team.isComplete ? <span className="ml-1 text-[10px] text-red-200/75">offen</span> : null}</td>
                                 <td className="px-2 py-1.5 text-right font-serif text-base font-black text-amber-300 landscape:text-lg">{team.detail}</td>
                               </tr>
                             ))}
