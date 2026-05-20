@@ -1410,8 +1410,15 @@ function LordOfTheHolesApp() {
 
   useEffect(() => {
     syncAtomicTime();
-    const timer = window.setInterval(() => syncAtomicTime(), 30000);
-    return () => window.clearInterval(timer);
+    const timer = window.setInterval(() => syncAtomicTime(), 5 * 60 * 1000);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") syncAtomicTime();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
   function getFlightCeremonyStepDuration(step) {
     const completedRevealPlayers = step?.type === "reveal"
