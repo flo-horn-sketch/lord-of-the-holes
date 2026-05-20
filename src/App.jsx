@@ -700,7 +700,7 @@ function getFirstUnscoredHole(scores = [], roundId = "", playerId = "", fallback
     const controlComplete = scorerPlayerId ? hasCompletedScore(scorerPlayerId, holeNumber, true) : false;
     if (!officialComplete || !controlComplete) return holeNumber;
   }
-  return Number(fallbackHole || 18);
+  return 18;
 }
 
 function TouchStepper({ label, value, min = 0, max = 12, emptyLabel = "–", status = "", defaultValue = null, disabled = false, onChange, formatValue }) {
@@ -1135,7 +1135,7 @@ function LordOfTheHolesApp() {
   const [flightDrawSaving, setFlightDrawSaving] = useState(false);
   const [flightCeremonyRunning, setFlightCeremonyRunning] = useState(false);
   const [flightCeremonyStepIndex, setFlightCeremonyStepIndex] = useState(0);
-  const [flightCeremonyCompleted, setFlightCeremonyCompleted] = useState(false);
+  const [flightCeremonyCompleted, setFlightCeremonyCompleted] = useState(() => readLocalJson("lordOfTheHoles.flightCeremonyCompleted", false));
   const [flightSummaryOpen, setFlightSummaryOpen] = useState(() => readLocalJson("lordOfTheHoles.flightSummaryOpen", false));
   const [localHandicaps, setLocalHandicaps] = useState({});
   const scoresRef = useRef(scores);
@@ -1145,12 +1145,14 @@ function LordOfTheHolesApp() {
   const lastAutoHoleTargetRef = useRef("");
   const selectedActiveRoundIdRef = useRef(selectedActiveRoundId);
   const scoredPlayerByRoundRef = useRef(scoredPlayerByRound);
+  const lockAdminBypassRef = useRef(lockAdminBypass);
+  const hintTimerRef = useRef(null);
 
   const displayedActiveRound = (selectedActiveRoundId && (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(selectedActiveRoundId))) || activeRound || rounds.find((round) => String(round.status).toLowerCase() === "active") || fallbackRounds[0];
   const displayCourseId = displayedActiveRound?.course_id || selectedCourseId || "goethe";
   const activeCourse = (courses.length ? courses : fallbackCourses).find((course) => String(course.course_id) === String(displayCourseId));
   const visiblePlayers = useMemo(() => getRoundPlayers(displayedActiveRound?.round_id, allPlayers, roundPlayers), [displayedActiveRound?.round_id, allPlayers, roundPlayers]);
-  const effectiveFlightDraw = flightDraw || readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null);
+  const effectiveFlightDraw = useMemo(() => flightDraw || readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null), [flightDraw]);
   const assignedScoredPlayerId = useMemo(() => getAssignedScoredPlayerIdFromDraw(effectiveFlightDraw, displayedActiveRound?.round_id || "", myPlayerId), [effectiveFlightDraw, displayedActiveRound?.round_id, myPlayerId]);
   const myFlightFromDraw = useMemo(() => getPlayerFlightFromDraw(effectiveFlightDraw, displayedActiveRound?.round_id || "", myPlayerId), [effectiveFlightDraw, displayedActiveRound?.round_id, myPlayerId]);
   const scoreablePlayers = useMemo(() => {
@@ -1311,6 +1313,7 @@ function LordOfTheHolesApp() {
     return { days, hours, minutes, seconds };
   }, [lockCountdownNow]);
   const flightDrawUnlocked = lockCountdownNow.getTime() >= FLIGHT_DRAW_TARGET.getTime();
+  const flightCeremonyTimeline = useMemo(() => buildFlightCeremonyTimeline(flightDraw), [flightDraw]);
 
   useEffect(() => { writeLocalJson("lordOfTheHoles.myPlayerId", myPlayerId); }, [myPlayerId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerId", scoredPlayerId); }, [scoredPlayerId]);
@@ -1327,6 +1330,10 @@ function LordOfTheHolesApp() {
   useEffect(() => { scoresRef.current = scores; }, [scores]);
   useEffect(() => { allScoresRef.current = allScores; }, [allScores]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.appLocked", appLocked); }, [appLocked]);
+  useEffect(() => { lockAdminBypassRef.current = lockAdminBypass; }, [lockAdminBypass]);
+  useEffect(() => () => {
+    if (hintTimerRef.current) window.clearTimeout(hintTimerRef.current);
+  }, []);
   useEffect(() => { writeLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", deviceAssignmentsResetAt); }, [deviceAssignmentsResetAt]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoresResetAt", scoresResetAt); }, [scoresResetAt]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.fullResetAt", fullResetAt); }, [fullResetAt]);
@@ -1365,7 +1372,7 @@ function LordOfTheHolesApp() {
   }, [appLocked, showSplash]);
   useEffect(() => {
     if (!flightCeremonyRunning) return undefined;
-    const timeline = buildFlightCeremonyTimeline(flightDraw);
+    const timeline = flightCeremonyTimeline;
     if (!timeline.length) return undefined;
     const isLastStep = flightCeremonyStepIndex >= timeline.length - 1;
     const currentStep = timeline[Math.min(flightCeremonyStepIndex, timeline.length - 1)];
@@ -1442,13 +1449,15 @@ function LordOfTheHolesApp() {
     if (storedPlayerIsValid && String(scoredPlayerId || "") !== String(storedPlayerId)) {
       setScoredPlayerId(storedPlayerId);
     }
-  }, [displayedActiveRound?.round_id, myPlayerId, assignedScoredPlayerId, scoredPlayerId, showSplash, appLocked, lockAdminBypass]);
+  }, [displayedActiveRound?.round_id, myPlayerId, assignedScoredPlayerId, scoredPlayerId, showSplash, appLocked, lockAdminBypass, scoreablePlayers, scoredPlayerByRound]);
 
   async function callSheetApi(payload) {
-    const url = new URL(GOOGLE_SHEETS_API_URL);
-    url.searchParams.set("payload", JSON.stringify(payload));
-    url.searchParams.set("cacheBust", String(Date.now()));
-    const response = await fetch(url.toString(), { method: "GET" });
+    const response = await fetch(GOOGLE_SHEETS_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload),
+    });
+
     if (!response.ok) throw new Error("Datenbank nicht erreichbar.");
     const data = await response.json();
     if (data && data.ok === false) throw new Error(data.error || "Datenbank meldet einen Fehler.");
@@ -1471,7 +1480,7 @@ function LordOfTheHolesApp() {
       if (data.app_locked != null || data.appLocked != null) {
         const nextAppLocked = normalizeBoolean(data.app_locked ?? data.appLocked);
         setAppLocked(nextAppLocked);
-        if (nextAppLocked && !lockAdminBypass) setShowSplash(true);
+        if (nextAppLocked && !lockAdminBypassRef.current) setShowSplash(true);
       }
       const nextFullResetAt = String(data.full_reset_at || data.fullResetAt || "");
       const localFullResetAt = String(readLocalJson("lordOfTheHoles.fullResetAt", "") || "");
@@ -1808,12 +1817,20 @@ function LordOfTheHolesApp() {
     return false;
   }
 
+  function showScoreHint(message, timeoutMs = 1800) {
+    if (hintTimerRef.current) window.clearTimeout(hintTimerRef.current);
+    setScoreHintMessage(message);
+    hintTimerRef.current = window.setTimeout(() => {
+      setScoreHintMessage("");
+      hintTimerRef.current = null;
+    }, timeoutMs);
+  }
+
   async function saveScore(patch) {
     const nextPatch = { ...patch };
     const nextStrokes = nextPatch.strokes !== undefined ? Number(nextPatch.strokes || 0) : currentEffectiveStrokes;
     if (nextPatch.putts_count !== undefined && nextStrokes > 0 && Number(nextPatch.putts_count || 0) > Math.max(0, nextStrokes - 1)) {
-      setScoreHintMessage("Putts dürfen maximal Schläge minus 1 sein.");
-      window.setTimeout(() => setScoreHintMessage(""), 1800);
+      showScoreHint("Putts dürfen maximal Schläge minus 1 sein.");
       return;
     }
     if (nextPatch.strokes !== undefined && currentScore.putts_count !== "" && currentScore.putts_count != null && Number(currentScore.putts_count || 0) > Math.max(0, Number(nextPatch.strokes || 0) - 1)) {
@@ -1821,8 +1838,7 @@ function LordOfTheHolesApp() {
       nextPatch.over_two_putts = Number(nextPatch.putts_count || 0) >= 3;
     }
     if (!canEnterScores) {
-      setScoreHintMessage(isFlightDrawRound ? "Erst Handy-Besitzer wählen und gespeicherte Flight-Ziehung laden. Der zu zählende Spieler wird automatisch zugeordnet." : "Erst Handy-Besitzer und zu zählenden Spieler auswählen.");
-      window.setTimeout(() => setScoreHintMessage(""), 1800);
+      showScoreHint(isFlightDrawRound ? "Erst Handy-Besitzer wählen und gespeicherte Flight-Ziehung laden. Der zu zählende Spieler wird automatisch zugeordnet." : "Erst Handy-Besitzer und zu zählenden Spieler auswählen.");
       return;
     }
     try { optimisticUpdate(nextPatch); }
@@ -1839,8 +1855,7 @@ function LordOfTheHolesApp() {
       if (!officialScoreForActiveHole || officialScoreForActiveHole.putts_count === "" || officialScoreForActiveHole.putts_count == null) missingItems.push(`Putts für ${getPlayerLabel(scoredPlayer) || "Spieler"}`);
       if (!controlScoreForActiveHole || controlScoreForActiveHole.strokes === "" || controlScoreForActiveHole.strokes == null) missingItems.push("mein Score");
       if (!controlScoreForActiveHole || controlScoreForActiveHole.putts_count === "" || controlScoreForActiveHole.putts_count == null) missingItems.push("meine Putts");
-      setScoreHintMessage(`Erst ${missingItems.join(", ")} eintragen, dann Runde abschließen.`);
-      window.setTimeout(() => setScoreHintMessage(""), 2400);
+      showScoreHint(`Erst ${missingItems.join(", ")} eintragen, dann Runde abschließen.`, 2400);
       return;
     }
     setScoreHintMessage("");
@@ -1856,8 +1871,7 @@ function LordOfTheHolesApp() {
       setError("");
       setSetupSavedMessage(`${displayedActiveRound?.round_name || "Runde"} abgeschlossen. Alle offenen Scores wurden synchronisiert.`);
     } else {
-      setScoreHintMessage("Runde konnte noch nicht vollständig synchronisiert werden. Offene Scores bleiben lokal gespeichert.");
-      window.setTimeout(() => setScoreHintMessage(""), 3200);
+      showScoreHint("Runde konnte noch nicht vollständig synchronisiert werden. Offene Scores bleiben lokal gespeichert.", 3200);
     }
   }
 
@@ -1869,8 +1883,7 @@ function LordOfTheHolesApp() {
       if (!officialScoreForActiveHole || officialScoreForActiveHole.putts_count === "" || officialScoreForActiveHole.putts_count == null) missingItems.push(`Putts für ${getPlayerLabel(scoredPlayer) || "Spieler"}`);
       if (!controlScoreForActiveHole || controlScoreForActiveHole.strokes === "" || controlScoreForActiveHole.strokes == null) missingItems.push("mein Score");
       if (!controlScoreForActiveHole || controlScoreForActiveHole.putts_count === "" || controlScoreForActiveHole.putts_count == null) missingItems.push("meine Putts");
-      setScoreHintMessage(`Erst ${missingItems.join(", ")} eintragen, dann weiter.`);
-      window.setTimeout(() => setScoreHintMessage(""), 2400);
+      showScoreHint(`Erst ${missingItems.join(", ")} eintragen, dann weiter.`, 2400);
       return;
     }
     setScoreHintMessage("");
@@ -2697,7 +2710,7 @@ function LordOfTheHolesApp() {
   }
 
   function renderFlightCeremonyStage() {
-    const timeline = buildFlightCeremonyTimeline(flightDraw);
+    const timeline = flightCeremonyTimeline;
     const step = timeline[Math.min(flightCeremonyStepIndex, Math.max(0, timeline.length - 1))];
     if (!step) return null;
     return (
