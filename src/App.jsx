@@ -1134,6 +1134,7 @@ function LordOfTheHolesApp() {
   const [serverTimeOffsetMs, setServerTimeOffsetMs] = useState(0);
   const [lastServerSync, setLastServerSync] = useState({ offsetMs: 0, rttMs: 0, syncedAt: "", source: "device" });
   const [atomicTimeStatus, setAtomicTimeStatus] = useState("idle");
+  const atomicSyncSequenceRef = useRef(0);
   const [deviceAssignmentsResetAt, setDeviceAssignmentsResetAt] = useState(() => readLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", ""));
   const [scoresResetAt, setScoresResetAt] = useState(() => readLocalJson("lordOfTheHoles.scoresResetAt", ""));
   const [fullResetAt, setFullResetAt] = useState(() => readLocalJson("lordOfTheHoles.fullResetAt", ""));
@@ -1597,23 +1598,67 @@ function LordOfTheHolesApp() {
     return true;
   }
 
-  async function syncAtomicTime() {
+  async function fetchAtomicTimeSample(sequenceId, sampleIndex = 0) {
     const requestStartedAt = Date.now();
+    const url = `https://itime.live/api/time?cacheBust=${requestStartedAt}_${sampleIndex}`;
+    const response = await fetch(url, {
+      method: "GET",
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache" },
+    });
+    const responseReceivedAt = Date.now();
+    if (sequenceId !== atomicSyncSequenceRef.current) return null;
+    if (!response.ok) throw new Error(`Atomzeit HTTP ${response.status}`);
+    const data = await response.json();
+    const parseAtomicTimeMs = (value) => {
+      if (value === "" || value == null) return NaN;
+      if (typeof value === "number") return value < 1000000000000 ? value * 1000 : value;
+      const text = String(value).trim();
+      const numeric = Number(text);
+      if (!Number.isNaN(numeric) && text.length >= 9) return numeric < 1000000000000 ? numeric * 1000 : numeric;
+      return Date.parse(text);
+    };
+    const candidates = [data?.utc, data?.iso, data?.datetime, data?.timestamp, data?.time]
+      .map(parseAtomicTimeMs)
+      .filter((value) => !Number.isNaN(value));
+    const sourceNowMs = candidates.find((value) => Math.abs(value - responseReceivedAt) < 5 * 60 * 1000);
+    if (!sourceNowMs) return null;
+    const rttMs = Math.max(0, responseReceivedAt - requestStartedAt);
+    const estimatedNowAtReceive = sourceNowMs + rttMs / 2;
+    const offsetMs = estimatedNowAtReceive - responseReceivedAt;
+    return { offsetMs, rttMs, sourceNowMs, requestStartedAt, responseReceivedAt };
+  }
+
+  async function syncAtomicTime() {
+    const sequenceId = atomicSyncSequenceRef.current + 1;
+    atomicSyncSequenceRef.current = sequenceId;
     try {
       setAtomicTimeStatus("syncing");
-      const response = await fetch("https://itime.live/api/time", { method: "GET", cache: "no-store" });
-      const responseReceivedAt = Date.now();
-      if (!response.ok) throw new Error(`Atomzeit HTTP ${response.status}`);
-      const data = await response.json();
-      const timestampValue = data?.timestamp;
-      const atomicMs = typeof timestampValue === "number"
-        ? timestampValue
-        : Number(timestampValue || Date.parse(data?.utc || data?.time || ""));
-      const ok = applyTimeSyncOffset("itime.live", atomicMs, requestStartedAt, responseReceivedAt);
-      setAtomicTimeStatus(ok ? "online" : "invalid");
-      return ok;
+      const samples = [];
+      for (let index = 0; index < 3; index += 1) {
+        const sample = await fetchAtomicTimeSample(sequenceId, index);
+        if (sample) samples.push(sample);
+        await new Promise((resolve) => window.setTimeout(resolve, 120));
+      }
+      if (sequenceId !== atomicSyncSequenceRef.current) return false;
+      const bestSample = samples
+        .filter((sample) => sample.rttMs <= 5000 && Math.abs(sample.offsetMs) < 5 * 60 * 1000)
+        .sort((a, b) => a.rttMs - b.rttMs)[0];
+      if (!bestSample) {
+        setAtomicTimeStatus("invalid");
+        return false;
+      }
+      setServerTimeOffsetMs(bestSample.offsetMs);
+      setLastServerSync({
+        offsetMs: bestSample.offsetMs,
+        rttMs: bestSample.rttMs,
+        syncedAt: new Date(bestSample.responseReceivedAt).toISOString(),
+        source: "itime.live",
+      });
+      setAtomicTimeStatus("online");
+      return true;
     } catch (err) {
-      setAtomicTimeStatus("fallback");
+      if (sequenceId === atomicSyncSequenceRef.current) setAtomicTimeStatus("fallback");
       return false;
     }
   }
