@@ -2923,6 +2923,20 @@ function LordOfTheHolesApp() {
     return labels[roundId] || "noch nicht festgelegt";
   }
 
+  function getTeamDrawCountdownLabel(roundId) {
+    const target = TEAM_DRAW_TARGETS[roundId];
+    if (!target) return "";
+    const diffMs = target.getTime() - lockCountdownNow.getTime();
+    if (diffMs <= 0) return "bereit zur Zeremonie";
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    if (days > 0) return `${days} T ${String(hours).padStart(2, "0")} Std ${String(minutes).padStart(2, "0")} Min`;
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+
   function getTeamDrawRowsForRound(roundId) {
     return (teamDrawRows || []).map(normalizeTeamDrawRow).filter((row) => String(row.round_id) === String(roundId)).sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
   }
@@ -3330,6 +3344,7 @@ function LordOfTheHolesApp() {
                       {!teamDrawVisible ? <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100/75">
                         <div className="font-bold text-amber-200">Team-Ziehung noch versiegelt</div>
                         <div className="mt-1">Die Zeremonie für diese Runde startet am {getTeamDrawTargetLabel(roundId)}. Danach erscheinen hier die Teams und die Tageswertung.</div>
+                        <div className="mt-2 rounded-xl border border-amber-500/25 bg-black/25 px-3 py-2 font-serif text-lg font-black text-amber-300">{getTeamDrawCountdownLabel(roundId)}</div>
                       </div> : null}
                       {teamDrawVisible ? <>
                       <div className="grid gap-2 landscape:grid-cols-3 landscape:gap-1.5">
