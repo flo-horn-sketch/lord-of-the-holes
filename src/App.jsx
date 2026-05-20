@@ -2782,7 +2782,7 @@ function LordOfTheHolesApp() {
         let score = 0;
         teams.forEach((team) => {
           const key = makePairKey(team[0], team[1]);
-          if (team[0] === team[1]) score += 50;
+          if (team[0] === team[1]) score += 10000;
           if (usedPairs.has(key)) score += 200;
         });
         if (score < bestScore) {
@@ -2925,14 +2925,90 @@ function LordOfTheHolesApp() {
       if (!teamMap[teamId]) teamMap[teamId] = [];
       teamMap[teamId].push(row);
     });
-    const steps = [
-      { type: "text", title, text: `${getRoundChapterLabel(round)} ist geschlagen. Nun öffnet der Rat das versiegelte Pergament der Tageswertung.`, waitLabel: "Das Pergament wird entrollt ..." },
-      { type: "text", title: "Die Mannschaften werden offenbart", text: "Kein Gefährte kann nun noch fliehen. Das Schicksal hat Teams geschmiedet — und mindestens einer wird behaupten, das sei statistisch verdächtig.", waitLabel: "Die Runen glimmen ..." },
+
+    const standings = buildDailyTeamStandings(roundId);
+    const standingMap = new Map((standings.teams || []).map((team, index) => [String(team.teamId), { ...team, ceremonyRank: index + 1 }]));
+    const teamLabel = (teamId) => `Team ${teamId}`;
+    const rankedTeams = ["A", "B", "C"].map((teamId, index) => {
+      const standing = standingMap.get(teamId) || { teamId, label: teamLabel(teamId), value: 0, detail: "noch ohne Wertung", ceremonyRank: index + 1 };
+      return { ...standing, teamId, players: teamMap[teamId] || [] };
+    }).sort((a, b) => Number(a.ceremonyRank || 99) - Number(b.ceremonyRank || 99));
+
+    const modeText = roundId === "r1"
+      ? "Heute zählt die rohe Macht der Netto-Punkte. Zwei Gefährten, ein gemeinsames Konto der Hoffnung."
+      : roundId === "r2"
+        ? "Heute zählt pro Loch nur der bessere Ball. Der schwächere Score wird höflich in den Schatten Mordors gestellt."
+        : "Heute wird Loch für Loch gerichtet. Wer das bessere Netto-Ergebnis bringt, nimmt das Loch — bei Gleichstand wird geteilt, wie Brot in Bruchtal.";
+
+    const rankTexts = {
+      1: "Die Hörner Gondors klingen heller. Dieses Bündnis führt die Tageswertung an.",
+      2: "Nicht ganz der Thron, aber noch lange kein Ork-Futter. Dieses Bündnis hält die Mitte.",
+      3: "Der Pfad ist steinig. Dieses Bündnis trägt die Last des Tages — und vermutlich die besseren Ausreden.",
+    };
+
+    const revealLines = [
+      "Das erste Siegel bricht. Ein Name tritt aus dem Pergament.",
+      "Das zweite Siegel glimmt. Der Partner wird offenbart.",
     ];
-    ["A", "B", "C"].forEach((teamId) => {
-      steps.push({ type: "team", title: `Team ${teamId}`, teamId, players: teamMap[teamId] || [] });
+
+    const steps = [
+      { type: "text", title, text: `${getRoundChapterLabel(round)} ist geschlagen. Der Abend senkt sich über Mittelerde, und der Rat öffnet das versiegelte Pergament der Tageswertung.`, waitLabel: "Das Pergament wird entrollt ..." },
+      { type: "text", title: "Die Mannschaften werden gerichtet", text: `${modeText} Die Teams erscheinen nun in der Reihenfolge ihrer aktuellen Wertung. Wer oben steht, darf kurz würdevoll schauen. Wer unten steht, bitte ebenfalls — nur leiser.`, waitLabel: "Der Palantír sortiert die Bündnisse ..." },
+    ];
+
+    rankedTeams.forEach((team) => {
+      const rank = Number(team.ceremonyRank || 0);
+      steps.push({
+        type: "teamIntro",
+        title: `${rank}. Platz · ${teamLabel(team.teamId)}`,
+        text: rankTexts[rank] || "Das Schicksal hat gesprochen. Das Bündnis tritt vor den Rat.",
+        teamId: team.teamId,
+        rank,
+        detail: team.detail,
+        waitLabel: "Die Fackeln werden gehoben ...",
+      });
+      steps.push({
+        type: "team",
+        title: `${teamLabel(team.teamId)} · ${rank}. Platz`,
+        teamId: team.teamId,
+        rank,
+        detail: team.detail,
+        players: (team.players || []).slice(0, 1),
+        revealLine: "Das erste Siegel bricht. Ein Name tritt aus dem Pergament.",
+        waitLabel: "Der zweite Name bleibt noch verborgen ...",
+      });
     });
-    steps.push({ type: "text", title: "Die Teams sind gesprochen", text: "Die Bündnisse stehen. Wer nun klagt, möge dies mit Netto-Punkten widerlegen.", waitLabel: "Die Chronik wird versiegelt ..." });
+
+    steps.push({
+      type: "text",
+      title: "Die halben Bündnisse stehen",
+      text: "Drei Namen sind gefallen. Drei Schatten fehlen noch. Der Rat tuschelt, der Palantír glimmt, und irgendwo rechnet jemand bereits heimlich Netto-Punkte nach.",
+      waitLabel: "Die zweiten Siegel werden vorbereitet ...",
+    });
+
+    rankedTeams.forEach((team) => {
+      const rank = Number(team.ceremonyRank || 0);
+      steps.push({
+        type: "team",
+        title: `${teamLabel(team.teamId)} · ${rank}. Platz`,
+        teamId: team.teamId,
+        rank,
+        detail: team.detail,
+        players: team.players || [],
+        revealLine: "Das zweite Siegel glimmt. Der Partner wird offenbart.",
+        waitLabel: "Das Bündnis ist vollständig ...",
+      });
+      steps.push({
+        type: "teamResult",
+        title: `${teamLabel(team.teamId)} ist vollständig`,
+        text: `${teamLabel(team.teamId)} steht aktuell auf Rang ${rank} mit ${team.detail}. ${rank === 1 ? "Der Rat nickt anerkennend, doch Hochmut kommt bekanntlich vor dem Drei-Putt." : rank === 2 ? "Solide wie ein Zwergentor. Nicht glänzend, aber schwer einzureißen." : "Ein ehrenvoller Rang für Gefährten, die Charakter offenbar höher bewerten als Punkte."}`,
+        teamId: team.teamId,
+        rank,
+        detail: team.detail,
+        waitLabel: "Die Chronisten notieren ...",
+      });
+    });
+    steps.push({ type: "text", title: "Die Teams sind gesprochen", text: "Die Bündnisse stehen. Die Rangfolge ist bekannt. Wer nun klagt, möge dies mit Netto-Punkten widerlegen — oder wenigstens mit einer sehr guten Geschichte.", waitLabel: "Die Chronik wird versiegelt ..." });
     return steps;
   }
 
@@ -2950,14 +3026,22 @@ function LordOfTheHolesApp() {
             <h2 className="mt-1 font-serif text-2xl font-black text-amber-200">{step.title}</h2>
             {step.type === "team" ? (
               <motion.div key={`${step.teamId}-${teamCeremonyStepIndex}`} initial={{ opacity: 0, scale: 0.94 }} animate={{ opacity: 1, scale: 1 }} className="mt-5 rounded-3xl border border-amber-500/35 bg-black/28 p-4">
+                <div className="mb-1 text-xs uppercase tracking-[0.2em] text-amber-100/50">Rang {step.rank} · {step.detail}</div>
                 <div className="mb-3 font-serif text-5xl font-black text-amber-300 drop-shadow-[0_0_18px_rgba(251,191,36,0.22)]">{step.teamId}</div>
+                <p className="mb-3 text-sm italic text-amber-100/65">{step.revealLine}</p>
                 <div className="space-y-2">
                   {(step.players || []).map((row, index) => (
-                    <motion.div key={`${row.player_id}-${index}`} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.45 }} className="rounded-2xl border border-amber-700/35 bg-stone-950/65 px-3 py-2 font-serif text-xl font-bold text-amber-100">
+                    <motion.div key={`${row.player_id}-${index}`} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.25 }} className="rounded-2xl border border-amber-700/35 bg-stone-950/65 px-3 py-2 font-serif text-xl font-bold text-amber-100">
                       {playerLabel(row)}
                     </motion.div>
                   ))}
                 </div>
+              </motion.div>
+            ) : step.type === "teamIntro" || step.type === "teamResult" ? (
+              <motion.div key={teamCeremonyStepIndex} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="mx-auto mt-5 max-w-md rounded-3xl border border-amber-500/30 bg-black/24 p-4">
+                <div className="mb-2 text-xs uppercase tracking-[0.22em] text-amber-300/65">{step.teamId ? `Team ${step.teamId}` : "Tageswertung"}</div>
+                <p className="text-lg leading-relaxed text-amber-100/85">{step.text}</p>
+                {step.detail ? <div className="mt-3 rounded-2xl border border-amber-700/35 bg-stone-950/60 px-3 py-2 font-serif text-xl font-black text-amber-300">{step.detail}</div> : null}
               </motion.div>
             ) : (
               <motion.p key={teamCeremonyStepIndex} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="mx-auto mt-5 max-w-md text-lg leading-relaxed text-amber-100/85">
@@ -3059,8 +3143,11 @@ function LordOfTheHolesApp() {
   }
 
   function isDailyTeamPlayerAlreadySelected(roundId, playerId, currentTeamId, currentSlotIndex) {
-    if (!playerId || String(roundId) === "r1") return false;
+    if (!playerId) return false;
     const teams = getDailyTeamSlots(roundId);
+    const sameTeamOtherSlot = (teams?.[currentTeamId] || []).some((selectedPlayerId, slotIndex) => String(selectedPlayerId || "") === String(playerId) && slotIndex !== currentSlotIndex);
+    if (sameTeamOtherSlot) return true;
+    if (String(roundId) === "r1") return false;
     return ["A", "B", "C"].some((teamId) => (teams?.[teamId] || []).some((selectedPlayerId, slotIndex) => String(selectedPlayerId || "") === String(playerId) && !(teamId === currentTeamId && slotIndex === currentSlotIndex)));
   }
 
@@ -3074,12 +3161,7 @@ function LordOfTheHolesApp() {
               <p className="text-xs uppercase tracking-[0.22em] text-amber-300/75">Tageswertungen</p>
               <h2 className="font-serif text-xl font-black text-amber-200">Teams eintragen & Tageswertung berechnen</h2>
               <p className="mt-1 text-sm text-amber-100/70">Pro Runde gibt es drei 2er-Teams. In Runde 1 darf ein Spieler doppelt gewählt werden, falls Gangolf noch über die Autobahn donnert.</p>
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                <Button disabled={teamDrawSaving || connectionStatus !== "online"} onClick={saveTeamDrawToSheet} className="rounded-2xl bg-amber-600 py-2 text-sm font-bold text-amber-50 disabled:opacity-50">{teamDrawSaving ? "Speichert ..." : "Teamdraw speichern"}</Button>
-                <Button disabled={teamDrawSaving || connectionStatus !== "online"} onClick={generateAndSaveTeamDrawToSheet} className="rounded-2xl border border-amber-400/50 bg-amber-950/50 py-2 text-sm font-bold text-amber-100 disabled:opacity-50">Neu auslosen</Button>
-                <Button disabled={teamDrawSaving || connectionStatus !== "online"} onClick={clearTeamDrawInSheet} className="rounded-2xl border border-red-400/50 bg-red-950/45 py-2 text-sm font-bold text-red-100 disabled:opacity-50">Teamdraw löschen</Button>
-              </div>
-              {teamDrawRows?.length ? <div className="mt-2 text-xs text-amber-100/55">Geladen aus TeamDraw: {teamDrawRows.length} Einträge.</div> : null}
+              {teamDrawRows?.length ? <div className="mt-2 text-xs text-amber-100/55">Geladen aus TeamDraw: {teamDrawRows.length} Einträge. Neuer TeamDraw nur über Admin & HCPs · Runde beginnen.</div> : null}
             </div>
             <div className="space-y-3 landscape:space-y-2">
               {roundIds.map((roundId) => {
@@ -3108,7 +3190,7 @@ function LordOfTheHolesApp() {
                                 </select>
                               ))}
                             </div>
-                            {roundId !== "r1" ? <div className="mt-1 text-[11px] text-amber-100/45">Runde 2/3: jeder Spieler nur einmal.</div> : <div className="mt-1 text-[11px] text-amber-100/45">Runde 1: Doppelwahl erlaubt.</div>}
+                            {roundId !== "r1" ? <div className="mt-1 text-[11px] text-amber-100/45">Runde 2/3: jeder Spieler nur einmal.</div> : <div className="mt-1 text-[11px] text-amber-100/45">Runde 1: Doppelwahl in verschiedenen Teams erlaubt; nie zweimal im selben Team.</div>}
                           </div>
                         ))}
                       </div>
