@@ -2186,12 +2186,13 @@ function LordOfTheHolesApp() {
     if (value === "archive") setView("archive");
     if (value === "fun") setView("fun");
     if (value === "flights") setView("flights");
+    if (value === "rules") setView("rules");
     if (value === "settings") setView("handicaps");
     if (value === "admin") setView("admin");
   }
 
   function renderHeader() {
-    const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "flights" ? "Flights" : mainMenu === "admin" ? "Admin" : "Einstellungen";
+    const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "flights" ? "Flights" : mainMenu === "rules" ? "Regeln" : mainMenu === "admin" ? "Admin" : "Einstellungen";
     return (
       <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-1 pt-1">
         <div className="relative flex h-8 items-center justify-center">
@@ -2202,7 +2203,7 @@ function LordOfTheHolesApp() {
           <button type="button" onClick={() => setMenuOpen((value) => !value)} className="ml-auto rounded-xl border border-amber-500/35 bg-[linear-gradient(180deg,rgba(48,35,22,0.82),rgba(12,10,9,0.82))] px-2.5 py-1 text-base leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.12),0_8px_18px_rgba(0,0,0,0.35)] backdrop-blur-sm transition active:scale-[0.96]" aria-label="Menü öffnen">☰</button>
           {menuOpen ? (
             <div className="absolute right-0 top-[34px] z-30 w-64 overflow-hidden rounded-2xl border border-amber-700/40 bg-stone-950/95 text-left shadow-2xl shadow-black/70 backdrop-blur">
-              {[["current", "Scoring"], ["roundTables", "Tabellen Runde"], ["tournament", "Turnier"], ["archive", "Scorekarten"], ["fun", "Mittelerde"], ["flights", "Flights"], ["settings", "Einstellungen"], ["admin", "Admin"]].map(([value, label]) => (
+              {[["current", "Scoring"], ["roundTables", "Tabellen Runde"], ["tournament", "Turnier"], ["archive", "Scorekarten"], ["fun", "Mittelerde"], ["flights", "Flights"], ["rules", "Regeln"], ["settings", "Einstellungen"], ["admin", "Admin"]].map(([value, label]) => (
                 <button
                   key={value}
                   type="button"
@@ -2583,6 +2584,100 @@ function LordOfTheHolesApp() {
     return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3"><div className="landscape:mx-auto landscape:max-w-none landscape:pb-6"><MiddleEarthTables players={playersWithCurrentHandicaps} holes={holes} scores={officialScores} mismatches={roundMismatches} /></div></motion.section>;
   }
 
+  function RulesSection({ title, subtitle = "", children }) {
+    return (
+      <div className="mb-2 overflow-hidden rounded-2xl border border-amber-700/35 bg-black/25 shadow-[inset_0_1px_0_rgba(251,191,36,0.08)]">
+        <div className="border-b border-amber-700/25 bg-amber-500/10 px-3 py-2">
+          <div className="font-serif text-lg font-black text-amber-200">{title}</div>
+          {subtitle ? <div className="mt-0.5 text-xs text-amber-100/60">{subtitle}</div> : null}
+        </div>
+        <div className="space-y-2 p-3 text-sm leading-relaxed text-amber-100/82">{children}</div>
+      </div>
+    );
+  }
+
+  function RulesPill({ children }) {
+    return <span className="inline-flex rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.12em] text-amber-200">{children}</span>;
+  }
+
+  function renderRulesView() {
+    return (
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
+        <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm">
+          <CardContent className="p-2">
+            <div className="mb-3 rounded-2xl border border-amber-500/30 bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.18),transparent_50%),rgba(0,0,0,0.24)] p-3 text-center">
+              <div className="text-[10px] uppercase tracking-[0.28em] text-amber-300/75">Charta der Gefährten</div>
+              <h2 className="mt-1 font-serif text-2xl font-black text-amber-200">Lord of the Holes Regeln</h2>
+              <p className="mt-1 text-sm text-amber-100/70">Offizielles Pergament für Fairness, Ruhm, Schmach und sehr teure Dreiputts.</p>
+            </div>
+
+            <RulesSection title="1. Handicap & Fairness" subtitle="Die Vorgaben sind gesetzt — die Ausreden nicht.">
+              <p>Für das Turnier gelten die festgelegten DGV-Handicaps. Die Spielleitung darf Vorgaben prüfen und anpassen, wenn es der Fairness dient. Während des Turniers bleiben die Handicaps unverändert.</p>
+            </RulesSection>
+
+            <RulesSection title="2. Turniermodus" subtitle="Vier Tage. Drei Kapitel. Ein Schicksalsberg.">
+              <div className="space-y-2">
+                <div><RulesPill>Runden 1–3</RulesPill><p className="mt-1">Die ersten drei Tagesrunden bilden die Qualifikation. Teams und Flights werden nach dem Prinzip des Schicksals bestimmt; Wiederholungen sollen vermieden werden.</p></div>
+                <div><RulesPill>Cut</RulesPill><p className="mt-1">Nach der Qualifikation ziehen die besten drei Gefährten in den Kampf um die Plätze 1–3. Die übrigen Spieler treten in der Platzierungsgruppe um die Plätze 4–6 an.</p></div>
+                <div><RulesPill>Finaltag</RulesPill><p className="mt-1">Am Finaltag zählt das Netto-Zählspiel: Bruttoschläge minus Spielvorgabe. Niedriger ist besser. Bei Gleichstand entscheidet ein Putt-Wettbewerb.</p></div>
+              </div>
+            </RulesSection>
+
+            <RulesSection title="3. Tageswertungen" subtitle="Ruhm gibt es täglich. Rechnungen auch.">
+              <ul className="list-disc space-y-1 pl-5">
+                <li><b>Tag 1 · Netto-Team:</b> Die Nettopunkte beider Teampartner werden addiert.</li>
+                <li><b>Tag 2 · Best Ball Netto:</b> Pro Loch zählt das beste Nettoergebnis des Teams.</li>
+                <li><b>Tag 3 · Best Ball Match Play:</b> Pro Loch gewinnt das bessere Nettoergebnis; geteilte Löcher werden geteilt.</li>
+                <li><b>Tag 4 · Einzel-Netto:</b> Finale und Platzierungsspiele werden im Zählspiel minus Vorgabe entschieden.</li>
+              </ul>
+            </RulesSection>
+
+            <RulesSection title="4. Side Bets" subtitle="Kleine Spiele, große Narben.">
+              <div className="space-y-2">
+                <div className="rounded-xl border border-amber-700/25 bg-black/20 p-2"><b className="text-amber-200">Shelobs Putt-Kammer / Snake</b><p className="mt-1">3 Putts: 2 €. 4 Putts: 4 €. 5 oder mehr Putts: 10 €. Der Snake-Pott geht an den Turniersieger.</p></div>
+                <div className="rounded-xl border border-amber-700/25 bg-black/20 p-2"><b className="text-amber-200">Weiße Fahne</b><p className="mt-1">Bei einem gestrichenen Loch wird die Ehre kurz beerdigt. Sonderrituale nach Beschluss der Gründerväter bleiben möglich.</p></div>
+                <div className="rounded-xl border border-amber-700/25 bg-black/20 p-2"><b className="text-amber-200">Nearest to the Pin</b><p className="mt-1">Der Ball muss auf dem Grün liegen. Der Gewinner erhält 5 € von seinen Flight-Partnern; Sonderwertung kann einen Schlag Abzug für den Finaltag bringen.</p></div>
+                <div className="rounded-xl border border-amber-700/25 bg-black/20 p-2"><b className="text-amber-200">Longest Drive</b><p className="mt-1">Nur Fairway zählt. Wer den längsten gültigen Drive schlägt, erhält 5 € von jedem Flight-Partner.</p></div>
+              </div>
+            </RulesSection>
+
+            <RulesSection title="5. Herren von Gondor & Schildträger" subtitle="Butlerdienst ist Ehrendienst. Angeblich.">
+              <p>Die schlechtesten Spieler der Tagesrunde dienen den Bestplatzierten als Schildträger. Der Dienst beginnt nach Ende der Runde und endet vor dem ersten Abschlag des nächsten Tages.</p>
+              <ul className="list-disc space-y-1 pl-5">
+                <li>Schläger putzen und spielfertig machen.</li>
+                <li>Rangebälle organisieren und Bag bereitstellen.</li>
+                <li>Frühstückstisch, Getränke und Wohlbefinden des Herren sichern.</li>
+                <li>Verweigerung oder schlampiger Dienst kann sanktioniert werden.</li>
+              </ul>
+            </RulesSection>
+
+            <RulesSection title="6. Preise, Strafen & Ehre" subtitle="Am Ende gewinnt einer. Zahlen tun mehrere.">
+              <ul className="list-disc space-y-1 pl-5">
+                <li><b>Team-Tageswertung:</b> Siegermannschaft +100 €, Platz 3 -100 €, bei Gleichstand wird geteilt.</li>
+                <li><b>Gesamtsieger:</b> teuerste Greenfee, Pokal und Snake-Pott.</li>
+                <li><b>Platz 2:</b> 50 % der Greenfee von Tag 4.</li>
+                <li><b>Plätze 4–6:</b> abgestufte Strafzahlungen nach Charta.</li>
+                <li><b>Bruttosieger:</b> Championship-Ring für den besten Bruttospieler des Turniers.</li>
+              </ul>
+            </RulesSection>
+
+            <RulesSection title="7. Heilige Ordnung" subtitle="Keine Gimmies. Keine Ausreden. Kein Ring ohne Regeln.">
+              <ul className="list-disc space-y-1 pl-5">
+                <li>Es werden keine Putts oder Schläge geschenkt.</li>
+                <li>Gespielt wird nach DGV-Regelwerk und Golfetikette.</li>
+                <li>Lautes Fluchen oder Beleidigen: 10 €.</li>
+                <li>Schlägerwurf: 30 €.</li>
+                <li>Schläger brechen oder Gegenstände beschädigen: 50 €.</li>
+                <li>Die Gründerväter dürfen über weitere Verfehlungen richten.</li>
+              </ul>
+              <p className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-2 text-xs text-amber-100/75">Da es sich um ein offizielles Turnier handelt, wird das Regelwerk nicht als Dekoration verstanden. Wer sündigt, wird geahndet — notfalls vom Palantír.</p>
+            </RulesSection>
+          </CardContent>
+        </Card>
+      </motion.section>
+    );
+  }
+
   function renderActiveView() {
     if (loading) return <Card className="rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm"><CardContent className="flex items-center gap-2 p-3 text-amber-100">⟳ Lade Datenbank ...</CardContent></Card>;
     if (view === "admin") return renderAdminView();
@@ -2592,6 +2687,7 @@ function LordOfTheHolesApp() {
     if (view === "archive") return renderArchiveView();
     if (view === "fun") return renderFunView();
     if (view === "flights") return renderFlightsView();
+    if (view === "rules") return renderRulesView();
     return renderScoreView();
   }
 
