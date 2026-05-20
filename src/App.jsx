@@ -1132,6 +1132,7 @@ function LordOfTheHolesApp() {
   const [lockAdminBypass, setLockAdminBypass] = useState(false);
   const [lockCountdownNow, setLockCountdownNow] = useState(() => new Date());
   const [serverTimeOffsetMs, setServerTimeOffsetMs] = useState(0);
+  const [lastServerSync, setLastServerSync] = useState({ offsetMs: 0, rttMs: 0, syncedAt: "" });
   const [deviceAssignmentsResetAt, setDeviceAssignmentsResetAt] = useState(() => readLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", ""));
   const [scoresResetAt, setScoresResetAt] = useState(() => readLocalJson("lordOfTheHoles.scoresResetAt", ""));
   const [fullResetAt, setFullResetAt] = useState(() => readLocalJson("lordOfTheHoles.fullResetAt", ""));
@@ -1579,17 +1580,26 @@ function LordOfTheHolesApp() {
   }, [displayedActiveRound?.round_id, myPlayerId, assignedScoredPlayerId, scoredPlayerId, showSplash, appLocked, lockAdminBypass, scoreablePlayers, scoredPlayerByRound]);
 
   async function callSheetApi(payload) {
+    const requestStartedAt = Date.now();
     const response = await fetch(GOOGLE_SHEETS_API_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...(payload || {}), _client_request_started_at: requestStartedAt }),
     });
 
     if (!response.ok) throw new Error("Datenbank nicht erreichbar.");
+    const responseReceivedAt = Date.now();
     const data = await response.json();
     const serverNowValue = data?.server_now || data?.serverNow || "";
     const serverNowMs = Date.parse(serverNowValue);
-    if (!Number.isNaN(serverNowMs)) setServerTimeOffsetMs(serverNowMs - Date.now());
+    if (!Number.isNaN(serverNowMs)) {
+      const requestStartedAt = Number(data?._client_request_started_at || 0);
+      const rttMs = requestStartedAt ? Math.max(0, responseReceivedAt - requestStartedAt) : 0;
+      const estimatedServerNowAtReceive = serverNowMs + (rttMs ? rttMs / 2 : 0);
+      const nextOffset = estimatedServerNowAtReceive - responseReceivedAt;
+      setServerTimeOffsetMs(nextOffset);
+      setLastServerSync({ offsetMs: nextOffset, rttMs, syncedAt: new Date(responseReceivedAt).toISOString() });
+    }
     if (data && data.ok === false) throw new Error(data.error || "Datenbank meldet einen Fehler.");
     return data;
   }
