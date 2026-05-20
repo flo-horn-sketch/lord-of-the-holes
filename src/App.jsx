@@ -2852,10 +2852,20 @@ function LordOfTheHolesApp() {
     ledger[key].notes.push(label);
   }
 
+  function getPrizeCategories(row) {
+    return {
+      daily: Number(row?.categories?.daily || 0),
+      snake: Number(row?.categories?.snake || 0),
+      final: Number(row?.categories?.final || 0),
+      honor: Array.isArray(row?.categories?.honor) ? row.categories.honor : [],
+      other: Number(row?.categories?.other || 0),
+    };
+  }
+
   function buildPrizeLedger() {
     const ledger = {};
     allPlayers.forEach((player) => {
-      ledger[String(player.id)] = { playerId: String(player.id), player: withFallbackAlias(player), money: 0, notes: [] };
+      ledger[String(player.id)] = { playerId: String(player.id), player: withFallbackAlias(player), money: 0, categories: { daily: 0, snake: 0, final: 0, honor: [], other: 0 }, notes: [] };
     });
 
     ["r1", "r2", "r3"].forEach((roundId) => {
@@ -2943,10 +2953,10 @@ function LordOfTheHolesApp() {
                   {prizeLedger.rows.map((row) => (
                     <tr key={row.playerId} className="border-t border-amber-700/20 align-top">
                       <td className="sticky left-0 z-10 bg-[#1b130c] px-2 py-2 font-semibold text-amber-100">{getPlayerLabel(row.player)}</td>
-                      <td className="px-2 py-2 text-right text-amber-100/85">{formatEuroValue(row.categories?.daily || 0)}</td>
-                      <td className="px-2 py-2 text-right text-amber-100/85">{formatEuroValue(row.categories?.snake || 0)}</td>
-                      <td className="px-2 py-2 text-right text-amber-100/85">{formatEuroValue(row.categories?.final || 0)}</td>
-                      <td className="max-w-[220px] px-2 py-2 text-xs text-amber-100/70">{row.categories?.honor?.length ? row.categories.honor.join(" · ") : "–"}</td>
+                      <td className="px-2 py-2 text-right text-amber-100/85">{formatEuroValue(getPrizeCategories(row).daily)}</td>
+                      <td className="px-2 py-2 text-right text-amber-100/85">{formatEuroValue(getPrizeCategories(row).snake)}</td>
+                      <td className="px-2 py-2 text-right text-amber-100/85">{formatEuroValue(getPrizeCategories(row).final)}</td>
+                      <td className="max-w-[220px] px-2 py-2 text-xs text-amber-100/70">{getPrizeCategories(row).honor.length ? getPrizeCategories(row).honor.join(" · ") : "–"}</td>
                       <td className={cls("px-2 py-2 text-right font-serif text-lg font-black", row.money > 0 ? "text-emerald-300" : row.money < 0 ? "text-red-200" : "text-amber-200")}>{formatEuroValue(row.money)}</td>
                     </tr>
                   ))}
