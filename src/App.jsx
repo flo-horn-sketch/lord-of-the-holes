@@ -1132,7 +1132,8 @@ function LordOfTheHolesApp() {
   const [lockAdminBypass, setLockAdminBypass] = useState(false);
   const [lockCountdownNow, setLockCountdownNow] = useState(() => new Date());
   const [serverTimeOffsetMs, setServerTimeOffsetMs] = useState(0);
-  const [lastServerSync, setLastServerSync] = useState({ offsetMs: 0, rttMs: 0, syncedAt: "" });
+  const [lastServerSync, setLastServerSync] = useState({ offsetMs: 0, rttMs: 0, syncedAt: "", source: "device" });
+  const [atomicTimeStatus, setAtomicTimeStatus] = useState("idle");
   const [deviceAssignmentsResetAt, setDeviceAssignmentsResetAt] = useState(() => readLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", ""));
   const [scoresResetAt, setScoresResetAt] = useState(() => readLocalJson("lordOfTheHoles.scoresResetAt", ""));
   const [fullResetAt, setFullResetAt] = useState(() => readLocalJson("lordOfTheHoles.fullResetAt", ""));
@@ -1404,6 +1405,12 @@ function LordOfTheHolesApp() {
     const timer = window.setInterval(() => setLockCountdownNow(new Date()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    syncAtomicTime();
+    const timer = window.setInterval(() => syncAtomicTime(), 30000);
+    return () => window.clearInterval(timer);
+  }, []);
   function getFlightCeremonyStepDuration(step) {
     const completedRevealPlayers = step?.type === "reveal"
       ? (step.roundPlan?.flights || []).reduce((sum, flight) => sum + (flight.players || []).length, 0)
@@ -1579,6 +1586,37 @@ function LordOfTheHolesApp() {
     }
   }, [displayedActiveRound?.round_id, myPlayerId, assignedScoredPlayerId, scoredPlayerId, showSplash, appLocked, lockAdminBypass, scoreablePlayers, scoredPlayerByRound]);
 
+  function applyTimeSyncOffset(source, sourceNowMs, requestStartedAt, responseReceivedAt) {
+    if (Number.isNaN(sourceNowMs)) return false;
+    const rttMs = requestStartedAt ? Math.max(0, responseReceivedAt - requestStartedAt) : 0;
+    const estimatedNowAtReceive = sourceNowMs + (rttMs ? rttMs / 2 : 0);
+    const nextOffset = estimatedNowAtReceive - responseReceivedAt;
+    setServerTimeOffsetMs(nextOffset);
+    setLastServerSync({ offsetMs: nextOffset, rttMs, syncedAt: new Date(responseReceivedAt).toISOString(), source });
+    return true;
+  }
+
+  async function syncAtomicTime() {
+    const requestStartedAt = Date.now();
+    try {
+      setAtomicTimeStatus("syncing");
+      const response = await fetch("https://itime.live/api/time", { method: "GET", cache: "no-store" });
+      const responseReceivedAt = Date.now();
+      if (!response.ok) throw new Error(`Atomzeit HTTP ${response.status}`);
+      const data = await response.json();
+      const timestampValue = data?.timestamp;
+      const atomicMs = typeof timestampValue === "number"
+        ? timestampValue
+        : Number(timestampValue || Date.parse(data?.utc || data?.time || ""));
+      const ok = applyTimeSyncOffset("itime.live", atomicMs, requestStartedAt, responseReceivedAt);
+      setAtomicTimeStatus(ok ? "online" : "invalid");
+      return ok;
+    } catch (err) {
+      setAtomicTimeStatus("fallback");
+      return false;
+    }
+  }
+
   async function callSheetApi(payload) {
     const requestStartedAt = Date.now();
     const response = await fetch(GOOGLE_SHEETS_API_URL, {
@@ -1592,13 +1630,9 @@ function LordOfTheHolesApp() {
     const data = await response.json();
     const serverNowValue = data?.server_now || data?.serverNow || "";
     const serverNowMs = Date.parse(serverNowValue);
-    if (!Number.isNaN(serverNowMs)) {
-      const requestStartedAt = Number(data?._client_request_started_at || 0);
-      const rttMs = requestStartedAt ? Math.max(0, responseReceivedAt - requestStartedAt) : 0;
-      const estimatedServerNowAtReceive = serverNowMs + (rttMs ? rttMs / 2 : 0);
-      const nextOffset = estimatedServerNowAtReceive - responseReceivedAt;
-      setServerTimeOffsetMs(nextOffset);
-      setLastServerSync({ offsetMs: nextOffset, rttMs, syncedAt: new Date(responseReceivedAt).toISOString() });
+    if (!Number.isNaN(serverNowMs) && atomicTimeStatus !== "online") {
+      const requestStartedAtFromPayload = Number(data?._client_request_started_at || requestStartedAt || 0);
+      applyTimeSyncOffset("apps-script", serverNowMs, requestStartedAtFromPayload, responseReceivedAt);
     }
     if (data && data.ok === false) throw new Error(data.error || "Datenbank meldet einen Fehler.");
     return data;
@@ -3013,6 +3047,19 @@ function LordOfTheHolesApp() {
     return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   }
 
+  function getTimeSourceLabel() {
+    if (lastServerSync?.source === "itime.live" && atomicTimeStatus === "online") return "Atomzeit aktiv";
+    if (lastServerSync?.source === "apps-script") return "Hinweis: Countdown läuft über Apps-Script-Zeit, nicht über Atomzeit.";
+    if (atomicTimeStatus === "syncing") return "Atomzeit wird synchronisiert ...";
+    if (atomicTimeStatus === "fallback") return "Hinweis: Atomzeit nicht erreichbar, Countdown läuft über Ersatzzeit.";
+    return "Hinweis: Countdown läuft über Gerätezeit, Atomzeit noch nicht bestätigt.";
+  }
+
+  function getTimeSourceClassName() {
+    if (lastServerSync?.source === "itime.live" && atomicTimeStatus === "online") return "text-emerald-200/75";
+    return "text-red-200/85";
+  }
+
   function getTeamDrawRowsForRound(roundId) {
     return (teamDrawRows || []).map(normalizeTeamDrawRow).filter((row) => String(row.round_id) === String(roundId)).sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
   }
@@ -3421,6 +3468,7 @@ function LordOfTheHolesApp() {
                         <div className="font-bold text-amber-200">Team-Ziehung noch versiegelt</div>
                         <div className="mt-1">Die Zeremonie für diese Runde startet am {getTeamDrawTargetLabel(roundId)}. Danach erscheinen hier die Teams und die Tageswertung.</div>
                         <div className="mt-2 rounded-xl border border-amber-500/25 bg-black/25 px-3 py-2 font-serif text-lg font-black text-amber-300">{getTeamDrawCountdownLabel(roundId)}</div>
+                        <div className={cls("mt-1 text-[11px] font-semibold", getTimeSourceClassName())}>{getTimeSourceLabel()}</div>
                       </div> : null}
                       {teamDrawVisible ? <>
                       <div className="grid gap-2 landscape:grid-cols-3 landscape:gap-1.5">
