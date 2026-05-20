@@ -1381,8 +1381,8 @@ function LordOfTheHolesApp() {
       : 0;
     const revealIsComplete = currentStep?.type === "reveal" && Number(currentStep.revealCount || 0) >= completedRevealPlayers;
     const textLength = String(currentStep?.text || "").length;
-    const relaxedReadingDelay = Math.max(6500, Math.min(15000, 3200 + textLength * 55));
-    const delay = currentStep?.type === "reveal" ? (revealIsComplete ? 5600 : 1900) : relaxedReadingDelay;
+    const relaxedReadingDelay = Math.max(4200, Math.min(9800, 2400 + textLength * 34));
+    const delay = currentStep?.type === "reveal" ? (revealIsComplete ? 4300 : 1550) : relaxedReadingDelay;
     const timer = window.setTimeout(() => {
       if (isLastStep) {
         setFlightCeremonyRunning(false);
