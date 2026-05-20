@@ -3484,7 +3484,7 @@ function LordOfTheHolesApp() {
                         <div className="font-bold text-amber-200">Team-Ziehung noch versiegelt</div>
                         <div className="mt-1">Die Zeremonie für diese Runde startet am {getTeamDrawTargetLabel(roundId)}. Danach erscheinen hier die Teams und die Tageswertung.</div>
                         {atomicTimeActive ? <div className="mt-2 rounded-xl border border-amber-500/25 bg-black/25 px-3 py-2 font-serif text-lg font-black text-amber-300">{getTeamDrawCountdownLabel(roundId)}</div> : null}
-                        <div className={cls("mt-1 text-[11px] font-semibold", getTimeSourceClassName())}>{getTimeSourceLabel()}</div>
+                        {!atomicTimeActive ? <div className={cls("mt-1 text-[11px] font-semibold", getTimeSourceClassName())}>{getTimeSourceLabel()}</div> : null}
                       </div> : null}
                       {teamDrawVisible ? <>
                       <div className="grid gap-2 landscape:grid-cols-3 landscape:gap-1.5">
