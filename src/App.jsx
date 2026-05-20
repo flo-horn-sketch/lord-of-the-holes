@@ -2204,7 +2204,7 @@ function LordOfTheHolesApp() {
   }
 
   function renderHeader() {
-    const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "flights" ? "Flights" : mainMenu === "rules" ? "Regeln" : mainMenu === "dailyTeams" ? "Tageswertungen" : mainMenu === "prizes" ? "Kasse & Ehre" : mainMenu === "admin" ? "Admin & HCPs" : mainMenu === "settings" ? "HCP" : "Scoring";
+    const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "flights" ? "Flights" : mainMenu === "rules" ? "Regeln" : mainMenu === "dailyTeams" ? "Tageswertungen" : mainMenu === "prizes" ? "Kasse & Ehre" : mainMenu === "admin" ? "Admin & HCPs" : mainMenu === "settings" ? "Einstellungen" : "Scoring";
     return (
       <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-1 pt-1">
         <div className="relative flex h-8 items-center justify-center">
@@ -2267,8 +2267,8 @@ function LordOfTheHolesApp() {
                     {renderMenuButton("current", "Scoring", true)}
                     {renderMenuGroup("tournament", "Turnier", [["tournament", "Turnierstand"], ["dailyTeams", "Tageswertungen"], ["prizes", "Kasse & Ehre"], ["archive", "Scorekarten"]])}
                     {renderMenuGroup("round", "Runde", [["roundTables", "Tabellen Runde"], ["fun", "Mittelerde"], ["flights", "Flights"]])}
-                    {renderMenuGroup("info", "Regeln & HCP", [["rules", "Regeln"], ["settings", "HCP"]])}
-                    {renderMenuGroup("system", "System", [["admin", "Admin & HCPs"]])}
+                    {renderMenuGroup("info", "Info", [["rules", "Regeln"]])}
+                    {renderMenuGroup("system", "System", [["settings", "Einstellungen"], ["admin", "Admin & HCPs"]])}
                   </>
                 );
               })()}
@@ -2926,9 +2926,9 @@ function LordOfTheHolesApp() {
     const prizeLedger = buildPrizeLedger();
     return (
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
-        <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm">
-          <CardContent className="p-2">
-            <div className="mb-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3">
+        <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm landscape:-mx-2 landscape:rounded-xl">
+          <CardContent className="p-2 landscape:p-1.5">
+            <div className="mb-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 landscape:mb-1.5 landscape:rounded-xl landscape:p-2">
               <p className="text-xs uppercase tracking-[0.22em] text-amber-300/75">Punkt 6 · Ehre, Strafen, Preise</p>
               <h2 className="font-serif text-xl font-black text-amber-200">Kasse & Ehre</h2>
               <p className="mt-1 text-sm text-amber-100/70">Gesamtübersicht aus Tageswertungen, Snake-Kasse, Finalpreisen und Ehrenpreisen.</p>
@@ -2946,9 +2946,9 @@ function LordOfTheHolesApp() {
               <div className="rounded-2xl border border-amber-700/30 bg-black/25 p-3"><div className="text-xs uppercase tracking-wide text-amber-100/50">Bruttosieger</div><div className="font-serif text-lg font-black text-amber-300">{prizeLedger.grossWinner ? getPlayerLabel(prizeLedger.grossWinner) : "–"}</div></div>
             </div>
 
-            <div className="overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              <table className="w-full min-w-[860px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">
-                <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100/75"><th className="sticky left-0 z-10 bg-[#1b130c] px-2 py-1.5">Spieler</th><th className="px-2 py-1.5 text-right">Tage 1–3</th><th className="px-2 py-1.5 text-right">Snake</th><th className="px-2 py-1.5 text-right">Finale</th><th className="px-2 py-1.5">Ehre</th><th className="px-2 py-1.5 text-right">Saldo</th></tr></thead>
+            <div className="w-full overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden landscape:rounded-xl">
+              <table className="w-full min-w-[860px] border-collapse text-sm text-amber-50 landscape:min-w-full landscape:table-fixed landscape:text-[11px]">
+                <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100/75"><th className="sticky left-0 z-10 w-[21%] bg-[#1b130c] px-2 py-1.5">Spieler</th><th className="w-[13%] px-2 py-1.5 text-right">Tage 1–3</th><th className="w-[12%] px-2 py-1.5 text-right">Snake</th><th className="w-[12%] px-2 py-1.5 text-right">Finale</th><th className="w-[27%] px-2 py-1.5">Ehre</th><th className="w-[15%] px-2 py-1.5 text-right">Saldo</th></tr></thead>
                 <tbody>
                   {prizeLedger.rows.map((row) => (
                     <tr key={row.playerId} className="border-t border-amber-700/20 align-top">
@@ -2956,7 +2956,7 @@ function LordOfTheHolesApp() {
                       <td className="px-2 py-2 text-right text-amber-100/85">{formatEuroValue(getPrizeCategories(row).daily)}</td>
                       <td className="px-2 py-2 text-right text-amber-100/85">{formatEuroValue(getPrizeCategories(row).snake)}</td>
                       <td className="px-2 py-2 text-right text-amber-100/85">{formatEuroValue(getPrizeCategories(row).final)}</td>
-                      <td className="max-w-[220px] px-2 py-2 text-xs text-amber-100/70">{getPrizeCategories(row).honor.length ? getPrizeCategories(row).honor.join(" · ") : "–"}</td>
+                      <td className="px-2 py-2 text-xs text-amber-100/70 landscape:whitespace-normal">{getPrizeCategories(row).honor.length ? getPrizeCategories(row).honor.join(" · ") : "–"}</td>
                       <td className={cls("px-2 py-2 text-right font-serif text-lg font-black", row.money > 0 ? "text-emerald-300" : row.money < 0 ? "text-red-200" : "text-amber-200")}>{formatEuroValue(row.money)}</td>
                     </tr>
                   ))}
