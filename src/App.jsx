@@ -3431,12 +3431,30 @@ function LordOfTheHolesApp() {
       if (completeTeams.length < 2) return;
 
       const winner = completeTeams[0];
+      const second = completeTeams[1];
       const loser = completeTeams[completeTeams.length - 1];
+      const teamWithLoan = (team) => String(roundId) === "r1" && (team.players || []).some((player, index) => getDailyTeamPlayerMeta(roundId, team.teamId, player.id, index).isLoanPlayer);
+      const realTeamPlayers = (team) => (team.players || []).filter((player, index) => !getDailyTeamPlayerMeta(roundId, team.teamId, player.id, index).isLoanPlayer);
+      const addDaily = (player, amount, label) => addPrizeLedgerEntry(ledger, player.id, amount, `${standings.title}: ${label} ${formatEuroValue(amount)}`, "money", "daily");
+
+      if (String(roundId) === "r1" && teamWithLoan(winner)) {
+        realTeamPlayers(loser).forEach((player) => addDaily(player, -50, "letzter Platz"));
+        realTeamPlayers(winner).forEach((player) => addDaily(player, 50, "Sieg mit Leihspieler-Team"));
+        if (second) realTeamPlayers(second).forEach((player) => addDaily(player, 25, "zweiter Platz bei Leihspieler-Sieg"));
+        return;
+      }
+
+      if (String(roundId) === "r1" && teamWithLoan(loser)) {
+        realTeamPlayers(loser).forEach((player) => addDaily(player, -50, "letzter Platz mit Leihspieler-Team"));
+        realTeamPlayers(winner).forEach((player) => addDaily(player, 25, "Sieg gegen Leihspieler-Team"));
+        return;
+      }
+
       const winnerShare = winner.players.length ? 100 / winner.players.length : 0;
       const loserShare = loser.players.length ? -100 / loser.players.length : 0;
 
-      winner.players.forEach((player) => addPrizeLedgerEntry(ledger, player.id, winnerShare, `${standings.title}: Siegermannschaft ${formatEuroValue(winnerShare)}`, "money", "daily"));
-      loser.players.forEach((player) => addPrizeLedgerEntry(ledger, player.id, loserShare, `${standings.title}: letzter Platz ${formatEuroValue(loserShare)}`, "money", "daily"));
+      winner.players.forEach((player) => addDaily(player, winnerShare, "Siegermannschaft"));
+      loser.players.forEach((player) => addDaily(player, loserShare, "letzter Platz"));
     });
 
     const snakeStats = buildFunPlayerStats(getPlayersForCourse(allPlayers, displayCourseId, courses), allHoles, officialAllScores);
@@ -3586,6 +3604,7 @@ function LordOfTheHolesApp() {
             <RulesSection title="6. Preise, Strafen & Ehre" subtitle="Am Ende gewinnt einer. Zahlen tun mehrere.">
               <ul className="list-disc space-y-1 pl-5">
                 <li><b>Team-Tageswertung:</b> Siegermannschaft +100 €, Platz 3 −100 €, Platz 2 neutral. Bei Gleichstand werden Preise bzw. Schulden geteilt.</li>
+                <li><b>Sonderregel Runde 1 · Leihspieler:</b> Der Leihspieler wird finanziell nicht doppelt gewertet. Verliert das Leihspieler-Team, zahlt nur der Einzelspieler 50 €; das Siegerteam erhält je 25 €. Gewinnt das Leihspieler-Team, zahlen die Spieler des letzten Teams je 50 €; der Einzelspieler des Siegerteams erhält 50 €, die Spieler auf Platz 2 erhalten je 25 €.</li>
                 <li><b>Gesamtsieger:</b> teuerste Greenfee, Pokal und Snake-Pott.</li>
                 <li><b>Platz 2:</b> 50 % der teuersten Greenfee.</li>
                 <li><b>Plätze 4–6:</b> Strafzahlungen auf Basis der teuersten Greenfee: Platz 4 = −35 %, Platz 5 = −50 %, Platz 6 = −65 %.</li>
