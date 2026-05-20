@@ -3307,7 +3307,7 @@ function LordOfTheHolesApp() {
                               <tr key={team.teamId} className="border-t border-amber-700/20">
                                 <td className="hidden px-2 py-1.5 text-amber-200/70 landscape:table-cell">{index + 1}</td>
                                 <td className="px-2 py-1.5 font-bold text-amber-200">{team.label}</td>
-                                <td className="px-2 py-1.5 text-amber-100/80 landscape:break-words">{team.players.map((player, playerIndex) => { const meta = getDailyTeamPlayerMeta(roundId, team.teamId, player.id, playerIndex); return `${player.character_name || player.display_name || player.id}${meta.isLoanPlayer ? " (Leihspieler)" : ""}`; }).join(" · ") || "–"}{!team.isComplete ? <span className="ml-1 text-[10px] text-red-200/75">offen</span> : null}</td>
+                                <td className="px-2 py-1.5 text-amber-100/80 landscape:break-words">{team.players.map((player, playerIndex) => { const meta = getDailyTeamPlayerMeta(roundId, team.teamId, player.id, playerIndex); const name = player.character_name || player.display_name || player.id; return meta.isLoanPlayer ? `${name} (Leihspieler aus Team ${meta.homeTeamId})` : name; }).join(" · ") || "–"}{!team.isComplete ? <span className="ml-1 text-[10px] text-red-200/75">offen</span> : null}</td>
                                 <td className="px-2 py-1.5 text-right font-serif text-base font-black text-amber-300 landscape:text-lg">{team.detail}</td>
                               </tr>
                             ))}
