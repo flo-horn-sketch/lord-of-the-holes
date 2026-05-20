@@ -2796,15 +2796,15 @@ function LordOfTheHolesApp() {
                         ))}
                       </div>
                       <div className="w-full overflow-x-auto rounded-xl border border-amber-700/25 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                        <table className="w-full min-w-[560px] border-collapse text-sm text-amber-50 landscape:min-w-full landscape:table-fixed landscape:text-[11px]">
-                          <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100/75"><th className="w-[10%] px-2 py-1.5">#</th><th className="w-[18%] px-2 py-1.5">Team</th><th className="w-[47%] px-2 py-1.5">Spieler</th><th className="w-[25%] px-2 py-1.5 text-right">Wertung</th></tr></thead>
+                        <table className="w-full table-fixed border-collapse text-xs text-amber-50 landscape:text-[11px]">
+                          <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100/75"><th className="hidden w-[8%] px-2 py-1.5 landscape:table-cell">#</th><th className="w-[23%] px-2 py-1.5 landscape:w-[18%]">Team</th><th className="w-[43%] px-2 py-1.5 landscape:w-[49%]">Spieler</th><th className="w-[34%] px-2 py-1.5 text-right landscape:w-[25%]">Wertung</th></tr></thead>
                           <tbody>
                             {standings.teams.map((team, index) => (
                               <tr key={team.teamId} className="border-t border-amber-700/20">
-                                <td className="px-2 py-1.5 text-amber-200/70">{index + 1}</td>
+                                <td className="hidden px-2 py-1.5 text-amber-200/70 landscape:table-cell">{index + 1}</td>
                                 <td className="px-2 py-1.5 font-bold text-amber-200">{team.label}</td>
-                                <td className="px-2 py-1.5 text-amber-100/80 landscape:break-words">{team.players.map((player) => player.character_name || player.display_name || player.id).join(" · ") || "–"}{!team.isComplete ? <span className="ml-2 text-xs text-red-200/75">unvollständig</span> : null}</td>
-                                <td className="px-2 py-1.5 text-right font-serif text-lg font-black text-amber-300">{team.detail}</td>
+                                <td className="px-2 py-1.5 text-amber-100/80 landscape:break-words">{team.players.map((player) => player.character_name || player.display_name || player.id).join(" · ") || "–"}{!team.isComplete ? <span className="ml-1 text-[10px] text-red-200/75">offen</span> : null}</td>
+                                <td className="px-2 py-1.5 text-right font-serif text-base font-black text-amber-300 landscape:text-lg">{team.detail}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -2947,17 +2947,17 @@ function LordOfTheHolesApp() {
             </div>
 
             <div className="w-full overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden landscape:rounded-xl">
-              <table className="w-full min-w-[860px] border-collapse text-sm text-amber-50 landscape:min-w-full landscape:table-fixed landscape:text-[11px]">
-                <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100/75"><th className="sticky left-0 z-10 w-[21%] bg-[#1b130c] px-2 py-1.5">Spieler</th><th className="w-[13%] px-2 py-1.5 text-right">Tage 1–3</th><th className="w-[12%] px-2 py-1.5 text-right">Snake</th><th className="w-[12%] px-2 py-1.5 text-right">Finale</th><th className="w-[27%] px-2 py-1.5">Ehre</th><th className="w-[15%] px-2 py-1.5 text-right">Saldo</th></tr></thead>
+              <table className="w-full table-fixed border-collapse text-xs text-amber-50 landscape:text-[11px]">
+                <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100/75"><th className="w-[58%] bg-[#1b130c] px-2 py-1.5 landscape:w-[21%]">Spieler</th><th className="hidden w-[13%] px-2 py-1.5 text-right landscape:table-cell">Tage 1–3</th><th className="hidden w-[12%] px-2 py-1.5 text-right landscape:table-cell">Snake</th><th className="hidden w-[12%] px-2 py-1.5 text-right landscape:table-cell">Finale</th><th className="hidden w-[27%] px-2 py-1.5 landscape:table-cell">Ehre</th><th className="w-[42%] px-2 py-1.5 text-right landscape:w-[15%]">Saldo</th></tr></thead>
                 <tbody>
                   {prizeLedger.rows.map((row) => (
                     <tr key={row.playerId} className="border-t border-amber-700/20 align-top">
-                      <td className="sticky left-0 z-10 bg-[#1b130c] px-2 py-2 font-semibold text-amber-100">{getPlayerLabel(row.player)}</td>
-                      <td className="px-2 py-2 text-right text-amber-100/85">{formatEuroValue(getPrizeCategories(row).daily)}</td>
-                      <td className="px-2 py-2 text-right text-amber-100/85">{formatEuroValue(getPrizeCategories(row).snake)}</td>
-                      <td className="px-2 py-2 text-right text-amber-100/85">{formatEuroValue(getPrizeCategories(row).final)}</td>
-                      <td className="px-2 py-2 text-xs text-amber-100/70 landscape:whitespace-normal">{getPrizeCategories(row).honor.length ? getPrizeCategories(row).honor.join(" · ") : "–"}</td>
-                      <td className={cls("px-2 py-2 text-right font-serif text-lg font-black", row.money > 0 ? "text-emerald-300" : row.money < 0 ? "text-red-200" : "text-amber-200")}>{formatEuroValue(row.money)}</td>
+                      <td className="bg-[#1b130c] px-2 py-2 font-semibold text-amber-100"><div className="truncate">{getPlayerLabel(row.player)}</div><div className="mt-0.5 text-[10px] font-normal text-amber-100/45 landscape:hidden">Tage/Snake/Finale im Querformat</div></td>
+                      <td className="hidden px-2 py-2 text-right text-amber-100/85 landscape:table-cell">{formatEuroValue(getPrizeCategories(row).daily)}</td>
+                      <td className="hidden px-2 py-2 text-right text-amber-100/85 landscape:table-cell">{formatEuroValue(getPrizeCategories(row).snake)}</td>
+                      <td className="hidden px-2 py-2 text-right text-amber-100/85 landscape:table-cell">{formatEuroValue(getPrizeCategories(row).final)}</td>
+                      <td className="hidden px-2 py-2 text-xs text-amber-100/70 landscape:table-cell landscape:whitespace-normal">{getPrizeCategories(row).honor.length ? getPrizeCategories(row).honor.join(" · ") : "–"}</td>
+                      <td className={cls("px-2 py-2 text-right font-serif text-base font-black landscape:text-lg", row.money > 0 ? "text-emerald-300" : row.money < 0 ? "text-red-200" : "text-amber-200")}>{formatEuroValue(row.money)}</td>
                     </tr>
                   ))}
                 </tbody>
