@@ -1336,9 +1336,8 @@ function LordOfTheHolesApp() {
   const unlockedTeamDrawRoundIds = useMemo(() => Object.entries(TEAM_DRAW_TARGETS).filter(([, target]) => lockCountdownNow.getTime() >= target.getTime()).map(([roundId]) => roundId), [lockCountdownNow]);
   const teamCeremonyTimeline = useMemo(() => buildTeamCeremonyTimeline(teamCeremonyRoundId), [teamCeremonyRoundId, teamDrawRows, allPlayers, officialAllScores]);
   const isTeamDrawRoundVisible = (roundId) => {
-    const target = TEAM_DRAW_TARGETS[roundId];
     const key = `team_ceremony_${roundId}`;
-    return Boolean(target && lockCountdownNow.getTime() >= target.getTime() && (teamCeremonyDismissedKeys || []).includes(key));
+    return Boolean((teamCeremonyDismissedKeys || []).includes(key));
   };
 
   useEffect(() => { writeLocalJson("lordOfTheHoles.myPlayerId", myPlayerId); }, [myPlayerId]);
@@ -3121,7 +3120,7 @@ function LordOfTheHolesApp() {
             <h2 className="mt-1 font-serif text-2xl font-black text-amber-200">{step.title}</h2>
             {step.type === "team" ? (
               <motion.div key={`${step.teamId}-${teamCeremonyStepIndex}`} initial={{ opacity: 0, scale: 0.94 }} animate={{ opacity: 1, scale: 1 }} className="mt-5 rounded-3xl border border-amber-500/35 bg-black/28 p-4">
-                <div className="mb-1 text-xs uppercase tracking-[0.2em] text-amber-100/50">Rang {step.rank} · {step.detail}</div>
+                {step.rank ? <div className="mb-1 text-xs uppercase tracking-[0.2em] text-amber-100/50">Rang {step.rank} · {step.detail}</div> : null}
                 <div className="mb-3 font-serif text-5xl font-black text-amber-300 drop-shadow-[0_0_18px_rgba(251,191,36,0.22)]">{step.teamId}</div>
                 <p className="mb-3 text-sm italic text-amber-100/65">{step.revealLine}</p>
                 <div className="space-y-2">
@@ -3261,7 +3260,6 @@ function LordOfTheHolesApp() {
             <div className="mb-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 landscape:mb-1.5 landscape:rounded-xl landscape:p-2">
               <p className="text-xs uppercase tracking-[0.22em] text-amber-300/75">Tageswertungen</p>
               <h2 className="font-serif text-xl font-black text-amber-200">TeamDraw & Tageswertung</h2>
-              <p className="mt-1 text-sm text-amber-100/70">Die Teams kommen automatisch aus dem gespeicherten TeamDraw. Manuelle Änderungen sind deaktiviert; neuer TeamDraw nur über Admin & HCPs · Runde beginnen.</p>
               {teamDrawRows?.length ? <div className="mt-2 text-xs text-amber-100/55">Geladen aus TeamDraw: {teamDrawRows.length} Einträge. Neuer TeamDraw nur über Admin & HCPs · Runde beginnen.</div> : null}
             </div>
             <div className="space-y-3 landscape:space-y-2">
