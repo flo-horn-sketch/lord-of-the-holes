@@ -3034,7 +3034,7 @@ function LordOfTheHolesApp() {
   }
 
   function getTeamDrawCountdownLabel(roundId) {
-    if (!atomicTimeActive) return "Atomzeit wird benötigt";
+    if (!atomicTimeActive) return "";
     const target = TEAM_DRAW_TARGETS[roundId];
     if (!target) return "";
     const diffMs = target.getTime() - syncedNow.getTime();
@@ -3468,7 +3468,7 @@ function LordOfTheHolesApp() {
                       {!teamDrawVisible ? <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100/75">
                         <div className="font-bold text-amber-200">Team-Ziehung noch versiegelt</div>
                         <div className="mt-1">Die Zeremonie für diese Runde startet am {getTeamDrawTargetLabel(roundId)}. Danach erscheinen hier die Teams und die Tageswertung.</div>
-                        <div className="mt-2 rounded-xl border border-amber-500/25 bg-black/25 px-3 py-2 font-serif text-lg font-black text-amber-300">{getTeamDrawCountdownLabel(roundId)}</div>
+                        {atomicTimeActive ? <div className="mt-2 rounded-xl border border-amber-500/25 bg-black/25 px-3 py-2 font-serif text-lg font-black text-amber-300">{getTeamDrawCountdownLabel(roundId)}</div> : null}
                         <div className={cls("mt-1 text-[11px] font-semibold", getTimeSourceClassName())}>{getTimeSourceLabel()}</div>
                       </div> : null}
                       {teamDrawVisible ? <>
