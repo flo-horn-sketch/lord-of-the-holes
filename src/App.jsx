@@ -2204,7 +2204,7 @@ function LordOfTheHolesApp() {
   }
 
   function renderHeader() {
-    const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "flights" ? "Flights" : mainMenu === "rules" ? "Regeln" : mainMenu === "dailyTeams" ? "Tageswertungen" : mainMenu === "prizes" ? "Kasse & Ehre" : mainMenu === "admin" ? "Admin & HCPs" : mainMenu === "settings" ? "HCP" : "Scoring"coring";
+    const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "flights" ? "Flights" : mainMenu === "rules" ? "Regeln" : mainMenu === "dailyTeams" ? "Tageswertungen" : mainMenu === "prizes" ? "Kasse & Ehre" : mainMenu === "admin" ? "Admin & HCPs" : mainMenu === "settings" ? "HCP" : "Scoring";
     return (
       <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-1 pt-1">
         <div className="relative flex h-8 items-center justify-center">
@@ -2267,9 +2267,10 @@ function LordOfTheHolesApp() {
                     {renderMenuButton("current", "Scoring", true)}
                     {renderMenuGroup("tournament", "Turnier", [["tournament", "Turnierstand"], ["dailyTeams", "Tageswertungen"], ["prizes", "Kasse & Ehre"], ["archive", "Scorekarten"]])}
                     {renderMenuGroup("round", "Runde", [["roundTables", "Tabellen Runde"], ["fun", "Mittelerde"], ["flights", "Flights"]])}
-                    {renderMenuGroup("info", "Regeln & HCP", [["rules", "Regeln"], ])}
-                    {renderMenuGroup("system", "System", [])}
-        ["admin", "Admin & HCPs"]            );
+                    {renderMenuGroup("info", "Regeln & HCP", [["rules", "Regeln"], ["settings", "HCP"]])}
+                    {renderMenuGroup("system", "System", [["admin", "Admin & HCPs"]])}
+                  </>
+                );
               })()}
             </div>
           ) : null}
