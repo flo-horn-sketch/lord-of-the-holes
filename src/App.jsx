@@ -1430,11 +1430,11 @@ function LordOfTheHolesApp() {
     return step?.type === "reveal" ? (revealIsComplete ? 4300 : 1550) : relaxedReadingDelay;
   }
 
-  function getNextSyncedFlightCeremonyStart(timeline = []) {
+  function getNextSyncedFlightCeremonyStart(timeline = [], forceImmediate = false) {
     const now = getSyncedNowMs();
-    if (now < FLIGHT_DRAW_TARGET.getTime()) return FLIGHT_DRAW_TARGET.toISOString();
+    if (!forceImmediate && now < FLIGHT_DRAW_TARGET.getTime()) return FLIGHT_DRAW_TARGET.toISOString();
     const totalDuration = (timeline || []).reduce((sum, step) => sum + getFlightCeremonyStepDuration(step), 0);
-    if (totalDuration > 0 && now - FLIGHT_DRAW_TARGET.getTime() < totalDuration) return FLIGHT_DRAW_TARGET.toISOString();
+    if (!forceImmediate && totalDuration > 0 && now - FLIGHT_DRAW_TARGET.getTime() < totalDuration) return FLIGHT_DRAW_TARGET.toISOString();
     const nextBoundary = Math.ceil((now + 2500) / 10000) * 10000;
     return new Date(nextBoundary).toISOString();
   }
@@ -1480,12 +1480,12 @@ function LordOfTheHolesApp() {
     return (timeline || []).reduce((sum, step) => sum + getTeamCeremonyStepDuration(step), 0);
   }
 
-  function getNextSyncedCeremonyStart(roundId, timeline = []) {
+  function getNextSyncedCeremonyStart(roundId, timeline = [], forceImmediate = false) {
     const target = TEAM_DRAW_TARGETS[roundId];
     const now = getSyncedNowMs();
-    if (target && now < target.getTime()) return target.toISOString();
+    if (!forceImmediate && target && now < target.getTime()) return target.toISOString();
     const totalDuration = getTeamCeremonyTotalDuration(timeline);
-    if (target && totalDuration > 0 && now - target.getTime() < totalDuration) return target.toISOString();
+    if (!forceImmediate && target && totalDuration > 0 && now - target.getTime() < totalDuration) return target.toISOString();
     const nextBoundary = Math.ceil((now + 2500) / 10000) * 10000;
     return new Date(nextBoundary).toISOString();
   }
@@ -3005,7 +3005,7 @@ function LordOfTheHolesApp() {
     setTeamCeremonyDismissedKeys((current) => (current || []).filter((item) => item !== key));
     setTeamCeremonyRoundId(roundId);
     setTeamCeremonyStepIndex(0);
-    setTeamCeremonySyncStartAt(getNextSyncedCeremonyStart(roundId, buildTeamCeremonyTimeline(roundId)));
+    setTeamCeremonySyncStartAt(getNextSyncedCeremonyStart(roundId, buildTeamCeremonyTimeline(roundId), true));
     setShowSplash(false);
     setTeamCeremonyRunning(true);
   }
@@ -3900,7 +3900,7 @@ function LordOfTheHolesApp() {
     setFlightSummaryOpen(false);
     setFlightCeremonyCompleted(false);
     setFlightCeremonyStepIndex(0);
-    setFlightCeremonySyncStartAt(getNextSyncedFlightCeremonyStart(buildFlightCeremonyTimeline(nextDraw)));
+    setFlightCeremonySyncStartAt(getNextSyncedFlightCeremonyStart(buildFlightCeremonyTimeline(nextDraw), true));
     setLockUnlockOpen(false);
     setFlightCeremonyRunning(true);
     return true;
