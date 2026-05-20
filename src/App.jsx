@@ -1336,8 +1336,9 @@ function LordOfTheHolesApp() {
     const seconds = totalSeconds % 60;
     return { days, hours, minutes, seconds };
   }, [lockCountdownNow, serverTimeOffsetMs]);
-  const syncedNow = useMemo(() => new Date(lockCountdownNow.getTime() + serverTimeOffsetMs), [lockCountdownNow, serverTimeOffsetMs]);
-  const getSyncedNowMs = () => Date.now() + serverTimeOffsetMs;
+  const atomicTimeActive = lastServerSync?.source === "itime.live" && atomicTimeStatus === "online";
+  const syncedNow = useMemo(() => new Date(lockCountdownNow.getTime() + (atomicTimeActive ? serverTimeOffsetMs : 0)), [lockCountdownNow, serverTimeOffsetMs, atomicTimeActive]);
+  const getSyncedNowMs = () => Date.now() + (atomicTimeActive ? serverTimeOffsetMs : 0);
   const flightDrawUnlocked = syncedNow.getTime() >= FLIGHT_DRAW_TARGET.getTime();
   const flightCeremonyTimeline = useMemo(() => buildFlightCeremonyTimeline(flightDraw), [flightDraw]);
   const unlockedTeamDrawRoundIds = useMemo(() => Object.entries(TEAM_DRAW_TARGETS).filter(([, target]) => syncedNow.getTime() >= target.getTime()).map(([roundId]) => roundId), [syncedNow]);
@@ -1631,8 +1632,7 @@ function LordOfTheHolesApp() {
     const serverNowValue = data?.server_now || data?.serverNow || "";
     const serverNowMs = Date.parse(serverNowValue);
     if (!Number.isNaN(serverNowMs) && atomicTimeStatus !== "online") {
-      const requestStartedAtFromPayload = Number(data?._client_request_started_at || requestStartedAt || 0);
-      applyTimeSyncOffset("apps-script", serverNowMs, requestStartedAtFromPayload, responseReceivedAt);
+      setLastServerSync((current) => current?.source === "itime.live" ? current : { ...(current || {}), source: "apps-script-available", syncedAt: new Date(responseReceivedAt).toISOString() });
     }
     if (data && data.ok === false) throw new Error(data.error || "Datenbank meldet einen Fehler.");
     return data;
@@ -3034,6 +3034,7 @@ function LordOfTheHolesApp() {
   }
 
   function getTeamDrawCountdownLabel(roundId) {
+    if (!atomicTimeActive) return "Atomzeit wird benötigt";
     const target = TEAM_DRAW_TARGETS[roundId];
     if (!target) return "";
     const diffMs = target.getTime() - syncedNow.getTime();
@@ -3048,15 +3049,15 @@ function LordOfTheHolesApp() {
   }
 
   function getTimeSourceLabel() {
-    if (lastServerSync?.source === "itime.live" && atomicTimeStatus === "online") return "Atomzeit aktiv";
-    if (lastServerSync?.source === "apps-script") return "Hinweis: Countdown läuft über Apps-Script-Zeit, nicht über Atomzeit.";
+    if (atomicTimeActive) return "Atomzeit aktiv";
     if (atomicTimeStatus === "syncing") return "Atomzeit wird synchronisiert ...";
-    if (atomicTimeStatus === "fallback") return "Hinweis: Atomzeit nicht erreichbar, Countdown läuft über Ersatzzeit.";
-    return "Hinweis: Countdown läuft über Gerätezeit, Atomzeit noch nicht bestätigt.";
+    if (atomicTimeStatus === "fallback") return "Atomzeit nicht erreichbar — Countdown pausiert.";
+    if (lastServerSync?.source === "apps-script-available") return "Apps-Script-Zeit verfügbar, aber Countdown wartet auf Atomzeit.";
+    return "Countdown wartet auf bestätigte Atomzeit.";
   }
 
   function getTimeSourceClassName() {
-    if (lastServerSync?.source === "itime.live" && atomicTimeStatus === "online") return "text-emerald-200/75";
+    if (atomicTimeActive) return "text-emerald-200/75";
     return "text-red-200/85";
   }
 
