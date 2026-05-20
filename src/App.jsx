@@ -1340,9 +1340,9 @@ function LordOfTheHolesApp() {
   const atomicTimeActive = lastServerSync?.source === "itime.live" && atomicTimeStatus === "online";
   const syncedNow = useMemo(() => new Date(lockCountdownNow.getTime() + (atomicTimeActive ? serverTimeOffsetMs : 0)), [lockCountdownNow, serverTimeOffsetMs, atomicTimeActive]);
   const getSyncedNowMs = () => Date.now() + (atomicTimeActive ? serverTimeOffsetMs : 0);
-  const flightDrawUnlocked = syncedNow.getTime() >= FLIGHT_DRAW_TARGET.getTime();
+  const flightDrawUnlocked = atomicTimeActive && syncedNow.getTime() >= FLIGHT_DRAW_TARGET.getTime();
   const flightCeremonyTimeline = useMemo(() => buildFlightCeremonyTimeline(flightDraw), [flightDraw]);
-  const unlockedTeamDrawRoundIds = useMemo(() => Object.entries(TEAM_DRAW_TARGETS).filter(([, target]) => syncedNow.getTime() >= target.getTime()).map(([roundId]) => roundId), [syncedNow]);
+  const unlockedTeamDrawRoundIds = useMemo(() => atomicTimeActive ? Object.entries(TEAM_DRAW_TARGETS).filter(([, target]) => syncedNow.getTime() >= target.getTime()).map(([roundId]) => roundId) : [], [syncedNow, atomicTimeActive]);
   const teamCeremonyTimeline = useMemo(() => buildTeamCeremonyTimeline(teamCeremonyRoundId), [teamCeremonyRoundId, teamDrawRows, allPlayers, officialAllScores]);
   const isTeamDrawRoundVisible = (roundId) => {
     const key = `team_ceremony_${roundId}`;
@@ -1522,18 +1522,18 @@ function LordOfTheHolesApp() {
   }, [appLocked, lockAdminBypass, flightCeremonyRunning, flightCeremonyCompleted, flightDrawUnlocked, flightDraw]);
 
   useEffect(() => {
-    if (teamCeremonyRunning || flightCeremonyRunning || showSplash || appLocked) return;
+    if (teamCeremonyRunning || flightCeremonyRunning || showSplash || appLocked || !atomicTimeActive) return;
     const nextRoundId = ["r1", "r2", "r3"].find((roundId) => {
       const target = TEAM_DRAW_TARGETS[roundId];
       const key = `team_ceremony_${roundId}`;
-      return target && syncedNow.getTime() >= target.getTime() && !(teamCeremonyDismissedKeys || []).includes(key) && getTeamDrawRowsForRound(roundId).length;
+      return atomicTimeActive && target && syncedNow.getTime() >= target.getTime() && !(teamCeremonyDismissedKeys || []).includes(key) && getTeamDrawRowsForRound(roundId).length;
     });
     if (!nextRoundId) return;
     setTeamCeremonyRoundId(nextRoundId);
     setTeamCeremonyStepIndex(0);
     setTeamCeremonySyncStartAt(getNextSyncedCeremonyStart(nextRoundId, buildTeamCeremonyTimeline(nextRoundId)));
     setTeamCeremonyRunning(true);
-  }, [teamCeremonyRunning, flightCeremonyRunning, showSplash, appLocked, syncedNow, teamCeremonyDismissedKeys, teamDrawRows]);
+  }, [teamCeremonyRunning, flightCeremonyRunning, showSplash, appLocked, syncedNow, atomicTimeActive, teamCeremonyDismissedKeys, teamDrawRows]);
   useEffect(() => {
     if (!myPlayerId && scoreEntryMode === "scorer") setScoreEntryMode("player");
     if (Number(activeHole) < 1 || Number(activeHole) > 18) setActiveHole(1);
@@ -3942,6 +3942,7 @@ function LordOfTheHolesApp() {
   }
 
   function renderCountdownGrid(countdown, compact = false) {
+    if (!atomicTimeActive) return null;
     return (
       <div className={cls("grid grid-cols-4 gap-1.5 rounded-2xl border border-amber-500/25 bg-black/35 p-2 text-center", compact && "p-1.5")}> 
         {[ ["Tage", countdown.days], ["Std", String(countdown.hours).padStart(2, "0")], ["Min", String(countdown.minutes).padStart(2, "0")], ["Sek", String(countdown.seconds).padStart(2, "0")] ].map(([label, value]) => (
@@ -4098,7 +4099,7 @@ function LordOfTheHolesApp() {
             <div className="rounded-3xl border border-amber-500/35 bg-black/55 p-3 text-center text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm">
               <div className="font-serif text-lg font-black text-amber-200">Der Rat ist noch nicht einberufen.</div>
               <div className="mt-1.5 text-xs text-amber-100/80">Im Weimarer Land werden Stimmen gesenkt, alte Karten entrollt und verdächtig ernste Blicke ausgetauscht. Die Gefährten werden bald gerufen.</div>
-              <div className="mt-2">{renderCountdownGrid(lockCountdown, true)}</div>
+              {atomicTimeActive ? <div className="mt-2">{renderCountdownGrid(lockCountdown, true)}</div> : <div className="mt-2 rounded-2xl border border-red-400/35 bg-red-950/35 p-2 text-xs font-semibold text-red-100">{getTimeSourceLabel()}</div>}
               <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/35 p-2 text-xs text-amber-100/75">Die Pforten sind noch verschlossen. Gandalf selbst würde jetzt sagen: „Du kommst hier noch nicht rein.“</div>
               {error ? <div className="mt-3 rounded-2xl border border-amber-500/35 bg-amber-950/60 p-3 text-sm text-amber-100">{error}</div> : null}
             </div>
