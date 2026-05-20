@@ -1334,7 +1334,12 @@ function LordOfTheHolesApp() {
   const flightDrawUnlocked = lockCountdownNow.getTime() >= FLIGHT_DRAW_TARGET.getTime();
   const flightCeremonyTimeline = useMemo(() => buildFlightCeremonyTimeline(flightDraw), [flightDraw]);
   const unlockedTeamDrawRoundIds = useMemo(() => Object.entries(TEAM_DRAW_TARGETS).filter(([, target]) => lockCountdownNow.getTime() >= target.getTime()).map(([roundId]) => roundId), [lockCountdownNow]);
-  const teamCeremonyTimeline = useMemo(() => buildTeamCeremonyTimeline(teamCeremonyRoundId), [teamCeremonyRoundId, teamDrawRows, allPlayers]);
+  const teamCeremonyTimeline = useMemo(() => buildTeamCeremonyTimeline(teamCeremonyRoundId), [teamCeremonyRoundId, teamDrawRows, allPlayers, officialAllScores]);
+  const isTeamDrawRoundVisible = (roundId) => {
+    const target = TEAM_DRAW_TARGETS[roundId];
+    const key = `team_ceremony_${roundId}`;
+    return Boolean(target && lockCountdownNow.getTime() >= target.getTime() && (teamCeremonyDismissedKeys || []).includes(key));
+  };
 
   useEffect(() => { writeLocalJson("lordOfTheHoles.myPlayerId", myPlayerId); }, [myPlayerId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.scoredPlayerId", scoredPlayerId); }, [scoredPlayerId]);
@@ -2910,6 +2915,15 @@ function LordOfTheHolesApp() {
     }
   }
 
+  function getTeamDrawTargetLabel(roundId) {
+    const labels = {
+      r1: "22.05.2026 · 20:30 Uhr",
+      r2: "23.05.2026 · 20:30 Uhr",
+      r3: "24.05.2026 · 20:30 Uhr",
+    };
+    return labels[roundId] || "noch nicht festgelegt";
+  }
+
   function getTeamDrawRowsForRound(roundId) {
     return (teamDrawRows || []).map(normalizeTeamDrawRow).filter((row) => String(row.round_id) === String(roundId)).sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
   }
@@ -2926,13 +2940,18 @@ function LordOfTheHolesApp() {
       teamMap[teamId].push(row);
     });
 
-    const standings = buildDailyTeamStandings(roundId);
+    const standings = buildDailyTeamStandings(roundId, true);
     const standingMap = new Map((standings.teams || []).map((team, index) => [String(team.teamId), { ...team, ceremonyRank: index + 1 }]));
     const teamLabel = (teamId) => `Team ${teamId}`;
-    const rankedTeams = ["A", "B", "C"].map((teamId, index) => {
+    const teamsByLetter = ["A", "B", "C"].map((teamId, index) => {
       const standing = standingMap.get(teamId) || { teamId, label: teamLabel(teamId), value: 0, detail: "noch ohne Wertung", ceremonyRank: index + 1 };
       return { ...standing, teamId, players: teamMap[teamId] || [] };
-    }).sort((a, b) => Number(a.ceremonyRank || 99) - Number(b.ceremonyRank || 99));
+    });
+    const rankedTeams = teamsByLetter.slice().sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
+    rankedTeams.forEach((team, index) => { team.ceremonyRank = index + 1; });
+    const resultRevealTeams = rankedTeams.slice().sort((a, b) => Number(b.ceremonyRank || 0) - Number(a.ceremonyRank || 0));
+    const playerCeremonyLabel = (row) => row?.player_alias ? `${row.player_alias} (${row.player_name || row.player_id})` : (row?.player_name || row?.player_id || "");
+    const teamPlayersText = (team) => (team.players || []).map(playerCeremonyLabel).filter(Boolean).join(" und ") || `Team ${team.teamId}`;
 
     const roundCeremonyTexts = {
       r1: {
@@ -3008,14 +3027,14 @@ function LordOfTheHolesApp() {
       return "";
     };
 
-    const hasLoanPlayer = roundId === "r1" && rankedTeams.some((team) => (team.players || []).some((row, index) => getDailyTeamPlayerMeta(roundId, team.teamId, row.player_id, index).isLoanPlayer));
+    const hasLoanPlayer = roundId === "r1" && teamsByLetter.some((team) => (team.players || []).some((row, index) => getDailyTeamPlayerMeta(roundId, team.teamId, row.player_id, index, true).isLoanPlayer));
     const steps = [
       { type: "text", title, text: `${getRoundChapterLabel(round)} ist geschlagen. Der Abend senkt sich über Mittelerde, und der Rat öffnet das versiegelte Pergament der Tageswertung.`, waitLabel: "Das Pergament wird entrollt ..." },
-      { type: "text", title: "Die Mannschaften werden gerichtet", text: `${modeText} Die Teams erscheinen nun in der Reihenfolge ihrer aktuellen Wertung. Wer oben steht, darf kurz würdevoll schauen. Wer unten steht, bitte ebenfalls — nur leiser.`, waitLabel: "Der Palantír sortiert die Bündnisse ..." },
+      { type: "text", title: "Die Mannschaften werden offenbart", text: `${modeText} Zuerst werden nur die Bündnisse gezogen. Die Wertung bleibt noch im Schatten, bis alle Namen gefallen sind.`, waitLabel: "Die Bündnisse werden entrollt ..." },
       ...(hasLoanPlayer ? [{ type: "text", title: "Sonderregel des ersten Tages", text: "Da Gangolf noch über die Straßen Mittelerdes jagte, erhält ein Team einen Leihspieler. Dessen Punkte zählen für dieses Team mit — seine eigene Wertung bleibt aber bei seinem Stammteam.", waitLabel: "Die Sonderregel wird ins Pergament gekratzt ..." }] : []),
     ];
 
-    rankedTeams.forEach((team) => {
+    teamsByLetter.forEach((team) => {
       steps.push({
         type: "team",
         title: `${teamLabel(team.teamId)}`,
@@ -3035,7 +3054,7 @@ function LordOfTheHolesApp() {
       waitLabel: "Die zweiten Siegel werden vorbereitet ...",
     });
 
-    rankedTeams.forEach((team) => {
+    teamsByLetter.forEach((team) => {
       steps.push({
         type: "team",
         title: `${teamLabel(team.teamId)}`,
@@ -3055,31 +3074,29 @@ function LordOfTheHolesApp() {
       waitLabel: "Die Rangfolge wird enthüllt ...",
     });
 
-    rankedTeams.forEach((team) => {
+    resultRevealTeams.forEach((team) => {
       const rank = Number(team.ceremonyRank || 0);
       steps.push({
         type: "teamResult",
-        title: `${rank}. Platz · ${teamLabel(team.teamId)}`,
-        text: `${teamLabel(team.teamId)} steht auf Rang ${rank} mit ${team.detail}. ${rankTexts[rank] || "Das Schicksal hat gesprochen."}`,
+        title: `${rank}. Platz`,
+        text: `Auf Platz ${rank} landen ${teamPlayersText(team)} mit ${team.detail}. ${rankTexts[rank] || "Das Schicksal hat gesprochen."}`,
         teamId: team.teamId,
         rank,
         detail: team.detail,
         waitLabel: "Die Chronisten notieren ...",
       });
-    });
-
-    rankedTeams.forEach((team) => {
       const specialText = getSpecialTeamComboText(team);
-      if (!specialText) return;
-      steps.push({
-        type: "teamResult",
-        title: `Sondervermerk des Rates · Team ${team.teamId}`,
-        text: specialText,
-        teamId: team.teamId,
-        rank: team.ceremonyRank,
-        detail: team.detail,
-        waitLabel: "Der Rat sortiert seine Gefühle ...",
-      });
+      if (specialText) {
+        steps.push({
+          type: "teamResult",
+          title: `Sondervermerk · ${teamPlayersText(team)}`,
+          text: specialText,
+          teamId: team.teamId,
+          rank: team.ceremonyRank,
+          detail: team.detail,
+          waitLabel: "Der Rat sortiert seine Gefühle ...",
+        });
+      }
     });
 
     steps.push({ type: "text", title: "Die Teams sind gesprochen", text: "Die Bündnisse stehen. Die Rangfolge ist bekannt. Wer nun klagt, möge dies mit Netto-Punkten widerlegen — oder wenigstens mit einer sehr guten Geschichte.", waitLabel: "Die Chronik wird versiegelt ..." });
@@ -3092,8 +3109,8 @@ function LordOfTheHolesApp() {
     if (!step) return null;
     const playerLabel = (row) => row.player_alias ? `${row.player_alias} (${row.player_name || row.player_id})` : (row.player_name || row.player_id);
     const playerMetaLabel = (row, teamId, index) => {
-      const meta = getDailyTeamPlayerMeta(teamCeremonyRoundId, teamId, row.player_id, index);
-      return meta.isLoanPlayer ? `Leihspieler · zählt hier mit, Stammteam ${meta.homeTeamId}` : "";
+      const meta = getDailyTeamPlayerMeta(teamCeremonyRoundId, teamId, row.player_id, index, true);
+      return meta.isLoanPlayer ? `Leihspieler in Team C · zählt hier mit, Stammteam ${meta.homeTeamId}` : "";
     };
     return (
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="min-h-[70vh]">
@@ -3137,9 +3154,9 @@ function LordOfTheHolesApp() {
     );
   }
 
-  function getDailyTeamPlayerMeta(roundId, teamId, playerId, slotIndex = 0) {
+  function getDailyTeamPlayerMeta(roundId, teamId, playerId, slotIndex = 0, includeHidden = false) {
     if (String(roundId) !== "r1" || !playerId) return { isLoanPlayer: false, homeTeamId: teamId, label: "" };
-    const slots = getDailyTeamSlots(roundId);
+    const slots = getDailyTeamSlots(roundId, includeHidden);
     const appearances = [];
     ["A", "B", "C"].forEach((currentTeamId) => {
       (slots?.[currentTeamId] || []).forEach((currentPlayerId, currentSlotIndex) => {
@@ -3149,28 +3166,25 @@ function LordOfTheHolesApp() {
       });
     });
     if (appearances.length <= 1) return { isLoanPlayer: false, homeTeamId: teamId, label: "" };
-    const firstAppearance = appearances[0];
-    const isCurrentFirst = firstAppearance.teamId === teamId && firstAppearance.slotIndex === slotIndex;
+    const loanAppearance = appearances[appearances.length - 1];
+    const homeAppearance = appearances[0];
+    const isLoanPlayer = teamId === loanAppearance.teamId && slotIndex === loanAppearance.slotIndex;
     return {
-      isLoanPlayer: !isCurrentFirst,
-      homeTeamId: firstAppearance.teamId,
-      label: isCurrentFirst ? "Stammteam" : `Leihspieler aus Team ${firstAppearance.teamId}`,
+      isLoanPlayer,
+      homeTeamId: homeAppearance.teamId,
+      label: isLoanPlayer ? `Leihspieler aus Team ${homeAppearance.teamId}` : "Stammteam",
     };
   }
 
-  function getDailyTeamSlots(roundId) {
-    const legacySelection = dailyTeamSelections?.[roundId] || {};
-    if (legacySelection?.teams) return legacySelection.teams;
-    const nextTeams = { A: ["", ""], B: ["", ""], C: ["", ""] };
-    Object.entries(legacySelection || {}).forEach(([playerId, teamId]) => {
-      if (!nextTeams[teamId]) return;
-      const emptyIndex = nextTeams[teamId].findIndex((value) => !value);
-      if (emptyIndex >= 0) nextTeams[teamId][emptyIndex] = playerId;
-    });
-    return nextTeams;
+  function getDailyTeamSlots(roundId, includeHidden = false) {
+    if (!includeHidden && !isTeamDrawRoundVisible(roundId)) return { A: ["", ""], B: ["", ""], C: ["", ""] };
+    const selectionsFromRows = buildDailyTeamSelectionsFromRows(teamDrawRows || [], false);
+    const rowSelection = selectionsFromRows?.[roundId]?.teams;
+    if (rowSelection) return rowSelection;
+    return { A: ["", ""], B: ["", ""], C: ["", ""] };
   }
 
-  function buildDailyTeamStandings(roundId) {
+  function buildDailyTeamStandings(roundId, includeHidden = false) {
     const round = (rounds.length ? rounds : fallbackRounds).find((item) => String(item.round_id) === String(roundId));
     if (!round) return { round: null, teams: [], mode: "nettoTeam", title: "" };
     const mode = String(roundId) === "r2" ? "bestBallNetto" : String(roundId) === "r3" ? "bestBallMatchplay" : "nettoTeam";
@@ -3179,7 +3193,7 @@ function LordOfTheHolesApp() {
     const roundScores = officialAllScores.filter((score) => String(score.round_id) === String(roundId));
     const roundPlayerList = getRoundPlayers(roundId, allPlayers, roundPlayers);
     const playerMap = new Map(roundPlayerList.map((player) => [String(player.id), player]));
-    const teamSlots = getDailyTeamSlots(roundId);
+    const teamSlots = getDailyTeamSlots(roundId, includeHidden);
     const teamIds = ["A", "B", "C"];
     const teams = teamIds.map((teamId) => {
       const playerIds = (teamSlots?.[teamId] || ["", ""]).slice(0, 2);
@@ -3226,20 +3240,7 @@ function LordOfTheHolesApp() {
   }
 
   function updateDailyTeamSlot(roundId, teamId, slotIndex, playerId) {
-    setDailyTeamSelections((current) => {
-      const currentRound = current?.[roundId]?.teams || getDailyTeamSlots(roundId);
-      const nextTeams = {
-        A: [...(currentRound.A || ["", ""]).slice(0, 2)],
-        B: [...(currentRound.B || ["", ""]).slice(0, 2)],
-        C: [...(currentRound.C || ["", ""]).slice(0, 2)],
-      };
-      while (nextTeams[teamId].length < 2) nextTeams[teamId].push("");
-      nextTeams[teamId][slotIndex] = playerId;
-      return {
-        ...(current || {}),
-        [roundId]: { teams: nextTeams },
-      };
-    });
+    return;
   }
 
   function isDailyTeamPlayerAlreadySelected(roundId, playerId, currentTeamId, currentSlotIndex) {
@@ -3259,8 +3260,8 @@ function LordOfTheHolesApp() {
           <CardContent className="p-2 landscape:p-1.5">
             <div className="mb-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 landscape:mb-1.5 landscape:rounded-xl landscape:p-2">
               <p className="text-xs uppercase tracking-[0.22em] text-amber-300/75">Tageswertungen</p>
-              <h2 className="font-serif text-xl font-black text-amber-200">Teams eintragen & Tageswertung berechnen</h2>
-              <p className="mt-1 text-sm text-amber-100/70">Pro Runde gibt es drei 2er-Teams. In Runde 1 darf ein Spieler doppelt gewählt werden, falls Gangolf noch über die Autobahn donnert.</p>
+              <h2 className="font-serif text-xl font-black text-amber-200">TeamDraw & Tageswertung</h2>
+              <p className="mt-1 text-sm text-amber-100/70">Die Teams kommen automatisch aus dem gespeicherten TeamDraw. Manuelle Änderungen sind deaktiviert; neuer TeamDraw nur über Admin & HCPs · Runde beginnen.</p>
               {teamDrawRows?.length ? <div className="mt-2 text-xs text-amber-100/55">Geladen aus TeamDraw: {teamDrawRows.length} Einträge. Neuer TeamDraw nur über Admin & HCPs · Runde beginnen.</div> : null}
             </div>
             <div className="space-y-3 landscape:space-y-2">
@@ -3268,6 +3269,7 @@ function LordOfTheHolesApp() {
                 const standings = buildDailyTeamStandings(roundId);
                 const roundPlayersForSelection = getRoundPlayers(roundId, allPlayers, roundPlayers);
                 const teamSlots = getDailyTeamSlots(roundId);
+                const teamDrawVisible = isTeamDrawRoundVisible(roundId);
                 return (
                   <div key={roundId} className="overflow-hidden rounded-2xl border border-amber-700/35 bg-black/24 landscape:rounded-xl">
                     <div className="border-b border-amber-700/25 bg-amber-500/10 px-3 py-2 landscape:px-2 landscape:py-1.5">
@@ -3275,13 +3277,18 @@ function LordOfTheHolesApp() {
                       <div className="text-xs text-amber-100/60">{getRoundChapterLabel(standings.round)}</div>
                     </div>
                     <div className="space-y-3 p-3 landscape:space-y-2 landscape:p-2">
+                      {!teamDrawVisible ? <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100/75">
+                        <div className="font-bold text-amber-200">Team-Ziehung noch versiegelt</div>
+                        <div className="mt-1">Die Zeremonie für diese Runde startet am {getTeamDrawTargetLabel(roundId)}. Danach erscheinen hier die Teams und die Tageswertung.</div>
+                      </div> : null}
+                      {teamDrawVisible ? <>
                       <div className="grid gap-2 landscape:grid-cols-3 landscape:gap-1.5">
                         {["A", "B", "C"].map((teamId) => (
                           <div key={teamId} className="rounded-xl border border-amber-700/25 bg-stone-950/45 p-2 landscape:p-1.5">
                             <div className="mb-1.5 font-serif text-base font-bold text-amber-200 landscape:mb-1 landscape:text-sm">Team {teamId}</div>
                             <div className="grid grid-cols-2 gap-2 landscape:gap-1">
                               {[0, 1].map((slotIndex) => (
-                                <select key={slotIndex} value={teamSlots?.[teamId]?.[slotIndex] || ""} onChange={(event) => updateDailyTeamSlot(roundId, teamId, slotIndex, event.target.value)} className="min-w-0 rounded-xl border border-amber-700/40 bg-stone-950 px-2 py-2 text-sm text-amber-50 landscape:px-1.5 landscape:py-1.5 landscape:text-[11px]">
+                                <select key={slotIndex} value={teamSlots?.[teamId]?.[slotIndex] || ""} disabled className="min-w-0 rounded-xl border border-amber-700/40 bg-stone-950 px-2 py-2 text-sm text-amber-50 opacity-80 landscape:px-1.5 landscape:py-1.5 landscape:text-[11px]">
                                   <option value="">Spieler {slotIndex + 1}</option>
                                   {roundPlayersForSelection.map((player) => {
                                     const disabled = isDailyTeamPlayerAlreadySelected(roundId, player.id, teamId, slotIndex);
@@ -3309,6 +3316,7 @@ function LordOfTheHolesApp() {
                           </tbody>
                         </table>
                       </div>
+                      </> : null}
                     </div>
                   </div>
                 );
