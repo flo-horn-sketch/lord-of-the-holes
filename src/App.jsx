@@ -2600,11 +2600,16 @@ function LordOfTheHolesApp() {
 
   function buildFlightCeremonyTimeline(draw = flightDraw) {
     const drawRounds = (draw?.rounds || []).filter((roundPlan) => ["r1", "r2", "r3"].includes(String(roundPlan.round_id || "")));
+    const hasPlayerInFlight = (flight, playerAliases = []) => {
+      const normalizedAliases = playerAliases.map((item) => String(item || "").toLowerCase().trim());
+      return (flight.players || []).some((playerId) => normalizedAliases.includes(String(playerId || "").toLowerCase().trim()));
+    };
+    const roundHasPairInFlight = (roundPlan, firstAliases, secondAliases) => (roundPlan?.flights || []).some((flight) => hasPlayerInFlight(flight, firstAliases) && hasPlayerInFlight(flight, secondAliases));
     const introTexts = {
       r1: [
-        "Die Türen von Bruchtal schließen sich. Kein Hobbit raschelt mehr mit der Scorekarte.",
+        "Der Rat von Bruchtal wurde einberufen. Elben schweigen, Zwerge murmeln, und irgendwo diskutieren Bogeymir und Gimme bereits über eine Auslegung, die niemand gefragt hat. Die Flights werden geschmiedet.",
         "Elrond hebt die Hand. Das erste Pergament wird in den Kreis getragen.",
-        "Runde 1 wird ohne Gangolf beschritten. Sein Pfad beginnt erst später.",
+        "Gangolf fehlt. Offiziell wegen Anreise. Inoffiziell, weil selbst Schattenfell bei 300 km/h auf der Autobahn kurz nach Tempolimit fragt. Der erste Flight wird ohne ihn entsandt.",
         "Möge das erste Kapitel die Gemeinschaft nicht schon am Tee 1 entzweien.",
       ],
       r2: [
@@ -2621,20 +2626,46 @@ function LordOfTheHolesApp() {
       ],
     };
     const steps = [];
+    let bogeymirGimmeShown = false;
+    let foredoGimmeShown = false;
+
     drawRounds.forEach((roundPlan, roundIndex) => {
       const chapter = roundIndex + 1;
       (introTexts[String(roundPlan.round_id)] || []).forEach((text) => {
         steps.push({ type: "text", title: "Flightziehung - Das Öffnen der Pergamente", text, waitLabel: "Die Gemeinschaft wartet ...", chapter });
       });
+
+      if (!bogeymirGimmeShown && roundHasPairInFlight(roundPlan, ["andreas", "bogeymir"], ["mucky", "gimme"])) {
+        bogeymirGimmeShown = true;
+        steps.push({
+          type: "text",
+          title: "Ein gefährliches Bündnis",
+          text: "Das Schicksal hat Bogeymir und Gimme in denselben Flight geworfen. Die Elben senken den Blick. Die Zwerge bestellen Nachschub. Der Marschall notiert: ‚Konfliktpotenzial: episch.‘",
+          waitLabel: "Der Rat hält kurz den Atem an ...",
+          chapter,
+        });
+      }
+
+      if (!foredoGimmeShown && roundHasPairInFlight(roundPlan, ["kio", "foredo"], ["mucky", "gimme"])) {
+        foredoGimmeShown = true;
+        steps.push({
+          type: "text",
+          title: "Die Last des Foredo",
+          text: "Foredo spürt eine alte Last auf seinen Schultern. Es ist nicht der Eine Ring. Es ist Gimme im selben Flight.",
+          waitLabel: "Foredo sammelt innere Kraft ...",
+          chapter,
+        });
+      }
+
       const totalPlayers = (roundPlan.flights || []).reduce((sum, flight) => sum + (flight.players || []).length, 0);
       for (let revealCount = 0; revealCount <= totalPlayers; revealCount += 1) {
         steps.push({ type: "reveal", roundPlan, revealCount, chapter });
       }
     });
     [
-      "Die Pergamente sinken. Der Rat schweigt. Selbst Golfum sagt kurz nichts.",
-      "Die Flights der ersten drei Kapitel sind besiegelt.",
-      "Was am Schicksalsberg geschieht, entscheidet allein die Tabelle.",
+      "Die Ziehung ist vollendet.",
+      "Bogeymir und Gimme prüfen bereits vorsorglich die Rechtslage eines Ereignisses, das noch gar nicht stattgefunden hat.",
+      "Der Rest der Gemeinschaft tut, was Helden tun: lächeln, nicken und innerlich den Ballvorrat zählen.",
     ].forEach((text) => steps.push({ type: "outro", title: "Der Rat hat gesprochen", text, waitLabel: "Die Chronik wird geschlossen ...", chapter: 3 }));
     return steps;
   }
