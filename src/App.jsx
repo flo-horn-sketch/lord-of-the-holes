@@ -55,9 +55,9 @@ const FLIGHT_DRAW_TARGET = new Date("2026-05-21T20:00:00+02:00");
 const FLIGHT_DRAW_STORAGE_KEY = "lordOfTheHoles.flightDraw";
 const TEAM_DRAW_STORAGE_KEY = "lordOfTheHoles.teamDraw";
 const TEAM_DRAW_TARGETS = {
-  r1: new Date("2026-05-22T20:30:00+02:00"),
-  r2: new Date("2026-05-23T20:30:00+02:00"),
-  r3: new Date("2026-05-24T20:30:00+02:00"),
+  r1: new Date("2026-05-22T21:00:00+02:00"),
+  r2: new Date("2026-05-23T21:00:00+02:00"),
+  r3: new Date("2026-05-24T21:00:00+02:00"),
 };
 
 const fallbackAliases = {
@@ -1198,6 +1198,7 @@ function LordOfTheHolesApp() {
   const [setupSavedMessage, setSetupSavedMessage] = useState("");
   const [backupSavedMessage, setBackupSavedMessage] = useState("");
   const [scoreHintMessage, setScoreHintMessage] = useState("");
+  const [zeroNetTributeDismissedKeys, setZeroNetTributeDismissedKeys] = useState(() => readLocalJson("lordOfTheHoles.zeroNetTributeDismissedKeys", []));
   const [showSplash, setShowSplash] = useState(true);
   const [splashEntering, setSplashEntering] = useState(false);
   const [appLocked, setAppLocked] = useState(() => readLocalJson("lordOfTheHoles.appLocked", true));
@@ -1309,6 +1310,9 @@ function LordOfTheHolesApp() {
       if (Number(netPoints) !== 0) return null;
       const isAchim = String(playerId).toLowerCase() === "achim" || String(player?.alias_name || "").toLowerCase() === "gangolf";
       return {
+        key: `zero_net_${roundId}_${holeNumber}_${playerId}`,
+        roundId,
+        holeNumber,
         player,
         playerId,
         action: isAchim ? "20 Burpees" : "Kurzer trinken",
@@ -1316,6 +1320,44 @@ function LordOfTheHolesApp() {
       };
     }).filter(Boolean);
   }, [displayedActiveRound?.round_id, activeHole, activeHoleData, myFlightFromDraw, visiblePlayers, allPlayers, displayCourseId, courses, scores]);
+  const flightZeroNetTributeQueue = useMemo(() => {
+    const roundId = String(displayedActiveRound?.round_id || "");
+    if (!roundId) return [];
+    const flightPlayerIds = (myFlightFromDraw?.players || []).map((id) => String(id));
+    const fallbackPlayerIds = visiblePlayers.map((player) => String(player.id));
+    const relevantPlayerIds = flightPlayerIds.length ? flightPlayerIds : fallbackPlayerIds;
+    const sourcePlayers = [...(visiblePlayers || []), ...(allPlayers || [])];
+    const roundHoles = holes?.length ? holes : fallbackHoles.filter((hole) => String(hole.course_id) === String(displayCourseId));
+    const rows = [];
+    relevantPlayerIds.forEach((playerId) => {
+      const playerBase = sourcePlayers.find((player) => String(player.id) === String(playerId));
+      if (!playerBase) return;
+      const player = getPlayerForCourse(playerBase, displayCourseId, courses);
+      roundHoles.forEach((hole) => {
+        const holeNumber = Number(hole.hole_number || 0);
+        if (!holeNumber) return;
+        const score = findScoreForPlayerHole(scores, roundId, playerId, holeNumber, false);
+        const hasCompleteScore = Boolean(score && score.strokes !== "" && score.strokes != null);
+        if (!hasCompleteScore) return;
+        const netPoints = getScoreStablefordPoints(score, hole.par, getShotsOnHole(player?.course_hcp, hole.hcp));
+        if (Number(netPoints) !== 0) return;
+        const key = `zero_net_${roundId}_${holeNumber}_${playerId}`;
+        if ((zeroNetTributeDismissedKeys || []).includes(key)) return;
+        const isAchim = String(playerId).toLowerCase() === "achim" || String(player?.alias_name || "").toLowerCase() === "gangolf";
+        rows.push({
+          key,
+          roundId,
+          holeNumber,
+          player,
+          playerId,
+          action: isAchim ? "20 Burpees" : "Kurzer trinken",
+          text: isAchim ? `${getPlayerLabel(player)} hat an Loch ${holeNumber} den Zorn Mordors geweckt · 20 Burpees vor den Augen des Flights` : `${getPlayerLabel(player)} ist an Loch ${holeNumber} in den Schatten Mordors geraten · ein Kurzer für den Gefährten`,
+        });
+      });
+    });
+    return rows.sort((a, b) => Number(a.holeNumber || 0) - Number(b.holeNumber || 0));
+  }, [displayedActiveRound?.round_id, myFlightFromDraw, visiblePlayers, allPlayers, holes, displayCourseId, courses, scores, zeroNetTributeDismissedKeys]);
+  const zeroNetTributePopup = flightZeroNetTributeQueue[0] || null;
   const currentEffectiveStrokes = normalizeBoolean(currentScore.picked_up) ? Number(pickedUpStrokes || 0) : Number(currentScore.strokes || 0);
   const maxPuttsForCurrentScore = currentEffectiveStrokes > 1 ? currentEffectiveStrokes - 1 : 0;
   const officialScoreForActiveHole = useMemo(() => findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", scoredPlayerId, activeHole, false), [scores, displayedActiveRound?.round_id, scoredPlayerId, activeHole]);
@@ -1492,6 +1534,7 @@ function LordOfTheHolesApp() {
   useEffect(() => { writeLocalJson("lordOfTheHoles.teamCeremonyDismissedKeys", teamCeremonyDismissedKeys); }, [teamCeremonyDismissedKeys]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.prizeSettings", prizeSettings); }, [prizeSettings]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", roundSummaryDismissedKeys); }, [roundSummaryDismissedKeys]);
+  useEffect(() => { writeLocalJson("lordOfTheHoles.zeroNetTributeDismissedKeys", zeroNetTributeDismissedKeys); }, [zeroNetTributeDismissedKeys]);
   useEffect(() => { writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, flightDraw); }, [flightDraw]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.flightCeremonyCompleted", flightCeremonyCompleted); }, [flightCeremonyCompleted]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.flightSummaryOpen", flightSummaryOpen); }, [flightSummaryOpen]);
@@ -4265,6 +4308,22 @@ function LordOfTheHolesApp() {
             </div>
             <div className="p-3">
               <button type="button" onClick={() => setRoundSummaryDismissedKeys((current) => Array.from(new Set([...(current || []), roundSummaryPopup.key])))} className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-2.5 text-sm font-bold text-amber-50">Chronik schließen ×</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {zeroNetTributePopup ? (
+        <div className="fixed inset-0 z-[105] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-sky-400/55 bg-stone-950 text-center text-sky-50 shadow-2xl shadow-black/80">
+            <div className="bg-[radial-gradient(circle_at_50%_0%,rgba(56,189,248,0.22),transparent_45%),linear-gradient(180deg,rgba(12,74,110,0.55),rgba(12,10,9,1))] p-5">
+              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-sky-300/45 bg-black/30 text-3xl shadow-xl shadow-sky-950/40">🍻</div>
+              <div className="text-[10px] uppercase tracking-[0.28em] text-sky-100/70">Loch {zeroNetTributePopup.holeNumber} · Der Rat des Flights raunt</div>
+              <div className="mt-2 font-serif text-xl font-black text-sky-100">Tribut an Mordor</div>
+              <div className="mt-2 rounded-2xl border border-sky-300/35 bg-black/25 p-3 text-sm font-semibold text-sky-50">{zeroNetTributePopup.text}</div>
+              <div className="mt-2 text-xs text-sky-100/70">Dieser Hinweis erscheint einmalig für diesen Tribut — auch wenn ihr schon am nächsten Loch seid.</div>
+            </div>
+            <div className="p-3">
+              <button type="button" onClick={() => setZeroNetTributeDismissedKeys((current) => Array.from(new Set([...(current || []), zeroNetTributePopup.key])))} className="w-full rounded-2xl border border-sky-400/45 bg-sky-700 px-4 py-2.5 text-sm font-bold text-sky-50">Tribut zur Kenntnis nehmen ×</button>
             </div>
           </div>
         </div>
