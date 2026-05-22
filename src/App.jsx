@@ -49,7 +49,7 @@ class AppErrorBoundary extends React.Component {
 }
 
 const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbzPTQvGhRIn9KWWaQ7Blz2WJQBAH5qjqSy-Plu48JYZpEIB5E3cqO3jCWtWKws-l2eO/exec";
-const ADMIN_PASSWORD = "weimar26";
+const ADMIN_PASSWORD = "weimar";
 const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T10:00:00+02:00");
 const FLIGHT_DRAW_TARGET = new Date("2026-05-21T20:00:00+02:00");
 const FLIGHT_DRAW_STORAGE_KEY = "lordOfTheHoles.flightDraw";
@@ -508,6 +508,34 @@ function formatToPar(value, played = true) {
   return value > 0 ? `+${value}` : String(value);
 }
 
+function normalizeRankValue(value) {
+  if (value == null) return "";
+  if (typeof value === "number") return Number.isFinite(value) ? String(value) : "";
+  return String(value).trim();
+}
+
+function getCompetitionRank(items = [], index = 0, getValue = (item) => item?.rankValue ?? item?.value ?? item?.points ?? item?.total ?? "") {
+  const currentValue = normalizeRankValue(getValue(items[index], index));
+  if (!currentValue) return index + 1;
+  let tiedBefore = 0;
+  for (let i = 0; i < index; i += 1) {
+    const previousValue = normalizeRankValue(getValue(items[i], i));
+    if (previousValue === currentValue) tiedBefore += 1;
+  }
+  return index + 1 - tiedBefore;
+}
+
+function isTiedAtRank(items = [], index = 0, getValue = (item) => item?.rankValue ?? item?.value ?? item?.points ?? item?.total ?? "") {
+  const currentValue = normalizeRankValue(getValue(items[index], index));
+  if (!currentValue) return false;
+  return items.some((item, itemIndex) => itemIndex !== index && normalizeRankValue(getValue(item, itemIndex)) === currentValue);
+}
+
+function formatCompetitionRank(items = [], index = 0, getValue) {
+  const rank = getCompetitionRank(items, index, getValue);
+  return isTiedAtRank(items, index, getValue) ? `T${rank}` : String(rank);
+}
+
 function normalizeHoles(rawHoles) {
   const validHoles = Array.isArray(rawHoles) ? rawHoles.filter((h) => Number(h.hole_number) > 0 && Number(h.par) > 0 && Number(h.hcp) > 0) : [];
   return validHoles.length ? validHoles : fallbackHoles;
@@ -766,6 +794,8 @@ function ScoreStepper({ value, par, pickedUpStrokes, disabled = false, onChange 
 }
 
 function LeaderboardTable({ title, players, columns }) {
+  const rankColumn = columns.find((column) => column.rankValue || column.emphasize) || columns[0];
+  const getRankValue = (player) => rankColumn?.rankValue ? rankColumn.rankValue(player) : rankColumn?.render ? rankColumn.render(player) : "";
   return (
     <div className="mb-3 overflow-hidden rounded-2xl border border-amber-700/30 bg-black/25">
       <div className="border-b border-amber-700/30 bg-amber-500/10 px-2 py-1.5 font-serif text-lg text-amber-200">{title}</div>
@@ -781,7 +811,7 @@ function LeaderboardTable({ title, players, columns }) {
           <tbody>
             {players.map((p, index) => (
               <tr key={p.id} className="border-t border-amber-700/20">
-                <td className="px-2 py-1.5 text-amber-200/75">{index + 1}</td>
+                <td className="px-2 py-1.5 text-amber-200/75">{formatCompetitionRank(players, index, getRankValue)}</td>
                 <td className="px-2 py-1.5 font-semibold text-amber-100">{getPlayerLabel(p)}</td>
                 {columns.map((column) => <td key={column.label} className={cls("px-2 py-1.5 text-right", column.emphasize && "font-serif text-lg text-amber-300")}>{column.render(p)}</td>)}
               </tr>
@@ -817,7 +847,7 @@ function buildFunPlayerStats(players, holes, scores) {
   return (players || []).map((player) => {
     const playerScores = (scores || []).filter((score) => String(score.player_id) === String(player.id) && score.strokes !== "" && score.strokes != null);
     const enrichedScores = playerScores.map((score) => {
-      const hole = (holes || []).find((item) => Number(item.hole_number) === Number(score.hole_number));
+      const hole = (holes || []).find((item) => Number(item.hole_number) === Number(score.hole_number) && (!item.round_id || String(item.round_id) === String(score.round_id)));
       return { score, hole, diff: getScoreDiffToPar(score, hole) };
     }).filter((item) => item.hole);
     const frontScores = enrichedScores.filter((item) => Number(item.hole.hole_number) <= 9);
@@ -851,12 +881,12 @@ function buildFunPlayerStats(players, holes, scores) {
 
 function buildFunHoleStats(players, holes, scores) {
   return (holes || []).map((hole) => {
-    const holeScores = (scores || []).filter((score) => Number(score.hole_number) === Number(hole.hole_number) && score.strokes !== "" && score.strokes != null);
+    const holeScores = (scores || []).filter((score) => (!hole.round_id || String(score.round_id) === String(hole.round_id)) && Number(score.hole_number) === Number(hole.hole_number) && score.strokes !== "" && score.strokes != null);
     const played = holeScores.length;
     const totalStrokes = holeScores.reduce((sum, score) => sum + Number(score.strokes || 0), 0);
     const avgScore = played ? totalStrokes / played : 0;
     const avgToPar = played ? avgScore - Number(hole.par || 0) : 0;
-    return { course_id: hole.course_id || "", course_name: getCourseShortName(hole.course_id), hole_number: hole.hole_number, par: hole.par, hcp: hole.hcp, played, avgScore, avgToPar, birdies: holeScores.filter((score) => getScoreDiffToPar(score, hole) === -1 && !normalizeBoolean(score.picked_up)).length, pars: holeScores.filter((score) => getScoreDiffToPar(score, hole) === 0 && !normalizeBoolean(score.picked_up)).length, pickedUpCount: holeScores.filter((score) => normalizeBoolean(score.picked_up)).length, ladies: holeScores.filter((score) => normalizeBoolean(score.lady)).length, snakes: holeScores.filter((score) => normalizeBoolean(score.over_two_putts)).length };
+    return { course_id: hole.course_id || "", course_name: hole.course_name || getCourseShortName(hole.course_id), hole_number: hole.hole_number, par: hole.par, hcp: hole.hcp, played, avgScore, avgToPar, birdies: holeScores.filter((score) => getScoreDiffToPar(score, hole) === -1 && !normalizeBoolean(score.picked_up)).length, pars: holeScores.filter((score) => getScoreDiffToPar(score, hole) === 0 && !normalizeBoolean(score.picked_up)).length, pickedUpCount: holeScores.filter((score) => normalizeBoolean(score.picked_up)).length, ladies: holeScores.filter((score) => normalizeBoolean(score.lady)).length, snakes: holeScores.filter((score) => normalizeBoolean(score.over_two_putts)).length };
   }).filter((item) => item.played > 0);
 }
 
@@ -929,23 +959,52 @@ function buildFinalNetStandings(players, rounds, holes, scores, courses = fallba
 
 function FunTable({ title, subtitle = "", players, columns, nameLabel = "Name" }) {
   const hasHoleRows = players.some((item) => item?.hole_number);
+  const rankColumn = columns.find((column) => column.rankValue || column.emphasize) || columns[0];
+  const getRankValue = (item) => rankColumn?.rankValue ? rankColumn.rankValue(item) : rankColumn?.render ? rankColumn.render(item) : "";
   return (
     <div className="mb-3 overflow-hidden rounded-2xl border border-amber-700/30 bg-black/20">
       <div className="border-b border-amber-700/30 bg-amber-500/10 px-2 py-1.5"><div className="font-serif text-lg text-amber-200">{title}</div>{subtitle ? <div className="text-xs text-amber-100/60">{subtitle}</div> : null}</div>
       <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <table className="w-full min-w-[360px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">
           <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100"><th className="px-2 py-1.5">Platz</th><th className="px-2 py-1.5">{hasHoleRows ? "Loch" : nameLabel}</th>{columns.map((column) => <th key={column.label} className="px-2 py-1.5 text-right">{column.label}</th>)}</tr></thead>
-          <tbody>{players.map((item, index) => <tr key={item.id || `${item.course_id || "course"}-${item.hole_number}-${index}`} className="border-t border-amber-700/20"><td className="px-2 py-1.5 text-amber-200/75">{index + 1}</td><td className="px-2 py-1.5 font-semibold text-amber-100">{item.hole_number ? `${item.course_name || getCourseShortName(item.course_id)} · Loch ${item.hole_number}` : item.character_name || item.display_name || item.id}</td>{columns.map((column) => <td key={column.label} className={cls("px-2 py-1.5 text-right", column.emphasize && "font-serif text-lg text-amber-300")}>{column.render(item, index)}</td>)}</tr>)}</tbody>
+          <tbody>{players.map((item, index) => <tr key={item.id || `${item.course_id || "course"}-${item.hole_number}-${index}`} className="border-t border-amber-700/20"><td className="px-2 py-1.5 text-amber-200/75">{formatCompetitionRank(players, index, getRankValue)}</td><td className="px-2 py-1.5 font-semibold text-amber-100">{item.hole_number ? `${item.course_name || getCourseShortName(item.course_id)} · Loch ${item.hole_number}` : item.character_name || item.display_name || item.id}</td>{columns.map((column) => <td key={column.label} className={cls("px-2 py-1.5 text-right", column.emphasize && "font-serif text-lg text-amber-300")}>{column.render(item, index)}</td>)}</tr>)}</tbody>
         </table>
       </div>
     </div>
   );
 }
 
-function MiddleEarthTables({ players, holes, scores, mismatches }) {
-  const funPlayers = useMemo(() => buildFunPlayerStats(players, holes, scores), [players, holes, scores]);
-  const funHoles = useMemo(() => buildFunHoleStats(players, holes, scores), [players, holes, scores]);
-  const palantirStats = useMemo(() => buildScorerMismatchStats(mismatches, players), [mismatches, players]);
+function MiddleEarthTables({ players, holes, scores, mismatches, rounds = fallbackRounds, allPlayers = players, allHoles = holes, allScores = scores, courses = fallbackCourses, roundPlayers = [], activeRoundId = "" }) {
+  const roundList = useMemo(() => (rounds?.length ? rounds : fallbackRounds).slice().sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0)), [rounds]);
+  const [middleEarthRoundId, setMiddleEarthRoundId] = useState(() => activeRoundId || "all");
+  const selectedRound = roundList.find((round) => String(round.round_id) === String(middleEarthRoundId)) || null;
+  const isMiddleEarthAllRounds = middleEarthRoundId === "all";
+  const selectedMiddleEarthLabel = isMiddleEarthAllRounds ? "Gesamtübersicht · alle Runden" : getRoundChapterLabel(selectedRound);
+  const scopedMiddleEarthPlayers = useMemo(() => {
+    if (isMiddleEarthAllRounds) return (allPlayers || players || []).map((player) => getPlayerForCourse(player, "goethe", courses));
+    return getRoundPlayers(selectedRound?.round_id, allPlayers || players, roundPlayers).map((player) => getPlayerForCourse(player, selectedRound?.course_id || "goethe", courses));
+  }, [isMiddleEarthAllRounds, allPlayers, players, courses, selectedRound?.round_id, selectedRound?.course_id, roundPlayers]);
+  const scopedMiddleEarthScores = useMemo(() => {
+    const sourceScores = allScores?.length ? allScores : scores;
+    if (isMiddleEarthAllRounds) return sourceScores || [];
+    return (sourceScores || []).filter((score) => String(score.round_id) === String(selectedRound?.round_id || ""));
+  }, [isMiddleEarthAllRounds, allScores, scores, selectedRound?.round_id]);
+  const scopedMiddleEarthHoles = useMemo(() => {
+    const sourceHoles = allHoles?.length ? allHoles : holes;
+    const buildRoundScopedHoles = (round) => getRoundHoles(round, sourceHoles).map((hole) => ({
+      ...hole,
+      round_id: round.round_id,
+      course_name: isMiddleEarthAllRounds ? `${round.round_name || round.round_id} · ${getCourseShortName(round.course_id)}` : getCourseShortName(round.course_id),
+    }));
+    if (isMiddleEarthAllRounds) return roundList.flatMap(buildRoundScopedHoles);
+    return selectedRound ? buildRoundScopedHoles(selectedRound) : holes;
+  }, [isMiddleEarthAllRounds, allHoles, holes, roundList, selectedRound]);
+  const scopedMiddleEarthMismatches = useMemo(() => {
+    if (isMiddleEarthAllRounds) return mismatches || [];
+    return getMismatchesForRound(scopedMiddleEarthScores, selectedRound?.round_id || "", scopedMiddleEarthPlayers);
+  }, [isMiddleEarthAllRounds, mismatches, scopedMiddleEarthScores, selectedRound?.round_id, scopedMiddleEarthPlayers]);
+  const funPlayers = useMemo(() => buildFunPlayerStats(scopedMiddleEarthPlayers, scopedMiddleEarthHoles, scopedMiddleEarthScores), [scopedMiddleEarthPlayers, scopedMiddleEarthHoles, scopedMiddleEarthScores]);
+  const funHoles = useMemo(() => buildFunHoleStats(scopedMiddleEarthPlayers, scopedMiddleEarthHoles, scopedMiddleEarthScores), [scopedMiddleEarthPlayers, scopedMiddleEarthHoles, scopedMiddleEarthScores]);
   const snakeLords = [...funPlayers].sort((a, b) => Number(b.puttPenaltyEuro || 0) - Number(a.puttPenaltyEuro || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
   const ladies = [...funPlayers].sort((a, b) => Number(b.ladyCount || 0) - Number(a.ladyCount || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
   const whiteFlags = [...funPlayers].sort((a, b) => Number(b.pickedUpCount || 0) - Number(a.pickedUpCount || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
@@ -959,7 +1018,17 @@ function MiddleEarthTables({ players, holes, scores, mismatches }) {
   return (
     <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm landscape:rounded-xl">
       <CardContent className="p-2">
-        <div className="mb-2"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Mittelerde</p><h2 className="font-serif text-lg text-amber-200">Die Chroniken der Runde</h2><p className="mt-1 text-sm text-amber-100/65">Fun-Tabellen aus den Scores der aktuellen Runde.</p></div>
+        <div className="mb-2">
+          <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Mittelerde</p>
+          <h2 className="font-serif text-lg text-amber-200">Die Chroniken der Gefährten</h2>
+          <p className="mt-1 text-sm text-amber-100/65">{selectedMiddleEarthLabel}</p>
+          <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-5">
+            <button type="button" onClick={() => setMiddleEarthRoundId("all")} className={cls("rounded-xl border px-2 py-1.5 text-xs font-bold", middleEarthRoundId === "all" ? "border-amber-400 bg-amber-500/20 text-amber-100" : "border-amber-700/35 bg-black/25 text-amber-100/65")}>Gesamt</button>
+            {roundList.map((round) => (
+              <button key={round.round_id} type="button" onClick={() => setMiddleEarthRoundId(round.round_id)} className={cls("rounded-xl border px-2 py-1.5 text-xs font-bold", String(middleEarthRoundId) === String(round.round_id) ? "border-amber-400 bg-amber-500/20 text-amber-100" : "border-amber-700/35 bg-black/25 text-amber-100/65")}>{round.round_name || round.round_id}</button>
+            ))}
+          </div>
+        </div>
         <FunTable title="Shelobs Putt-Kammer" subtitle="Snake-König der Runde" players={snakeLords} columns={[{ label: "3P", render: (p) => p.threePutts }, { label: "4P", render: (p) => p.fourPutts }, { label: "5+P", render: (p) => p.fivePlusPutts }, { label: "€", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} />
         <FunTable title="Galadriels Spiegel" subtitle="Lady-Liga" players={ladies} columns={[{ label: "Ladys", render: (p) => p.ladyCount, emphasize: true }, { label: "Quote", render: (p) => p.played ? `${Math.round((p.ladyCount / p.played) * 100)} %` : "–" }]} />
         <FunTable title="Die weißen Fahnen von Minas Tirith" subtitle="Gestrichene Löcher" players={whiteFlags} columns={[{ label: "X", render: (p) => p.pickedUpCount, emphasize: true }, { label: "Quote", render: (p) => p.played ? `${Math.round((p.pickedUpCount / p.played) * 100)} %` : "–" }]} />
@@ -970,7 +1039,6 @@ function MiddleEarthTables({ players, holes, scores, mismatches }) {
         <FunTable title="Der Schicksalsberg" subtitle="Härtestes Loch des Feldes" players={hardestHoles} columns={[{ label: "Par", render: (h) => h.par }, { label: "Ø +/−", render: (h) => formatToPar(Math.round(h.avgToPar * 10) / 10, h.played), emphasize: true }, { label: "X", render: (h) => h.pickedUpCount }, { label: "Snake", render: (h) => h.snakes }]} />
         <FunTable title="Bruchtal" subtitle="Lieblingsloch des Feldes" players={favoriteHoles} columns={[{ label: "Par", render: (h) => h.par }, { label: "Ø +/−", render: (h) => formatToPar(Math.round(h.avgToPar * 10) / 10, h.played), emphasize: true }, { label: "Birdies", render: (h) => h.birdies }, { label: "Pars", render: (h) => h.pars }]} />
         <FunTable title="Mithril-Ausbeute" subtitle="Netto-Punkte je erhaltenem Schlag" players={mithrilMiners} columns={[{ label: "SpV genutzt", render: (p) => p.hcpShotsUsed }, { label: "Netto", render: (p) => p.netStableford }, { label: "Quote", render: (p) => p.hcpShotsUsed ? p.pointsPerHcpShot : "–", emphasize: true }]} />
-        <FunTable title="Palantír-Protokoll" subtitle="Abweichungen bei Score-Kontrolle" players={palantirStats} columns={[{ label: "Als Spieler", render: (p) => p.asPlayer }, { label: "Als Zähler", render: (p) => p.asScorer }, { label: "Gesamt", render: (p) => p.total, emphasize: true }]} />
       </CardContent>
     </Card>
   );
@@ -1076,7 +1144,7 @@ function TournamentStandings({ players, rounds, holes, scores, courses = fallbac
         <div className="overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <table className="w-full min-w-[360px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">
             <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100"><th className="px-2 py-1.5">#</th><th className="px-2 py-1.5">Spieler</th>{isFinalActive ? <><th className="px-2 py-1.5 text-right">Quali</th><th className="px-2 py-1.5 text-right">Final Strokes HCP</th><th className="px-2 py-1.5 text-right">Löcher</th><th className="px-2 py-1.5 text-right">Gruppe</th></> : <>{qualificationRounds.map((round) => <th key={round.round_id} className="px-2 py-1.5 text-right">{round.round_name}</th>)}<th className="px-2 py-1.5 text-right">Gesamt</th></>}</tr></thead>
-            <tbody>{isFinalActive ? finalStandings.map((player, index) => <React.Fragment key={player.id}>{index === 3 && <tr><td colSpan={6} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-amber-200">Platzierungsgruppe · Plätze 4–6</td></tr>}<tr className={cls("border-t border-amber-700/20", index < 3 && "bg-emerald-500/5")}><td className="px-2 py-1.5 font-serif text-lg font-bold text-amber-300">{player.finalRank}</td><td className="px-2 py-1.5 font-semibold text-amber-100">{getPlayerLabel(player)}</td><td className="px-2 py-1.5 text-right text-amber-100/75">{player.qualificationRank}</td><td className="px-2 py-1.5 text-right font-serif text-lg font-bold text-amber-300">{player.finalHcpAdjustedStrokes ?? "–"}</td><td className="px-2 py-1.5 text-right text-amber-100">{player.finalPlayed}/18</td><td className="px-2 py-1.5 text-right text-amber-100/75">{player.finalGroup === "championship" ? "1–3" : "4–6"}</td></tr></React.Fragment>) : standings.map((player, index) => <React.Fragment key={player.id}>{index === 3 && <tr><td colSpan={qualificationRounds.length + 3} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-amber-200">Cut-Linie · Top 3 spielen den Finaltag</td></tr>}<tr className={cls("border-t border-amber-700/20", index < 3 && "bg-emerald-500/5")}><td className="px-2 py-1.5 text-amber-200/75">{index + 1}</td><td className="px-2 py-1.5 font-semibold text-amber-100">{getPlayerLabel(player)}{index < 3 && <span className="ml-2 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-200">Final</span>}</td>{qualificationRounds.map((round) => { const result = player.roundResults.find((item) => item.round_id === round.round_id); const isCounted = player.countedRoundIds.includes(round.round_id); const isDropped = player.droppedRoundId === round.round_id; return <td key={round.round_id} className={cls("px-2 py-1.5 text-right", isCounted && "font-bold text-amber-300", isDropped && "text-amber-100/50 line-through")}>{result?.played ? result.points : "–"}</td>; })}<td className="px-2 py-1.5 text-right font-serif text-lg font-bold text-amber-300">{player.totalBestTwo ?? "–"}</td></tr></React.Fragment>)}</tbody>
+            <tbody>{isFinalActive ? finalStandings.map((player, index) => <React.Fragment key={player.id}>{index === 3 && <tr><td colSpan={6} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-amber-200">Platzierungsgruppe · Plätze 4–6</td></tr>}<tr className={cls("border-t border-amber-700/20", index < 3 && "bg-emerald-500/5")}><td className="px-2 py-1.5 font-serif text-lg font-bold text-amber-300">{formatCompetitionRank(finalStandings, index, (item) => `${item.finalGroup}|${item.finalHcpAdjustedStrokes ?? ""}`)}</td><td className="px-2 py-1.5 font-semibold text-amber-100">{getPlayerLabel(player)}</td><td className="px-2 py-1.5 text-right text-amber-100/75">{player.qualificationRank}</td><td className="px-2 py-1.5 text-right font-serif text-lg font-bold text-amber-300">{player.finalHcpAdjustedStrokes ?? "–"}</td><td className="px-2 py-1.5 text-right text-amber-100">{player.finalPlayed}/18</td><td className="px-2 py-1.5 text-right text-amber-100/75">{player.finalGroup === "championship" ? "1–3" : "4–6"}</td></tr></React.Fragment>) : standings.map((player, index) => <React.Fragment key={player.id}>{index === 3 && <tr><td colSpan={qualificationRounds.length + 3} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-amber-200">Cut-Linie · Top 3 spielen den Finaltag</td></tr>}<tr className={cls("border-t border-amber-700/20", index < 3 && "bg-emerald-500/5")}><td className="px-2 py-1.5 text-amber-200/75">{formatCompetitionRank(players, index, getRankValue)}</td><td className="px-2 py-1.5 font-semibold text-amber-100">{getPlayerLabel(player)}{index < 3 && <span className="ml-2 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-200">Final</span>}</td>{qualificationRounds.map((round) => { const result = player.roundResults.find((item) => item.round_id === round.round_id); const isCounted = player.countedRoundIds.includes(round.round_id); const isDropped = player.droppedRoundId === round.round_id; return <td key={round.round_id} className={cls("px-2 py-1.5 text-right", isCounted && "font-bold text-amber-300", isDropped && "text-amber-100/50 line-through")}>{result?.played ? result.points : "–"}</td>; })}<td className="px-2 py-1.5 text-right font-serif text-lg font-bold text-amber-300">{player.totalBestTwo ?? "–"}</td></tr></React.Fragment>)}</tbody>
           </table>
         </div>
       </CardContent>
@@ -1203,7 +1271,19 @@ function LordOfTheHolesApp() {
     if (isScorerEntryMode) return String(s.player_id) === String(entryPlayerId) && isScorerControlScore(s);
     return String(s.player_id) === String(entryPlayerId) && !isScorerControlScore(s);
   }) || { strokes: "", picked_up: false, over_two_putts: false, putts_count: "", lady: false }, [scores, entryPlayerId, activeHole, displayedActiveRound?.round_id, isScorerEntryMode]);
-  const canEnterScores = Boolean(displayedActiveRound?.round_id && myPlayerId && (!isFlightDrawRound || assignedScoredPlayerId) && scoredPlayerId && entryPlayerId && entryPlayer && Number(activeHole) > 0);
+  const roundScoreEntryClosed = useMemo(() => {
+    const roundId = String(displayedActiveRound?.round_id || "");
+    if (!roundId) return false;
+    const roundHolesForLock = (holes?.length ? holes : fallbackHoles.filter((hole) => String(hole.course_id) === String(displayCourseId))).filter((hole) => Number(hole.hole_number) > 0);
+    const roundPlayersForLock = visiblePlayers || [];
+    if (!roundHolesForLock.length || !roundPlayersForLock.length) return false;
+    const hasCompleteScore = (score) => Boolean(score && score.strokes !== "" && score.strokes != null && score.putts_count !== "" && score.putts_count != null);
+    const allOfficialScoresComplete = roundPlayersForLock.every((player) => roundHolesForLock.every((hole) => hasCompleteScore(findScoreForPlayerHole(scores, roundId, player.id, hole.hole_number, false))));
+    const allControlScoresComplete = roundPlayersForLock.every((player) => roundHolesForLock.every((hole) => hasCompleteScore(findScoreForPlayerHole(scores, roundId, player.id, hole.hole_number, true))));
+    const noRoundMismatches = getMismatchesForRound(scores, roundId, roundPlayersForLock).length === 0;
+    return allOfficialScoresComplete && allControlScoresComplete && noRoundMismatches;
+  }, [displayedActiveRound?.round_id, holes, displayCourseId, visiblePlayers, scores]);
+  const canEnterScores = Boolean(displayedActiveRound?.round_id && myPlayerId && (!isFlightDrawRound || assignedScoredPlayerId) && scoredPlayerId && entryPlayerId && entryPlayer && Number(activeHole) > 0 && !roundScoreEntryClosed);
   const currentEffectiveStrokes = normalizeBoolean(currentScore.picked_up) ? Number(pickedUpStrokes || 0) : Number(currentScore.strokes || 0);
   const maxPuttsForCurrentScore = currentEffectiveStrokes > 1 ? currentEffectiveStrokes - 1 : 0;
   const officialScoreForActiveHole = useMemo(() => findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", scoredPlayerId, activeHole, false), [scores, displayedActiveRound?.round_id, scoredPlayerId, activeHole]);
@@ -2543,6 +2623,7 @@ function LordOfTheHolesApp() {
                 <div className="mb-3"><ScoreStepper value={normalizeBoolean(currentScore.picked_up) ? 0 : currentScore.strokes ?? ""} par={activeHoleData?.par || 4} pickedUpStrokes={pickedUpStrokes} disabled={!canEnterScores} onChange={(scoreValue) => Number(scoreValue) === 0 || Number(scoreValue) >= Number(pickedUpStrokes || 0) ? saveScore({ strokes: pickedUpStrokes, picked_up: true }) : saveScore({ strokes: scoreValue, picked_up: false })} /></div>
                 <div className="mb-3"><PuttStepper value={currentScore.putts_count} disabled={!canEnterScores || currentEffectiveStrokes <= 1} max={maxPuttsForCurrentScore} onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })} /></div>
                 <div className="mb-3 rounded-2xl border border-[rgb(var(--score-accent)/0.30)] bg-black/25 p-2"><div className="flex items-center justify-between gap-2"><div><div className="text-xs font-semibold text-amber-100">Lady</div><div className="text-[10px] text-amber-100/65">Markiert eine Lady.</div></div><input type="checkbox" disabled={!canEnterScores} checked={normalizeBoolean(currentScore.lady)} onChange={(e) => saveScore({ lady: e.target.checked })} className="h-6 w-6 accent-amber-500 disabled:opacity-40" /></div></div>
+                {roundScoreEntryClosed ? <div className="mb-2 rounded-xl border border-emerald-500/40 bg-emerald-950/45 p-2 text-center text-xs font-semibold text-emerald-100">Diese Runde ist vollständig eingetragen und ohne Palantír-Abweichung. Score-Eingaben sind gesperrt.</div> : null}
                 {scoreHintMessage ? <div className="mb-2 rounded-xl border border-amber-500/40 bg-amber-950/50 p-1.5 text-center text-xs font-semibold text-amber-100">{scoreHintMessage}</div> : null}
                 <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 py-3 text-base font-bold text-amber-100">Zurück</Button>{activeHole === 18 ? <Button disabled={!canEnterScores || saving} onClick={completeCurrentRound} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-emerald-700" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>{saving ? "Synchronisiere ..." : "Runde abschließen"}</Button> : <Button disabled={!canEnterScores || saving} onClick={goToNextHole} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>{`Loch ${Math.min(18, Number(activeHole || 1) + 1)}`}</Button>}</div>
               </div>
@@ -2821,7 +2902,7 @@ function LordOfTheHolesApp() {
   }
 
   function renderFunView() {
-    return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3"><div className="landscape:mx-auto landscape:max-w-none landscape:pb-6"><MiddleEarthTables players={playersWithCurrentHandicaps} holes={holes} scores={officialScores} mismatches={roundMismatches} /></div></motion.section>;
+    return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3"><div className="landscape:mx-auto landscape:max-w-none landscape:pb-6"><MiddleEarthTables players={playersWithCurrentHandicaps} holes={holes} scores={officialScores} mismatches={roundMismatches} rounds={rounds} allPlayers={allPlayers} allHoles={allHoles} allScores={officialAllScores} courses={courses} roundPlayers={roundPlayers} activeRoundId={displayedActiveRound?.round_id || ""} /></div></motion.section>;
   }
 
   function RulesSection({ title, subtitle = "", children }) {
@@ -3107,7 +3188,10 @@ function LordOfTheHolesApp() {
       return { ...standing, teamId, players: teamMap[teamId] || [] };
     });
     const rankedTeams = teamsByLetter.slice().sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
-    rankedTeams.forEach((team, index) => { team.ceremonyRank = index + 1; });
+    rankedTeams.forEach((team, index) => {
+      team.ceremonyRank = getCompetitionRank(rankedTeams, index, (item) => Number(item.value || 0));
+      team.ceremonyRankLabel = formatCompetitionRank(rankedTeams, index, (item) => Number(item.value || 0));
+    });
     const resultRevealTeams = rankedTeams.slice().sort((a, b) => Number(b.ceremonyRank || 0) - Number(a.ceremonyRank || 0));
     const playerCeremonyLabel = (row) => row?.player_alias ? `${row.player_alias} (${row.player_name || row.player_id})` : (row?.player_name || row?.player_id || "");
     const teamPlayersText = (team) => (team.players || []).map(playerCeremonyLabel).filter(Boolean).join(" und ") || `Team ${team.teamId}`;
@@ -3259,10 +3343,11 @@ function LordOfTheHolesApp() {
 
     resultRevealTeams.forEach((team) => {
       const rank = Number(team.ceremonyRank || 0);
+      const rankLabel = team.ceremonyRankLabel || String(rank);
       steps.push({
         type: "teamResult",
-        title: `${rank}. Platz`,
-        text: `Auf Platz ${rank} landen ${teamPlayersText(team)} mit ${team.detail}. ${rankTexts[rank] || "Das Schicksal hat gesprochen."}`,
+        title: `${rankLabel}. Platz`,
+        text: `Auf Platz ${rankLabel} landen ${teamPlayersText(team)} mit ${team.detail}. ${rankTexts[rank] || "Das Schicksal hat gesprochen."}`,
         teamId: team.teamId,
         rank,
         detail: team.detail,
@@ -3519,7 +3604,7 @@ function LordOfTheHolesApp() {
                           <tbody>
                             {standings.teams.map((team, index) => (
                               <tr key={team.teamId} className="border-t border-amber-700/20">
-                                <td className="hidden px-2 py-1.5 text-amber-200/70 landscape:table-cell">{index + 1}</td>
+                                <td className="hidden px-2 py-1.5 text-amber-200/70 landscape:table-cell">{formatCompetitionRank(standings.teams, index, (item) => Number(item.value || 0))}</td>
                                 <td className="px-2 py-1.5 font-bold text-amber-200">{team.label}</td>
                                 <td className="px-2 py-1.5 text-amber-100/80 landscape:break-words">{team.players.map((player, playerIndex) => { const meta = getDailyTeamPlayerMeta(roundId, team.teamId, player.id, playerIndex); const name = player.character_name || player.display_name || player.id; return meta.isLoanPlayer ? `${name} (Leihspieler aus Team ${meta.homeTeamId})` : name; }).join(" · ") || "–"}{!team.isComplete ? <span className="ml-1 text-[10px] text-red-200/75">offen</span> : null}</td>
                                 <td className="px-2 py-1.5 text-right font-serif text-base font-black text-amber-300 landscape:text-lg">{team.detail}</td>
