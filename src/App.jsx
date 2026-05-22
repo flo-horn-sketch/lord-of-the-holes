@@ -536,6 +536,17 @@ function formatCompetitionRank(items = [], index = 0, getValue) {
   return isTiedAtRank(items, index, getValue) ? `T${rank}` : String(rank);
 }
 
+function getRankValue(item) {
+  if (!item) return "";
+  if (item.totalBestTwo !== undefined && item.totalBestTwo !== null) return item.totalBestTwo;
+  if (item.finalHcpAdjustedStrokes !== undefined && item.finalHcpAdjustedStrokes !== null) return `${item.finalGroup || ""}|${item.finalHcpAdjustedStrokes}`;
+  if (item.hcpAdjustedStrokes !== undefined && item.hcpAdjustedStrokes !== null) return item.hcpAdjustedStrokes;
+  if (item.value !== undefined && item.value !== null) return item.value;
+  if (item.points !== undefined && item.points !== null) return item.points;
+  if (item.total !== undefined && item.total !== null) return item.total;
+  return "";
+}
+
 function normalizeHoles(rawHoles) {
   const validHoles = Array.isArray(rawHoles) ? rawHoles.filter((h) => Number(h.hole_number) > 0 && Number(h.par) > 0 && Number(h.hcp) > 0) : [];
   return validHoles.length ? validHoles : fallbackHoles;
