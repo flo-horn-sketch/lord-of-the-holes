@@ -3215,9 +3215,9 @@ function LordOfTheHolesApp() {
 
   function getTeamDrawTargetLabel(roundId) {
     const labels = {
-      r1: "22.05.2026 · 20:30 Uhr",
-      r2: "23.05.2026 · 20:30 Uhr",
-      r3: "24.05.2026 · 20:30 Uhr",
+      r1: "22.05.2026 · 21:00 Uhr",
+      r2: "23.05.2026 · 21:00 Uhr",
+      r3: "24.05.2026 · 21:00 Uhr",
     };
     return labels[roundId] || "noch nicht festgelegt";
   }
