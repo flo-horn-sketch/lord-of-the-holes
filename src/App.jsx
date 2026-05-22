@@ -859,6 +859,10 @@ function buildFunPlayerStats(players, holes, scores) {
     const frontToPar = frontTotal == null || frontPar == null ? null : frontTotal - frontPar;
     const backToPar = backTotal == null || backPar == null ? null : backTotal - backPar;
     const backMinusFront = frontToPar == null || backToPar == null ? null : backToPar - frontToPar;
+    const zeroNetPoints = enrichedScores.filter((item) => getScoreStablefordPoints(item.score, item.hole.par, getShotsOnHole(player.course_hcp, item.hole.hcp)) === 0).length;
+    const isGangolf = String(player.id || "").toLowerCase() === "achim" || String(player.alias_name || "").toLowerCase() === "gangolf";
+    const shortDrinkCount = isGangolf ? 0 : zeroNetPoints;
+    const burpeeCount = isGangolf ? zeroNetPoints * 20 : 0;
     const birdies = enrichedScores.filter((item) => item.diff === -1 && !normalizeBoolean(item.score.picked_up)).length;
     const eaglesOrBetter = enrichedScores.filter((item) => item.diff != null && item.diff <= -2 && !normalizeBoolean(item.score.picked_up)).length;
     const pars = enrichedScores.filter((item) => item.diff === 0 && !normalizeBoolean(item.score.picked_up)).length;
@@ -875,7 +879,7 @@ function buildFunPlayerStats(players, holes, scores) {
     const netStableford = enrichedScores.reduce((sum, item) => sum + getScoreStablefordPoints(item.score, item.hole.par, getShotsOnHole(player.course_hcp, item.hole.hcp)), 0);
     const hcpBonus = netStableford - grossStableford;
     const hcpShotsUsed = enrichedScores.reduce((sum, item) => sum + getShotsOnHole(player.course_hcp, item.hole.hcp), 0);
-    return { ...withFallbackAlias(player), played: enrichedScores.length, birdies, eaglesOrBetter, pars, parOrBetter, doubleBogeyPlus, triplePlus, pickedUpCount, ladyCount, greenAttempts: greenAttempts.length, greenInRegulation, underRegulation, threePutts, fourPutts, fivePlusPutts, fourPlusPutts, puttPenaltyEuro, frontTotal, backTotal, frontToPar, backToPar, backMinusFront, grossStableford, netStableford, hcpBonus, hcpShotsUsed, pointsPerHcpShot: hcpShotsUsed ? Number((netStableford / hcpShotsUsed).toFixed(2)) : 0 };
+    return { ...withFallbackAlias(player), played: enrichedScores.length, zeroNetPoints, shortDrinkCount, burpeeCount, birdies, eaglesOrBetter, pars, parOrBetter, doubleBogeyPlus, triplePlus, pickedUpCount, ladyCount, greenAttempts: greenAttempts.length, greenInRegulation, underRegulation, threePutts, fourPutts, fivePlusPutts, fourPlusPutts, puttPenaltyEuro, frontTotal, backTotal, frontToPar, backToPar, backMinusFront, grossStableford, netStableford, hcpBonus, hcpShotsUsed, pointsPerHcpShot: hcpShotsUsed ? Number((netStableford / hcpShotsUsed).toFixed(2)) : 0 };
   });
 }
 
@@ -1006,6 +1010,7 @@ function MiddleEarthTables({ players, holes, scores, mismatches, rounds = fallba
   const funPlayers = useMemo(() => buildFunPlayerStats(scopedMiddleEarthPlayers, scopedMiddleEarthHoles, scopedMiddleEarthScores), [scopedMiddleEarthPlayers, scopedMiddleEarthHoles, scopedMiddleEarthScores]);
   const funHoles = useMemo(() => buildFunHoleStats(scopedMiddleEarthPlayers, scopedMiddleEarthHoles, scopedMiddleEarthScores), [scopedMiddleEarthPlayers, scopedMiddleEarthHoles, scopedMiddleEarthScores]);
   const snakeLords = [...funPlayers].sort((a, b) => Number(b.puttPenaltyEuro || 0) - Number(a.puttPenaltyEuro || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
+  const mordorTributes = [...funPlayers].sort((a, b) => Number(b.shortDrinkCount || 0) - Number(a.shortDrinkCount || 0) || Number(b.zeroNetPoints || 0) - Number(a.zeroNetPoints || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
   const ladies = [...funPlayers].sort((a, b) => Number(b.ladyCount || 0) - Number(a.ladyCount || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
   const whiteFlags = [...funPlayers].sort((a, b) => Number(b.pickedUpCount || 0) - Number(a.pickedUpCount || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
   const parMachines = [...funPlayers].sort((a, b) => Number(b.parOrBetter || 0) - Number(a.parOrBetter || 0) || Number(b.pars || 0) - Number(a.pars || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
@@ -1030,6 +1035,7 @@ function MiddleEarthTables({ players, holes, scores, mismatches, rounds = fallba
           </div>
         </div>
         <FunTable title="Shelobs Putt-Kammer" subtitle="Snake-König der Runde" players={snakeLords} columns={[{ label: "3P", render: (p) => p.threePutts }, { label: "4P", render: (p) => p.fourPutts }, { label: "5+P", render: (p) => p.fivePlusPutts }, { label: "€", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} />
+        <FunTable title="Der Tribut Mordors" subtitle="0 Netto-Punkte · Kurze und Gangolfs Burpees" players={mordorTributes} columns={[{ label: "Kurze", render: (p) => p.shortDrinkCount || 0, emphasize: true }, { label: "0 Netto", render: (p) => p.zeroNetPoints || 0 }, { label: "Burpees", render: (p) => p.burpeeCount || 0 }]} />
         <FunTable title="Galadriels Spiegel" subtitle="Lady-Liga" players={ladies} columns={[{ label: "Ladys", render: (p) => p.ladyCount, emphasize: true }, { label: "Quote", render: (p) => p.played ? `${Math.round((p.ladyCount / p.played) * 100)} %` : "–" }]} />
         <FunTable title="Die weißen Fahnen von Minas Tirith" subtitle="Gestrichene Löcher" players={whiteFlags} columns={[{ label: "X", render: (p) => p.pickedUpCount, emphasize: true }, { label: "Quote", render: (p) => p.played ? `${Math.round((p.pickedUpCount / p.played) * 100)} %` : "–" }]} />
         <FunTable title="Die Ents der Fairways" subtitle="Par oder besser" players={parMachines} columns={[{ label: "Par+", render: (p) => p.parOrBetter, emphasize: true }, { label: "Pars", render: (p) => p.pars }, { label: "Birdie+", render: (p) => p.birdies + p.eaglesOrBetter }]} />
@@ -1284,6 +1290,32 @@ function LordOfTheHolesApp() {
     return allOfficialScoresComplete && allControlScoresComplete && noRoundMismatches;
   }, [displayedActiveRound?.round_id, holes, displayCourseId, visiblePlayers, scores]);
   const canEnterScores = Boolean(displayedActiveRound?.round_id && myPlayerId && (!isFlightDrawRound || assignedScoredPlayerId) && scoredPlayerId && entryPlayerId && entryPlayer && Number(activeHole) > 0 && !roundScoreEntryClosed);
+  const currentFlightZeroNetPenalties = useMemo(() => {
+    const roundId = String(displayedActiveRound?.round_id || "");
+    const holeNumber = Number(activeHole || 0);
+    if (!roundId || !holeNumber || !activeHoleData) return [];
+    const flightPlayerIds = (myFlightFromDraw?.players || []).map((id) => String(id));
+    const fallbackPlayerIds = visiblePlayers.map((player) => String(player.id));
+    const relevantPlayerIds = flightPlayerIds.length ? flightPlayerIds : fallbackPlayerIds;
+    const sourcePlayers = [...(visiblePlayers || []), ...(allPlayers || [])];
+    return relevantPlayerIds.map((playerId) => {
+      const playerBase = sourcePlayers.find((player) => String(player.id) === String(playerId));
+      if (!playerBase) return null;
+      const player = getPlayerForCourse(playerBase, displayCourseId, courses);
+      const score = findScoreForPlayerHole(scores, roundId, playerId, holeNumber, false);
+      const hasCompleteScore = Boolean(score && score.strokes !== "" && score.strokes != null);
+      if (!hasCompleteScore) return null;
+      const netPoints = getScoreStablefordPoints(score, activeHoleData.par, getShotsOnHole(player?.course_hcp, activeHoleData.hcp));
+      if (Number(netPoints) !== 0) return null;
+      const isAchim = String(playerId).toLowerCase() === "achim" || String(player?.alias_name || "").toLowerCase() === "gangolf";
+      return {
+        player,
+        playerId,
+        action: isAchim ? "20 Burpees" : "Kurzer trinken",
+        text: isAchim ? `${getPlayerLabel(player)} hat am Loch den Zorn Mordors geweckt · 20 Burpees vor den Augen des Flights` : `${getPlayerLabel(player)} ist an diesem Loch in den Schatten Mordors geraten · ein Kurzer für den Gefährten`,
+      };
+    }).filter(Boolean);
+  }, [displayedActiveRound?.round_id, activeHole, activeHoleData, myFlightFromDraw, visiblePlayers, allPlayers, displayCourseId, courses, scores]);
   const currentEffectiveStrokes = normalizeBoolean(currentScore.picked_up) ? Number(pickedUpStrokes || 0) : Number(currentScore.strokes || 0);
   const maxPuttsForCurrentScore = currentEffectiveStrokes > 1 ? currentEffectiveStrokes - 1 : 0;
   const officialScoreForActiveHole = useMemo(() => findScoreForPlayerHole(scores, displayedActiveRound?.round_id || "r1", scoredPlayerId, activeHole, false), [scores, displayedActiveRound?.round_id, scoredPlayerId, activeHole]);
@@ -2615,6 +2647,17 @@ function LordOfTheHolesApp() {
                     <div className="mt-1 space-y-1 text-red-100/90">
                       {visibleScoreMismatchMessages.map((message) => (
                         <div key={message} className="rounded-xl bg-black/25 px-2 py-1">{message}</div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {currentFlightZeroNetPenalties.length ? (
+                  <div className="mb-2 rounded-2xl border border-sky-400/45 bg-sky-950/40 p-2 text-xs text-sky-100 shadow-[0_10px_24px_rgba(0,0,0,0.30)]">
+                    <div className="font-serif text-sm font-bold text-sky-100">Der Rat des Flights raunt</div>
+                    <div className="mt-1 text-sky-100/80">Ein Gefährte hat an diesem Loch 0 Netto-Punkte errungen. Das Regelwerk verlangt Tribut:</div>
+                    <div className="mt-1 space-y-1">
+                      {currentFlightZeroNetPenalties.map((item) => (
+                        <div key={`${item.playerId}-${item.action}`} className="rounded-xl bg-black/25 px-2 py-1 font-semibold">{item.text}</div>
                       ))}
                     </div>
                   </div>
