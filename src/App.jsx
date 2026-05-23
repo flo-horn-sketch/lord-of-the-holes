@@ -822,7 +822,7 @@ function LeaderboardTable({ title, players, columns }) {
           <tbody>
             {players.map((p, index) => (
               <tr key={p.id} className="border-t border-amber-700/20">
-                <td className="px-2 py-1.5 text-amber-200/75">{formatCompetitionRank(players, index, getRankValue)}</td>
+                <td className="px-2 py-1.5 text-amber-200/75">{formatCompetitionRank(standings, index, getQualificationRankValue)}</td>
                 <td className="px-2 py-1.5 font-semibold text-amber-100">{getPlayerLabel(p)}</td>
                 {columns.map((column) => <td key={column.label} className={cls("px-2 py-1.5 text-right", column.emphasize && "font-serif text-lg text-amber-300")}>{column.render(p)}</td>)}
               </tr>
