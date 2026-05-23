@@ -822,7 +822,7 @@ function LeaderboardTable({ title, players, columns }) {
           <tbody>
             {players.map((p, index) => (
               <tr key={p.id} className="border-t border-amber-700/20">
-                <td className="px-2 py-1.5 text-amber-200/75">{formatCompetitionRank(standings, index, getQualificationRankValue)}</td>
+                <td className="px-2 py-1.5 text-amber-200/75">{formatCompetitionRank(players, index, getRankValue)}</td>
                 <td className="px-2 py-1.5 font-semibold text-amber-100">{getPlayerLabel(p)}</td>
                 {columns.map((column) => <td key={column.label} className={cls("px-2 py-1.5 text-right", column.emphasize && "font-serif text-lg text-amber-300")}>{column.render(p)}</td>)}
               </tr>
@@ -1007,7 +1007,7 @@ function FunTable({ title, subtitle = "", players, columns, nameLabel = "Name" }
       <div className="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <table className="w-full min-w-[360px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">
           <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100"><th className="px-2 py-1.5">Platz</th><th className="px-2 py-1.5">{hasHoleRows ? "Loch" : nameLabel}</th>{columns.map((column) => <th key={column.label} className="px-2 py-1.5 text-right">{column.label}</th>)}</tr></thead>
-          <tbody>{players.map((item, index) => <tr key={item.id || `${item.course_id || "course"}-${item.hole_number}-${index}`} className="border-t border-amber-700/20"><td className="px-2 py-1.5 text-amber-200/75">{formatCompetitionRank(players, index, getRankValue)}</td><td className="px-2 py-1.5 font-semibold text-amber-100">{item.hole_number ? `${item.course_name || getCourseShortName(item.course_id)} · Loch ${item.hole_number}` : item.character_name || item.display_name || item.id}</td>{columns.map((column) => <td key={column.label} className={cls("px-2 py-1.5 text-right", column.emphasize && "font-serif text-lg text-amber-300")}>{column.render(item, index)}</td>)}</tr>)}</tbody>
+          <tbody>{players.map((item, index) => <tr key={item.id || `${item.course_id || "course"}-${item.hole_number}-${index}`} className="border-t border-amber-700/20"><td className="px-2 py-1.5 text-amber-200/75">{getQualificationRankLabel(index)}</td><td className="px-2 py-1.5 font-semibold text-amber-100">{item.hole_number ? `${item.course_name || getCourseShortName(item.course_id)} · Loch ${item.hole_number}` : item.character_name || item.display_name || item.id}</td>{columns.map((column) => <td key={column.label} className={cls("px-2 py-1.5 text-right", column.emphasize && "font-serif text-lg text-amber-300")}>{column.render(item, index)}</td>)}</tr>)}</tbody>
         </table>
       </div>
     </div>
@@ -1183,7 +1183,8 @@ function TournamentStandings({ players, rounds, holes, scores, courses = fallbac
   const finalRound = getFinalRound(rounds);
   const isFinalActive = String(activeRoundId) === String(finalRound?.round_id || "r4");
   const getQualificationRankValue = (player) => player.totalBestTwo ?? "";
-  const isFinalQualified = (player, index) => player.totalBestTwo != null && getCompetitionRank(standings, index, getQualificationRankValue) <= 3;
+  const getQualificationRankLabel = (index) => formatCompetitionRank(standings, index, (item) => item.totalBestTwo ?? "");
+  const isFinalQualified = (player, index) => player.totalBestTwo != null && getCompetitionRank(standings, index, (item) => item.totalBestTwo ?? "") <= 3;
   return (
     <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm landscape:rounded-xl">
       <CardContent className="p-2">
