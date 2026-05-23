@@ -3258,6 +3258,14 @@ function LordOfTheHolesApp() {
             <Button disabled={!isAdminUnlocked || connectionStatus !== "online"} onClick={resetDeviceAssignmentsForAll} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">Spieler-/Zähler-Zuordnungen zurücksetzen</Button>
             <Button disabled={!isAdminUnlocked} onClick={clearLocalCache} className="mt-2 w-full rounded-2xl border border-sky-500/40 bg-sky-950/60 py-2 text-sky-100 disabled:opacity-50">Lokalen Cache dieses Geräts löschen</Button>
             <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
+              <div className="text-sm font-bold text-amber-200">Score-Sperre</div>
+              <div className="mt-1 text-[11px] text-amber-100/55">Öffnet die aktuelle Runde lokal auf diesem Gerät, falls du nachträglich Scores korrigieren musst.</div>
+              <Button disabled={!isAdminUnlocked} onClick={() => setAdminScoreEntryUnlocks((current) => {
+                const roundId = String(displayedActiveRound?.round_id || selectedActiveRoundId || "");
+                return { ...(current || {}), [roundId]: !Boolean(current?.[roundId]) };
+              })} className={cls("mt-2 w-full rounded-2xl border py-2 text-sm font-bold disabled:opacity-50", adminScoreEntryUnlocks?.[String(displayedActiveRound?.round_id || selectedActiveRoundId || "")] ? "border-amber-400/55 bg-amber-700/45 text-amber-50" : "border-amber-500/40 bg-stone-950/70 text-amber-100")}>{adminScoreEntryUnlocks?.[String(displayedActiveRound?.round_id || selectedActiveRoundId || "")] ? "Score-Sperre wieder aktivieren" : "Score-Sperre für aktuelle Runde aufheben"}</Button>
+            </div>
+            <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
               <div className="mb-2 text-sm font-bold text-amber-200">Team-Zeremonie testen</div>
               <div className="grid grid-cols-3 gap-2">
                 <Button disabled={!isAdminUnlocked} onClick={() => startTeamCeremonyTest("r1")} className="rounded-2xl border border-amber-500/40 bg-amber-950/60 py-2 text-xs font-bold text-amber-100 disabled:opacity-50">R1</Button>
@@ -4718,9 +4726,9 @@ function LordOfTheHolesApp() {
       ) : null}
       {showDevicePlayerGate ? <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm"><div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-500/45 bg-stone-950 text-amber-50 shadow-2xl shadow-black/80"><div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.20),transparent_45%),linear-gradient(180deg,rgba(41,37,36,0.94),rgba(12,10,9,1))] p-4 text-center"><div className="text-[10px] uppercase tracking-[0.24em] text-amber-300/75">Dieses Handy</div><div className="mt-1 font-serif text-2xl font-black text-amber-200">Wer bist du?</div><div className="mt-1 text-sm text-amber-100/70">Wähle deinen eigenen Spieler. Diese Auswahl bleibt auf diesem Handy gespeichert.</div><div className="mt-4 grid gap-2">{visiblePlayers.map((player) => <button key={player.id} type="button" onClick={() => { setMyPlayerId(player.id); writeLocalJson("lordOfTheHoles.myPlayerId", player.id); setForceMyPlayerPromptOpen(false); setScoreEntryMode("player"); }} className="rounded-2xl border border-amber-700/35 bg-stone-900 px-3 py-3 font-serif text-base font-bold text-amber-100 transition active:scale-[0.98]">{getPlayerLabel(player)}</button>)}</div></div></div></div> : null}
       {showRoundHonorPopup ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-400/60 bg-stone-950 text-center text-amber-50 shadow-2xl shadow-black/80">
-            <div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.28),transparent_45%),linear-gradient(180deg,rgba(120,53,15,0.55),rgba(12,10,9,1))] p-5">
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/75 px-4 py-4 backdrop-blur-sm">
+          <div className="flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-amber-400/60 bg-stone-950 text-center text-amber-50 shadow-2xl shadow-black/80">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.28),transparent_45%),linear-gradient(180deg,rgba(120,53,15,0.55),rgba(12,10,9,1))] p-5 [scrollbar-width:thin]">
               <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-amber-300/50 bg-black/30 text-3xl shadow-xl shadow-amber-950/40">⚜</div>
               <div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/70">{displayedRoundHonorCelebration.roundName} beendet</div>
               <div className="mt-2 font-serif text-lg font-black text-amber-200">Gondors Erlass</div>
@@ -4738,7 +4746,7 @@ function LordOfTheHolesApp() {
               {displayedRoundHonorCelebration.butlerPlayoff?.length ? <div className="mt-2 rounded-2xl border border-red-400/45 bg-red-500/10 p-3 text-left"><div className="text-xs uppercase tracking-[0.22em] text-red-200/80">Entscheidungsputten um {displayedRoundHonorCelebration.butlerPlayoffSlots} Schildträgerplatz{displayedRoundHonorCelebration.butlerPlayoffSlots === 1 ? "" : "plätze"}</div><div className="mt-2 space-y-1">{displayedRoundHonorCelebration.butlerPlayoff.map((player) => <div key={player.id} className="flex items-center justify-between gap-2 rounded-xl bg-red-500/10 px-2 py-1.5"><span className="font-serif text-lg font-black text-red-100">{getPlayerLabel(player)}</span><span className="text-xs text-red-100/70">{player.hcpAdjustedStrokes}</span></div>)}</div><div className="mt-2 text-xs text-red-100/75">Nur diese punktgleichen Spieler müssen ins Entscheidungsputten um den offenen Schildträgerdienst. Bereits eindeutig feststehende Schildträger müssen nicht antreten.</div></div> : null}
               <div className="mt-2 rounded-2xl border border-amber-500/25 bg-black/20 p-2 text-sm text-amber-100/75">{displayedRoundHonorCelebration.hasPlayoff ? "Gondor wartet auf das Entscheidungsputten. Erst danach ist geklärt, wer Krone trägt und wer Schild hält." : displayedRoundHonorCelebration.roundOrder === 1 ? "Der Herr von Gondor steht fest. Sein Schildträger ebenso. Der Dienst ist ehrenvoll — und vermutlich leicht erniedrigend." : "Die Herren von Gondor und ihre Schildträger stehen fest. Der Hofstaat ist informiert, die Eide sind gesprochen, die Knie zittern."}</div>
             </div>
-            <div className="p-3"><button type="button" onClick={() => {
+            <div className="shrink-0 border-t border-amber-400/25 bg-stone-950/95 p-3"><button type="button" onClick={() => {
                     const key = displayedRoundHonorCelebration?.key;
                     if (!key) return;
                     setRoundHonorDismissedKeys((current) => Array.from(new Set([...(current || []), key])));
