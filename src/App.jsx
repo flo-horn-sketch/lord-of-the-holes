@@ -838,6 +838,92 @@ function LeaderboardTable({ title, players, columns }) {
   );
 }
 
+function RoundProgressChart({ title, players = [], holes = [], scores = [], metric = "strokesHcpAdjusted" }) {
+  const chartPlayers = (players || []).filter(Boolean);
+  const chartHoles = (holes || []).filter((hole) => Number(hole.hole_number) > 0).sort((a, b) => Number(a.hole_number) - Number(b.hole_number));
+  const palette = ["#fbbf24", "#38bdf8", "#34d399", "#f472b6", "#a78bfa", "#fb923c", "#f87171", "#fde68a"];
+  const getMetricLabel = () => {
+    if (metric === "strokes") return "Strokes +/−";
+    if (metric === "netStableford") return "Netto Stableford";
+    if (metric === "grossStableford") return "Brutto Punkte";
+    if (metric === "puttPenalty") return "Putt-Kasse €";
+    return "Strokes HCP adjusted +/−";
+  };
+  const playerLines = chartPlayers.map((player, playerIndex) => {
+    let cumulative = 0;
+    const points = [];
+    chartHoles.forEach((hole, holeIndex) => {
+      const score = (scores || []).find((item) => String(item.player_id) === String(player.id) && Number(item.hole_number) === Number(hole.hole_number));
+      if (!score || score.strokes === "" || score.strokes == null) return;
+      const strokes = Number(score.strokes || 0);
+      const shots = getShotsOnHole(player.course_hcp, hole.hcp);
+      if (metric === "strokes") cumulative += strokes - Number(hole.par || 0);
+      else if (metric === "netStableford") cumulative += getScoreStablefordPoints(score, hole.par, shots);
+      else if (metric === "grossStableford") cumulative += getScoreStablefordPoints(score, hole.par, 0);
+      else if (metric === "puttPenalty") {
+        const putts = Number(score.putts_count || 0);
+        cumulative += putts >= 5 ? 10 : putts === 4 ? 4 : putts === 3 ? 2 : 0;
+      } else cumulative += strokes - shots - Number(hole.par || 0);
+      points.push({ hole: Number(hole.hole_number), holeIndex, value: cumulative });
+    });
+    return { player, points, color: palette[playerIndex % palette.length] };
+  }).filter((line) => line.points.length);
+  const allValues = playerLines.flatMap((line) => line.points.map((point) => point.value));
+  if (!playerLines.length || !chartHoles.length || !allValues.length) return null;
+  const minValue = Math.min(...allValues, 0);
+  const maxValue = Math.max(...allValues, 0);
+  const range = Math.max(1, maxValue - minValue);
+  const width = 720;
+  const height = 260;
+  const padLeft = 42;
+  const padRight = 18;
+  const padTop = 18;
+  const padBottom = 34;
+  const xFor = (holeIndex) => padLeft + (chartHoles.length <= 1 ? 0 : (holeIndex / (chartHoles.length - 1)) * (width - padLeft - padRight));
+  const yFor = (value) => padTop + ((maxValue - value) / range) * (height - padTop - padBottom);
+  const axisTicks = Array.from(new Set([minValue, 0, maxValue].map((value) => Math.round(value * 10) / 10))).sort((a, b) => a - b);
+  return (
+    <div className="mb-3 overflow-hidden rounded-2xl border border-amber-700/30 bg-black/20">
+      <div className="border-b border-amber-700/30 bg-amber-500/10 px-2 py-1.5">
+        <div className="font-serif text-base text-amber-200">{title} · Verlauf</div>
+        <div className="text-xs text-amber-100/60">X-Achse: Löcher · Y-Achse: {getMetricLabel()}</div>
+      </div>
+      <div className="overflow-x-auto p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <svg viewBox={`0 0 ${width} ${height}`} className="min-w-[620px] rounded-xl bg-black/18">
+          {axisTicks.map((tick) => (
+            <g key={`tick-${tick}`}>
+              <line x1={padLeft} x2={width - padRight} y1={yFor(tick)} y2={yFor(tick)} stroke="rgba(251,191,36,0.16)" strokeDasharray="4 5" />
+              <text x={padLeft - 8} y={yFor(tick) + 4} textAnchor="end" fontSize="11" fill="rgba(254,243,199,0.72)">{formatToPar(tick, true)}</text>
+            </g>
+          ))}
+          {chartHoles.map((hole, index) => (
+            <g key={`hole-${hole.hole_number}`}>
+              <line x1={xFor(index)} x2={xFor(index)} y1={padTop} y2={height - padBottom} stroke="rgba(251,191,36,0.08)" />
+              <text x={xFor(index)} y={height - 12} textAnchor="middle" fontSize="10" fill="rgba(254,243,199,0.62)">{hole.hole_number}</text>
+            </g>
+          ))}
+          <line x1={padLeft} x2={width - padRight} y1={height - padBottom} y2={height - padBottom} stroke="rgba(251,191,36,0.22)" />
+          <line x1={padLeft} x2={padLeft} y1={padTop} y2={height - padBottom} stroke="rgba(251,191,36,0.22)" />
+          {playerLines.map((line) => {
+            const d = line.points.map((point) => `${xFor(point.holeIndex)},${yFor(point.value)}`).join(" ");
+            const lastPoint = line.points[line.points.length - 1];
+            return (
+              <g key={line.player.id}>
+                <polyline points={d} fill="none" stroke={line.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity="0.92" />
+                {line.points.map((point) => <circle key={`${line.player.id}-${point.hole}`} cx={xFor(point.holeIndex)} cy={yFor(point.value)} r="3.2" fill={line.color} />)}
+                {lastPoint ? <text x={Math.min(width - 92, xFor(lastPoint.holeIndex) + 7)} y={yFor(lastPoint.value) + 4} fontSize="10" fontWeight="700" fill={line.color}>{line.player.alias_name || line.player.character_name || line.player.display_name}</text> : null}
+              </g>
+            );
+          })}
+        </svg>
+        <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-amber-100/75">
+          {playerLines.map((line) => <div key={`legend-${line.player.id}`} className="inline-flex items-center gap-1.5 rounded-full border border-amber-700/25 bg-black/25 px-2 py-1"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: line.color }} />{line.player.alias_name || line.player.character_name || line.player.display_name}</div>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function getCourseShortName(courseId) {
   const normalized = String(courseId || "").toLowerCase().trim();
   if (normalized === "goethe") return "Goethe";
@@ -2904,7 +2990,12 @@ function LordOfTheHolesApp() {
             <CardContent className="p-3 text-sm text-amber-100"><div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Tabellen Runde</div><div className="mt-1 font-serif text-lg text-amber-200">{tableRound?.round_name || "Runde"}</div><div className="text-amber-100/65">{tableCourse?.course_name || "Kurs"}</div><div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">{availableRounds.map((round) => <button key={round.round_id} type="button" onClick={() => setRoundTableRoundId(round.round_id)} className={cls("rounded-xl border px-2 py-2 text-xs font-bold", String(tableRound?.round_id) === String(round.round_id) ? "border-amber-400/60 bg-amber-600 text-amber-50" : "border-amber-700/35 bg-black/25 text-amber-100")}>{round.round_name || round.round_id}</button>)}</div></CardContent>
           </Card>
           <Card className="mb-2 rounded-2xl border border-amber-500/30 bg-[linear-gradient(180deg,rgba(48,35,22,0.86),rgba(18,13,9,0.82))] shadow-[inset_0_1px_0_rgba(251,191,36,0.10),0_18px_46px_rgba(0,0,0,0.38)] backdrop-blur-sm">
-            <CardContent className="p-3"><div className="mb-2"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Leaderboard</p></div><LeaderboardTable title="Strokes HCP adjusted" players={sortHcpAdjustedStrokePlay(tableStats)} columns={[{ label: "+/−", render: (p) => formatToPar(p.hcpAdjustedToPar, p.played), emphasize: true }, { label: "Netto", render: (p) => p.played ? p.hcpAdjustedTotal : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Strokes" players={sortStrokePlay(tableStats)} columns={[{ label: "+/−", render: (p) => formatToPar(p.toPar, p.played), emphasize: true }, { label: "Schläge", render: (p) => p.played ? p.total : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Netto Stableford" players={sortStableford(tableStats, "netStableford")} columns={[{ label: "Punkte", render: (p) => p.netStableford, emphasize: true }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Brutto Punkte" players={sortStableford(tableStats, "grossStableford")} columns={[{ label: "Punkte", render: (p) => p.grossStableford, emphasize: true }, { label: "Schläge", render: (p) => p.played ? p.total : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} /><LeaderboardTable title="Putt-Kasse" players={[...tableStats].sort((a, b) => Number(b.puttPenaltyEuro || 0) - Number(a.puttPenaltyEuro || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0))} columns={[{ label: "3 Putts", render: (p) => `${p.threePutts} × 2 €` }, { label: "4+ Putts", render: (p) => `${p.fourPlusPutts} × 4 €` }, { label: "Gesamt", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} /></CardContent>
+            <CardContent className="p-3"><div className="mb-2"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Leaderboard</p></div><LeaderboardTable title="Strokes HCP adjusted" players={sortHcpAdjustedStrokePlay(tableStats)} columns={[{ label: "+/−", render: (p) => formatToPar(p.hcpAdjustedToPar, p.played), emphasize: true }, { label: "Netto", render: (p) => p.played ? p.hcpAdjustedTotal : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} />
+              <RoundProgressChart title="Strokes HCP adjusted" players={tablePlayers} holes={tableHoles} scores={tableScores} metric="strokesHcpAdjusted" /><LeaderboardTable title="Strokes" players={sortStrokePlay(tableStats)} columns={[{ label: "+/−", render: (p) => formatToPar(p.toPar, p.played), emphasize: true }, { label: "Schläge", render: (p) => p.played ? p.total : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} />
+              <RoundProgressChart title="Strokes" players={tablePlayers} holes={tableHoles} scores={tableScores} metric="strokes" /><LeaderboardTable title="Netto Stableford" players={sortStableford(tableStats, "netStableford")} columns={[{ label: "Punkte", render: (p) => p.netStableford, emphasize: true }, { label: "Löcher", render: (p) => `${p.played}/18` }]} />
+              <RoundProgressChart title="Netto Stableford" players={tablePlayers} holes={tableHoles} scores={tableScores} metric="netStableford" /><LeaderboardTable title="Brutto Punkte" players={sortStableford(tableStats, "grossStableford")} columns={[{ label: "Punkte", render: (p) => p.grossStableford, emphasize: true }, { label: "Schläge", render: (p) => p.played ? p.total : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} />
+              <RoundProgressChart title="Brutto Punkte" players={tablePlayers} holes={tableHoles} scores={tableScores} metric="grossStableford" /><LeaderboardTable title="Putt-Kasse" players={[...tableStats].sort((a, b) => Number(b.puttPenaltyEuro || 0) - Number(a.puttPenaltyEuro || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0))} columns={[{ label: "3 Putts", render: (p) => `${p.threePutts} × 2 €` }, { label: "4+ Putts", render: (p) => `${p.fourPlusPutts} × 4 €` }, { label: "Gesamt", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} />
+              <RoundProgressChart title="Putt-Kasse" players={tablePlayers} holes={tableHoles} scores={tableScores} metric="puttPenalty" /></CardContent>
           </Card>
         </div>
       </motion.section>
