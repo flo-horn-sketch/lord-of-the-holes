@@ -1076,8 +1076,9 @@ function buildRoundHcpAdjustedStandings(players, round, holes, scores, roundPlay
   }).sort((a, b) => (a.hcpAdjustedStrokes == null && b.hcpAdjustedStrokes != null ? 1 : b.hcpAdjustedStrokes == null && a.hcpAdjustedStrokes != null ? -1 : Number(a.hcpAdjustedStrokes || 0) - Number(b.hcpAdjustedStrokes || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0)));
 }
 
-function getRoundHonorCelebration(players, rounds, holes, scores, roundPlayers, dismissedKeys = []) {
+function getRoundHonorCelebration(players, rounds, holes, scores, roundPlayers, dismissedKeys = [], lockedRoundIds = []) {
   const qualificationRounds = getQualificationRounds(rounds);
+  const blockedRoundIds = new Set((lockedRoundIds || []).map((roundId) => String(roundId)));
 
   const sameHcpAdjustedScore = (a, b) => Number(a?.hcpAdjustedStrokes) === Number(b?.hcpAdjustedStrokes);
   const buildCutoffDecision = (standings, count, side) => {
@@ -1105,6 +1106,7 @@ function getRoundHonorCelebration(players, rounds, holes, scores, roundPlayers, 
 
   for (const round of qualificationRounds) {
     if (!round?.round_id || !round?.course_id) continue;
+    if (blockedRoundIds.has(String(round.round_id))) continue;
     const popupKey = `round_honor_${round.round_id}`;
     if ((dismissedKeys || []).includes(popupKey)) continue;
     const standings = buildRoundHcpAdjustedStandings(players, round, holes, scores, roundPlayers);
@@ -1462,7 +1464,27 @@ function LordOfTheHolesApp() {
 
     return buildSummary(9) || buildSummary(18);
   }, [myPlayerId, displayedActiveRound?.round_id, visiblePlayers, allPlayers, displayCourseId, courses, holes, officialScores, roundSummaryDismissedKeys]);
-  const displayedRoundHonorCelebration = useMemo(() => getRoundHonorCelebration(allPlayers, rounds, allHoles, officialAllScores, roundPlayers, roundHonorDismissedKeys), [allPlayers, rounds, allHoles, officialAllScores, roundPlayers, roundHonorDismissedKeys]);
+  const roundsWithLocalPendingScores = useMemo(() => {
+    const roundIds = new Set();
+    [...(pendingScores || []), ...(localScoreDrafts || [])].forEach((score) => {
+      const roundId = String(score?.round_id || "");
+      if (roundId && isValidScorePayload(score)) roundIds.add(roundId);
+    });
+    return Array.from(roundIds);
+  }, [pendingScores, localScoreDrafts]);
+  const roundsWithPalantirMismatches = useMemo(() => {
+    const roundIds = new Set();
+    (getQualificationRounds(rounds) || []).forEach((round) => {
+      const roundId = String(round?.round_id || "");
+      if (!roundId) return;
+      const playersForRound = getRoundPlayers(roundId, allPlayers, roundPlayers);
+      const mismatchesForRound = getMismatchesForRound(officialAllScores, roundId, playersForRound);
+      if (mismatchesForRound.length) roundIds.add(roundId);
+    });
+    return Array.from(roundIds);
+  }, [rounds, allPlayers, roundPlayers, officialAllScores]);
+  const roundsBlockedForHonor = useMemo(() => Array.from(new Set([...(roundsWithLocalPendingScores || []), ...(roundsWithPalantirMismatches || [])])), [roundsWithLocalPendingScores, roundsWithPalantirMismatches]);
+  const displayedRoundHonorCelebration = useMemo(() => getRoundHonorCelebration(allPlayers, rounds, allHoles, officialAllScores, roundPlayers, roundHonorDismissedKeys, roundsBlockedForHonor), [allPlayers, rounds, allHoles, officialAllScores, roundPlayers, roundHonorDismissedKeys, roundsBlockedForHonor]);
   const myRoundHonorRole = useMemo(() => {
     if (!displayedRoundHonorCelebration || !myPlayerId) return "neutral";
     if (displayedRoundHonorCelebration.lords.some((player) => String(player.id) === String(myPlayerId))) return "lord";
@@ -4361,7 +4383,11 @@ function LordOfTheHolesApp() {
               {displayedRoundHonorCelebration.butlerPlayoff?.length ? <div className="mt-2 rounded-2xl border border-red-400/45 bg-red-500/10 p-3 text-left"><div className="text-xs uppercase tracking-[0.22em] text-red-200/80">Entscheidungsputten um {displayedRoundHonorCelebration.butlerPlayoffSlots} Schildträgerplatz{displayedRoundHonorCelebration.butlerPlayoffSlots === 1 ? "" : "plätze"}</div><div className="mt-2 space-y-1">{displayedRoundHonorCelebration.butlerPlayoff.map((player) => <div key={player.id} className="flex items-center justify-between gap-2 rounded-xl bg-red-500/10 px-2 py-1.5"><span className="font-serif text-lg font-black text-red-100">{getPlayerLabel(player)}</span><span className="text-xs text-red-100/70">{player.hcpAdjustedStrokes}</span></div>)}</div><div className="mt-2 text-xs text-red-100/75">Nur diese punktgleichen Spieler müssen ins Entscheidungsputten um den offenen Schildträgerdienst. Bereits eindeutig feststehende Schildträger müssen nicht antreten.</div></div> : null}
               <div className="mt-2 rounded-2xl border border-amber-500/25 bg-black/20 p-2 text-sm text-amber-100/75">{displayedRoundHonorCelebration.hasPlayoff ? "Gondor wartet auf das Entscheidungsputten. Erst danach ist geklärt, wer Krone trägt und wer Schild hält." : displayedRoundHonorCelebration.roundOrder === 1 ? "Der Herr von Gondor steht fest. Sein Schildträger ebenso. Der Dienst ist ehrenvoll — und vermutlich leicht erniedrigend." : "Die Herren von Gondor und ihre Schildträger stehen fest. Der Hofstaat ist informiert, die Eide sind gesprochen, die Knie zittern."}</div>
             </div>
-            <div className="p-3"><button type="button" onClick={() => setRoundHonorDismissedKeys((current) => Array.from(new Set([...(current || []), displayedRoundHonorCelebration.key])))} className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-2.5 text-sm font-bold text-amber-50">{roundHonorCloseLabel}</button></div>
+            <div className="p-3"><button type="button" onClick={() => {
+                    const key = displayedRoundHonorCelebration?.key;
+                    if (!key) return;
+                    setRoundHonorDismissedKeys((current) => Array.from(new Set([...(current || []), key])));
+                  }} className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-2.5 text-sm font-bold text-amber-50">{roundHonorCloseLabel || "Erlass schließen ×"}</button></div>
           </div>
         </div>
       ) : null}
