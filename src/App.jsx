@@ -1183,7 +1183,14 @@ function TournamentStandings({ players, rounds, holes, scores, courses = fallbac
   const finalRound = getFinalRound(rounds);
   const isFinalActive = String(activeRoundId) === String(finalRound?.round_id || "r4");
   const getQualificationRankValue = (player) => player.totalBestTwo ?? "";
-  const getQualificationRankLabel = (index) => formatCompetitionRank(standings, index, (item) => item.totalBestTwo ?? "");
+  const getQualificationRankLabel = (index) => {
+    const current = standings[index];
+    if (!current || current.totalBestTwo == null) return String(index + 1);
+    const sameValueCount = standings.filter((item) => item.totalBestTwo != null && Number(item.totalBestTwo) === Number(current.totalBestTwo)).length;
+    const betterCount = standings.filter((item) => item.totalBestTwo != null && Number(item.totalBestTwo) < Number(current.totalBestTwo)).length;
+    const rank = betterCount + 1;
+    return sameValueCount > 1 ? `T${rank}` : String(rank);
+  };
   const isFinalQualified = (player, index) => player.totalBestTwo != null && getCompetitionRank(standings, index, (item) => item.totalBestTwo ?? "") <= 3;
   return (
     <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm landscape:rounded-xl">
@@ -3869,19 +3876,23 @@ function LordOfTheHolesApp() {
     });
 
     const finalStandings = buildFinalNetStandings(allPlayers, rounds, allHoles, officialAllScores, courses);
+    const finalRound = getFinalRound(rounds);
+    const finalHoles = getRoundHoles(finalRound, allHoles);
+    const finalPlayers = getRoundPlayers(finalRound?.round_id, allPlayers, roundPlayers);
+    const finalResultsComplete = Boolean(finalRound?.round_id && finalHoles.length && finalPlayers.length && finalPlayers.every((player) => finalHoles.every((hole) => officialAllScores.some((score) => String(score.round_id) === String(finalRound.round_id) && String(score.player_id) === String(player.id) && Number(score.hole_number) === Number(hole.hole_number) && score.strokes !== "" && score.strokes != null && score.putts_count !== "" && score.putts_count != null))));
     const topGreenfee = parseEuroValue(prizeSettings.topGreenfee);
     const finalGreenfee = topGreenfee;
     const winner = finalStandings.find((player) => Number(player.finalRank) === 1) || finalStandings[0];
     const second = finalStandings.find((player) => Number(player.finalRank) === 2);
-    if (winner?.id) {
+    if (finalResultsComplete && winner?.id) {
       if (topGreenfee) addPrizeLedgerEntry(ledger, winner.id, topGreenfee, `Gesamtsieger: teuerste Greenfee ${formatEuroValue(topGreenfee)}`, "money", "final");
       if (snakePot) addPrizeLedgerEntry(ledger, winner.id, snakePot, `Snake-Pott an den Turniersieger ${formatEuroValue(snakePot)}`, "money", "snake");
       addPrizeLedgerEntry(ledger, winner.id, 0, "Pokal des Lord of the Holes", "note", "honor");
     }
-    if (second?.id && finalGreenfee) addPrizeLedgerEntry(ledger, second.id, finalGreenfee * 0.5, `Platz 2: 50 % teuerste Greenfee ${formatEuroValue(finalGreenfee * 0.5)}`, "money", "final");
+    if (finalResultsComplete && second?.id && finalGreenfee) addPrizeLedgerEntry(ledger, second.id, finalGreenfee * 0.5, `Platz 2: 50 % teuerste Greenfee ${formatEuroValue(finalGreenfee * 0.5)}`, "money", "final");
 
     const placementPenalties = { 4: -0.35, 5: -0.5, 6: -0.65 };
-    Object.entries(placementPenalties).forEach(([rank, factor]) => {
+    if (finalResultsComplete) Object.entries(placementPenalties).forEach(([rank, factor]) => {
       const player = finalStandings.find((item) => Number(item.finalRank) === Number(rank));
       if (player?.id && finalGreenfee) addPrizeLedgerEntry(ledger, player.id, finalGreenfee * factor, `Platz ${rank}: Strafzahlung ${formatEuroValue(finalGreenfee * factor)}`, "money", "final");
     });
