@@ -1034,11 +1034,12 @@ function getScorecardSegmentSummary(player, holes = [], scores = [], fromHole = 
   return { par, strokes: playedRows.length ? strokes : null, hcpAdjusted: playedRows.length ? strokes - hcpShots : null, toPar, hcpAdjustedToPar, hcpShots, putts: playedRows.length ? putts : null, netStableford, grossStableford, played: playedRows.length, holes: segmentHoles.length };
 }
 
-function renderScorecardCellsWithSummaries(holes = [], renderHoleCell, renderOutCell, renderInCell, renderTotalCell) {
-  return (holes || []).flatMap((hole) => {
-    const cells = [renderHoleCell(hole)];
-    if (Number(hole.hole_number) === 9) cells.push(renderOutCell());
-    if (Number(hole.hole_number) === 18) {
+function renderScorecardCellsWithSummaries(items = [], renderHoleCell, renderOutCell, renderInCell, renderTotalCell) {
+  return (items || []).flatMap((item) => {
+    const holeNumber = Number(item?.hole?.hole_number ?? item?.hole_number ?? 0);
+    const cells = [renderHoleCell(item)];
+    if (holeNumber === 9) cells.push(renderOutCell());
+    if (holeNumber === 18) {
       cells.push(renderInCell());
       cells.push(renderTotalCell());
     }
