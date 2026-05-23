@@ -1182,34 +1182,118 @@ function TournamentStandings({ players, rounds, holes, scores, courses = fallbac
   const qualificationRounds = getQualificationRounds(rounds);
   const finalRound = getFinalRound(rounds);
   const isFinalActive = String(activeRoundId) === String(finalRound?.round_id || "r4");
-  const getQualificationRankValue = (player) => player.totalBestTwo ?? "";
-  const getQualificationRankLabel = (index) => {
+  const orderedRounds = (rounds?.length ? rounds : fallbackRounds).slice().sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
+
+  const getQualRank = (index) => {
+    const current = standings[index];
+    if (!current || current.totalBestTwo == null) return index + 1;
+    const value = Number(current.totalBestTwo);
+    const betterCount = standings.filter((item) => item.totalBestTwo != null && Number(item.totalBestTwo) < value).length;
+    return betterCount + 1;
+  };
+
+  const getQualRankLabel = (index) => {
     const current = standings[index];
     if (!current || current.totalBestTwo == null) return String(index + 1);
-    const currentValue = Number(current.totalBestTwo);
-    const sameValueCount = standings.filter((item) => item.totalBestTwo != null && Number(item.totalBestTwo) === currentValue).length;
-    const betterCount = standings.filter((item) => item.totalBestTwo != null && Number(item.totalBestTwo) < currentValue).length;
-    const rank = betterCount + 1;
-    return sameValueCount > 1 ? `T${rank}` : String(rank);
+    const value = Number(current.totalBestTwo);
+    const sameCount = standings.filter((item) => item.totalBestTwo != null && Number(item.totalBestTwo) === value).length;
+    const rank = getQualRank(index);
+    return sameCount > 1 ? `T${rank}` : String(rank);
   };
-  const isFinalQualified = (player, index) => player.totalBestTwo != null && getCompetitionRank(standings, index, (item) => item.totalBestTwo ?? "") <= 3;
+
+  const isFinalQualified = (index) => {
+    const current = standings[index];
+    return Boolean(current && current.totalBestTwo != null && getQualRank(index) <= 3);
+  };
+
   return (
     <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm landscape:rounded-xl">
       <CardContent className="p-2">
-        <div className="mb-3"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Turnier</p><h2 className="font-serif text-lg text-amber-200">{isFinalActive ? "Finalwertung Strokes HCP adjusted" : "Gesamtwertung Strokes HCP adjusted"}</h2>{isFinalActive ? <div className="mt-0.5 text-sm font-semibold text-amber-300/85">Am Schicksalsberg · Nur einer trägt den Ring.</div> : null}<p className="mt-1 text-sm text-amber-100/70">{isFinalActive ? "Finaltag: Top 3 nach der Qualifikation spielen Plätze 1–3 aus. Die übrigen Spieler spielen Plätze 4–6 aus." : "Es zählen die besten zwei Strokes-HCP-adjusted-Ergebnisse aus den ersten drei Runden. Niedriger ist besser. Nach Platz 3 liegt der aktuelle Cut."}</p></div>
+        <div className="mb-3">
+          <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Turnier</p>
+          <h2 className="font-serif text-lg text-amber-200">{isFinalActive ? "Finalwertung Strokes HCP adjusted" : "Gesamtwertung Strokes HCP adjusted"}</h2>
+          {isFinalActive ? <div className="mt-0.5 text-sm font-semibold text-amber-300/85">Am Schicksalsberg · Nur einer trägt den Ring.</div> : null}
+          <p className="mt-1 text-sm text-amber-100/70">
+            {isFinalActive ? "Finaltag: Finalgruppe und Platzierungsgruppe werden nach Strokes HCP adjusted gewertet." : "Es zählen die besten zwei Strokes-HCP-adjusted-Ergebnisse aus den ersten drei Runden. Rang T3 oder besser liegt oberhalb des Cuts."}
+          </p>
+        </div>
+
         <div className="overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <table className="w-full min-w-[360px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">
-            <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100"><th className="px-2 py-1.5">#</th><th className="px-2 py-1.5">Spieler</th>{isFinalActive ? <><th className="px-2 py-1.5 text-right">Quali</th><th className="px-2 py-1.5 text-right">Final Strokes HCP</th><th className="px-2 py-1.5 text-right">Löcher</th><th className="px-2 py-1.5 text-right">Gruppe</th></> : <>{qualificationRounds.map((round) => <th key={round.round_id} className="px-2 py-1.5 text-right">{round.round_name}</th>)}<th className="px-2 py-1.5 text-right">Gesamt</th></>}</tr></thead>
-            <tbody>{isFinalActive ? finalStandings.map((player, index) => <React.Fragment key={player.id}>{index === 3 && <tr><td colSpan={6} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-amber-200">Platzierungsgruppe · Plätze 4–6</td></tr>}<tr className={cls("border-t border-amber-700/20", isFinalQualified(player, index) && "bg-emerald-500/5")}><td className="px-2 py-1.5 font-serif text-lg font-bold text-amber-300">{formatCompetitionRank(finalStandings, index, (item) => `${item.finalGroup}|${item.finalHcpAdjustedStrokes ?? ""}`)}</td><td className="px-2 py-1.5 font-semibold text-amber-100">{getPlayerLabel(player)}</td><td className="px-2 py-1.5 text-right text-amber-100/75">{player.qualificationRank}</td><td className="px-2 py-1.5 text-right font-serif text-lg font-bold text-amber-300">{player.finalHcpAdjustedStrokes ?? "–"}</td><td className="px-2 py-1.5 text-right text-amber-100">{player.finalPlayed}/18</td><td className="px-2 py-1.5 text-right text-amber-100/75">{player.finalGroup === "championship" ? "1–3" : "4–6"}</td></tr></React.Fragment>) : standings.map((player, index) => <React.Fragment key={player.id}>{index > 0 && isFinalQualified(standings[index - 1], index - 1) && !isFinalQualified(player, index) && <tr><td colSpan={qualificationRounds.length + 3} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-amber-200">Cut-Linie · Rang 3 inklusive geteilter Plätze spielt den Finaltag</td></tr>}<tr className={cls("border-t border-amber-700/20", isFinalQualified(player, index) && "bg-emerald-500/5")}><td className="px-2 py-1.5 text-amber-200/75">{formatCompetitionRank(players, index, getRankValue)}</td><td className="px-2 py-1.5 font-semibold text-amber-100">{getPlayerLabel(player)}{isFinalQualified(player, index) && <span className="ml-2 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-200">Final</span>}</td>{qualificationRounds.map((round) => { const result = player.roundResults.find((item) => item.round_id === round.round_id); const isCounted = player.countedRoundIds.includes(round.round_id); const isDropped = player.droppedRoundId === round.round_id; return <td key={round.round_id} className={cls("px-2 py-1.5 text-right", isCounted && "font-bold text-amber-300", isDropped && "text-amber-100/50 line-through")}>{result?.played ? result.points : "–"}</td>; })}<td className="px-2 py-1.5 text-right font-serif text-lg font-bold text-amber-300">{player.totalBestTwo ?? "–"}</td></tr></React.Fragment>)}</tbody>
+            <thead>
+              <tr className="text-left text-xs uppercase tracking-wider text-amber-100">
+                <th className="px-2 py-1.5">#</th>
+                <th className="px-2 py-1.5">Spieler</th>
+                {isFinalActive ? (
+                  <>
+                    <th className="px-2 py-1.5 text-right">Quali</th>
+                    <th className="px-2 py-1.5 text-right">Final Strokes HCP</th>
+                    <th className="px-2 py-1.5 text-right">Löcher</th>
+                    <th className="px-2 py-1.5 text-right">Gruppe</th>
+                  </>
+                ) : (
+                  <>
+                    {qualificationRounds.map((round) => <th key={round.round_id} className="px-2 py-1.5 text-right">{round.round_name}</th>)}
+                    <th className="px-2 py-1.5 text-right">Gesamt</th>
+                  </>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {isFinalActive ? finalStandings.map((player, index) => (
+                <React.Fragment key={player.id}>
+                  {index === 3 && <tr><td colSpan={6} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-amber-200">Platzierungsgruppe · Plätze 4–6</td></tr>}
+                  <tr className={cls("border-t border-amber-700/20", index < 3 && "bg-emerald-500/5")}>
+                    <td className="px-2 py-1.5 font-serif text-lg font-bold text-amber-300">{formatCompetitionRank(finalStandings, index, (item) => `${item.finalGroup}|${item.finalHcpAdjustedStrokes ?? ""}`)}</td>
+                    <td className="px-2 py-1.5 font-semibold text-amber-100">{getPlayerLabel(player)}</td>
+                    <td className="px-2 py-1.5 text-right text-amber-100/75">{player.qualificationRank}</td>
+                    <td className="px-2 py-1.5 text-right font-serif text-lg font-bold text-amber-300">{player.finalHcpAdjustedStrokes ?? "–"}</td>
+                    <td className="px-2 py-1.5 text-right text-amber-100">{player.finalPlayed}/18</td>
+                    <td className="px-2 py-1.5 text-right text-amber-100/75">{player.finalGroup === "championship" ? "1–3" : "4–6"}</td>
+                  </tr>
+                </React.Fragment>
+              )) : standings.map((player, index) => {
+                const qualified = isFinalQualified(index);
+                const previousQualified = index > 0 ? isFinalQualified(index - 1) : true;
+                return (
+                  <React.Fragment key={player.id}>
+                    {index > 0 && previousQualified && !qualified && <tr><td colSpan={qualificationRounds.length + 3} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-amber-200">Cut-Linie · Rang T3 oder besser spielt den Finaltag</td></tr>}
+                    <tr className={cls("border-t border-amber-700/20", qualified && "bg-emerald-500/5")}>
+                      <td className="px-2 py-1.5 text-amber-200/75">{getQualRankLabel(index)}</td>
+                      <td className="px-2 py-1.5 font-semibold text-amber-100">
+                        {getPlayerLabel(player)}
+                        {qualified && <span className="ml-2 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-200">Final</span>}
+                      </td>
+                      {qualificationRounds.map((round) => {
+                        const result = player.roundResults.find((item) => item.round_id === round.round_id);
+                        const isCounted = player.countedRoundIds.includes(round.round_id);
+                        const isDropped = player.droppedRoundId === round.round_id;
+                        return <td key={round.round_id} className={cls("px-2 py-1.5 text-right", isCounted && "font-bold text-amber-300", isDropped && "text-amber-100/50 line-through")}>{result?.played ? result.points : "–"}</td>;
+                      })}
+                      <td className="px-2 py-1.5 text-right font-serif text-lg font-bold text-amber-300">{player.totalBestTwo ?? "–"}</td>
+                    </tr>
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
           </table>
         </div>
+
         <div className="mt-3 overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="border-b border-amber-700/30 bg-amber-500/10 px-2 py-1.5">
             <div className="font-serif text-lg text-amber-200">Brutto Strokes · tatsächliche Schläge</div>
             <div className="text-xs text-amber-100/60">Über alle vier Runden · ohne Gangolf/Achim · Pick-up wird mit der Strichregel gewertet.</div>
           </div>
           <table className="w-full min-w-[420px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">
-            <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100"><th className="px-2 py-1.5">#</th><th className="px-2 py-1.5">Spieler</th>{(rounds?.length ? rounds : fallbackRounds).slice().sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0)).map((round) => <th key={round.round_id} className="px-2 py-1.5 text-right">{round.round_name}</th>)}<th className="px-2 py-1.5 text-right">Gesamt</th><th className="px-2 py-1.5 text-right">Löcher</th></tr></thead>
+            <thead>
+              <tr className="text-left text-xs uppercase tracking-wider text-amber-100">
+                <th className="px-2 py-1.5">#</th>
+                <th className="px-2 py-1.5">Spieler</th>
+                {orderedRounds.map((round) => <th key={round.round_id} className="px-2 py-1.5 text-right">{round.round_name}</th>)}
+                <th className="px-2 py-1.5 text-right">Gesamt</th>
+                <th className="px-2 py-1.5 text-right">Löcher</th>
+              </tr>
+            </thead>
             <tbody>{grossStrokeStandings.map((player, index) => <tr key={player.id} className="border-t border-amber-700/20"><td className="px-2 py-1.5 text-amber-200/75">{formatCompetitionRank(grossStrokeStandings, index, (item) => item.grossTotal ?? "")}</td><td className="px-2 py-1.5 font-semibold text-amber-100">{getPlayerLabel(player)}</td>{player.roundResults.map((result) => <td key={result.round_id} className="px-2 py-1.5 text-right text-amber-100">{result.grossStrokes ?? "–"}</td>)}<td className="px-2 py-1.5 text-right font-serif text-lg font-bold text-amber-300">{player.grossTotal ?? "–"}</td><td className="px-2 py-1.5 text-right text-amber-100/75">{player.played}/{player.expected || "–"}</td></tr>)}</tbody>
           </table>
         </div>
