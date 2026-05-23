@@ -1566,6 +1566,7 @@ function LordOfTheHolesApp() {
   const [scorecardRoundId, setScorecardRoundId] = useState(() => readLocalJson("lordOfTheHoles.scorecardRoundId", ""));
   const [roundTableRoundId, setRoundTableRoundId] = useState(() => readLocalJson("lordOfTheHoles.roundTableRoundId", ""));
   const [dailyTeamSelections, setDailyTeamSelections] = useState(() => readLocalJson("lordOfTheHoles.dailyTeamSelections", {}));
+  const [openTeamHoleDetails, setOpenTeamHoleDetails] = useState(() => readLocalJson("lordOfTheHoles.openTeamHoleDetails", {}));
   const [teamDrawRows, setTeamDrawRows] = useState(cachedState?.teamDrawRows || []);
   const [teamDrawSaving, setTeamDrawSaving] = useState(false);
   const [teamCeremonyRunning, setTeamCeremonyRunning] = useState(false);
@@ -1897,6 +1898,7 @@ function LordOfTheHolesApp() {
   useEffect(() => { writeLocalJson("lordOfTheHoles.scorecardRoundId", scorecardRoundId); }, [scorecardRoundId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundTableRoundId", roundTableRoundId); }, [roundTableRoundId]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.dailyTeamSelections", dailyTeamSelections); }, [dailyTeamSelections]);
+  useEffect(() => { writeLocalJson("lordOfTheHoles.openTeamHoleDetails", openTeamHoleDetails); }, [openTeamHoleDetails]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.openMenuGroups", openMenuGroups); }, [openMenuGroups]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.teamCeremonyDismissedKeys", teamCeremonyDismissedKeys); }, [teamCeremonyDismissedKeys]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.prizeSettings", prizeSettings); }, [prizeSettings]);
@@ -3953,6 +3955,54 @@ function LordOfTheHolesApp() {
     return { A: ["", ""], B: ["", ""], C: ["", ""] };
   }
 
+  function buildDailyTeamHoleDetails(roundId, includeHidden = false) {
+    const round = (rounds.length ? rounds : fallbackRounds).find((item) => String(item.round_id) === String(roundId));
+    if (!round) return [];
+    const mode = String(roundId) === "r2" ? "bestBallNetto" : String(roundId) === "r3" ? "bestBallMatchplay" : "nettoTeam";
+    const roundHoles = getRoundHoles(round, allHoles);
+    const roundScores = officialAllScores.filter((score) => String(score.round_id) === String(roundId));
+    const roundPlayerList = getRoundPlayers(roundId, allPlayers, roundPlayers);
+    const playerMap = new Map(roundPlayerList.map((player) => [String(player.id), player]));
+    const teamSlots = getDailyTeamSlots(roundId, includeHidden);
+    const teams = ["A", "B", "C"].map((teamId) => {
+      const players = (teamSlots?.[teamId] || ["", ""]).slice(0, 2).map((playerId) => playerMap.get(String(playerId))).filter(Boolean);
+      return { teamId, players };
+    });
+
+    return roundHoles.map((hole) => {
+      const teamValues = teams.map((team) => {
+        const playerRows = team.players.map((player) => {
+          const playerForRound = getPlayerForCourse(player, round.course_id || "goethe", courses);
+          const score = roundScores.find((item) => String(item.player_id) === String(player.id) && Number(item.hole_number) === Number(hole.hole_number));
+          const shots = getShotsOnHole(playerForRound?.course_hcp, hole.hcp);
+          const points = getScoreStablefordPoints(score, hole.par, shots);
+          return { player: playerForRound, score, shots, points };
+        });
+        const bestPoints = playerRows.length ? Math.max(0, ...playerRows.map((row) => Number(row.points || 0))) : 0;
+        const totalPoints = playerRows.reduce((sum, row) => sum + Number(row.points || 0), 0);
+        return {
+          teamId: team.teamId,
+          players: playerRows,
+          bestPoints,
+          totalPoints,
+          value: mode === "bestBallNetto" || mode === "bestBallMatchplay" ? bestPoints : totalPoints,
+          label: mode === "bestBallNetto" || mode === "bestBallMatchplay" ? `${bestPoints} Best Ball` : `${totalPoints} Netto`,
+        };
+      });
+      const bestValue = Math.max(0, ...teamValues.map((team) => Number(team.value || 0)));
+      const winners = teamValues.filter((team) => Number(team.value || 0) === bestValue && bestValue > 0);
+      return {
+        hole,
+        mode,
+        teams: teamValues.map((team) => ({
+          ...team,
+          isHoleWinner: winners.some((winner) => winner.teamId === team.teamId),
+          matchplayPoints: mode === "bestBallMatchplay" && winners.length && team.value === bestValue ? Number((1 / winners.length).toFixed(2)) : 0,
+        })),
+      };
+    });
+  }
+
   function buildDailyTeamStandings(roundId, includeHidden = false) {
     const round = (rounds.length ? rounds : fallbackRounds).find((item) => String(item.round_id) === String(roundId));
     if (!round) return { round: null, teams: [], mode: "nettoTeam", title: "" };
@@ -4038,6 +4088,8 @@ function LordOfTheHolesApp() {
                 const roundPlayersForSelection = getRoundPlayers(roundId, allPlayers, roundPlayers);
                 const teamSlots = getDailyTeamSlots(roundId);
                 const teamDrawVisible = isTeamDrawRoundVisible(roundId);
+                const teamHoleDetails = buildDailyTeamHoleDetails(roundId);
+                const detailsOpen = Boolean(openTeamHoleDetails?.[roundId]);
                 return (
                   <div key={roundId} className="overflow-hidden rounded-2xl border border-amber-700/35 bg-black/24 landscape:rounded-xl">
                     <div className="border-b border-amber-700/25 bg-amber-500/10 px-3 py-2 landscape:px-2 landscape:py-1.5">
@@ -4086,6 +4138,47 @@ function LordOfTheHolesApp() {
                           </tbody>
                         </table>
                       </div>
+                      {['r2', 'r3'].includes(String(roundId)) ? (
+                        <div className="rounded-xl border border-amber-700/25 bg-stone-950/45 p-2">
+                          <button type="button" onClick={() => setOpenTeamHoleDetails((current) => ({ ...(current || {}), [roundId]: !Boolean(current?.[roundId]) }))} className="flex w-full items-center justify-between gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-left text-sm font-bold text-amber-100">
+                            <span>Lochwertung der Teams anzeigen</span>
+                            <span className="text-amber-300">{detailsOpen ? '−' : '+'}</span>
+                          </button>
+                          {detailsOpen ? (
+                            <div className="mt-2 overflow-x-auto rounded-xl border border-amber-700/25 bg-black/25 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                              <table className="w-full min-w-[720px] border-collapse text-xs text-amber-50 landscape:min-w-0 landscape:text-[11px]">
+                                <thead>
+                                  <tr className="text-left uppercase tracking-wider text-amber-100/70">
+                                    <th className="px-2 py-1.5">Loch</th>
+                                    {['A', 'B', 'C'].map((teamId) => <th key={teamId} className="px-2 py-1.5 text-center">Team {teamId}</th>)}
+                                    <th className="px-2 py-1.5 text-right">Gewinner</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {teamHoleDetails.map((row) => {
+                                    const winningTeams = row.teams.filter((team) => team.isHoleWinner).map((team) => `Team ${team.teamId}`).join(' · ') || '–';
+                                    return (
+                                      <tr key={row.hole.hole_number} className="border-t border-amber-700/20 align-top">
+                                        <td className="px-2 py-2 font-bold text-amber-200">{row.hole.hole_number}</td>
+                                        {row.teams.map((team) => (
+                                          <td key={team.teamId} className={cls('px-2 py-2 text-center', team.isHoleWinner && 'bg-emerald-500/10 text-emerald-200')}>
+                                            <div className="font-serif text-base font-black">{row.mode === 'bestBallMatchplay' ? `${team.matchplayPoints || 0}` : team.value}</div>
+                                            <div className="text-[10px] text-amber-100/55">{row.mode === 'bestBallMatchplay' ? `${team.value} Best Ball` : team.label}</div>
+                                            <div className="mt-1 space-y-0.5 text-[10px] text-amber-100/70">
+                                              {team.players.map((playerRow) => <div key={playerRow.player?.id || Math.random()}>{playerRow.player?.alias_name || playerRow.player?.character_name || playerRow.player?.display_name}: {playerRow.points} P</div>)}
+                                            </div>
+                                          </td>
+                                        ))}
+                                        <td className="px-2 py-2 text-right font-bold text-amber-200">{winningTeams}</td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
                       </> : null}
                     </div>
                   </div>
