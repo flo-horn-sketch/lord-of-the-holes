@@ -56,7 +56,7 @@ const FLIGHT_DRAW_STORAGE_KEY = "lordOfTheHoles.flightDraw";
 const TEAM_DRAW_STORAGE_KEY = "lordOfTheHoles.teamDraw";
 const TEAM_DRAW_TARGETS = {
   r1: new Date("2026-05-22T21:00:00+02:00"),
-  r2: new Date("2026-05-23T21:00:00+02:00"),
+  r2: new Date("2026-05-23T19:30:00+02:00"),
   r3: new Date("2026-05-24T21:00:00+02:00"),
 };
 
@@ -951,8 +951,33 @@ function buildTournamentNetStandings(players, rounds, holes, scores, courses = f
     const playedResults = roundResults.filter((result) => result.played > 0 && result.hcpAdjustedStrokes != null);
     const counted = [...playedResults].sort((a, b) => Number(a.hcpAdjustedStrokes || 0) - Number(b.hcpAdjustedStrokes || 0)).slice(0, 2);
     const dropped = [...playedResults].sort((a, b) => Number(a.hcpAdjustedStrokes || 0) - Number(b.hcpAdjustedStrokes || 0)).slice(2, 3)[0] || null;
-    return { ...withFallbackAlias(player), roundResults, countedRoundIds: counted.map((result) => result.round_id), droppedRoundId: dropped?.round_id || "", totalBestTwo: counted.length ? counted.reduce((sum, result) => sum + Number(result.hcpAdjustedStrokes || 0), 0) : null, roundsPlayed: playedResults.length };
+    const hasMinimumQualiRounds = counted.length >= 2;
+    return { ...withFallbackAlias(player), roundResults, countedRoundIds: counted.map((result) => result.round_id), droppedRoundId: dropped?.round_id || "", totalBestTwo: hasMinimumQualiRounds ? counted.reduce((sum, result) => sum + Number(result.hcpAdjustedStrokes || 0), 0) : null, roundsPlayed: playedResults.length, hasMinimumQualiRounds };
   }).sort((a, b) => (a.totalBestTwo == null && b.totalBestTwo != null ? 1 : b.totalBestTwo == null && a.totalBestTwo != null ? -1 : Number(a.totalBestTwo || 0) - Number(b.totalBestTwo || 0) || Number(b.roundsPlayed || 0) - Number(a.roundsPlayed || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0)));
+}
+
+function buildGrossStrokeStandings(players, rounds, holes, scores) {
+  const roundList = (rounds?.length ? rounds : fallbackRounds).slice().sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
+  const expectedHoles = roundList.reduce((sum, round) => sum + getRoundHoles(round, holes).length, 0);
+  return (players || [])
+    .filter((player) => String(player.id || "").toLowerCase() !== "achim" && String(player.alias_name || "").toLowerCase() !== "gangolf")
+    .map((player) => {
+      const roundResults = roundList.map((round) => {
+        const roundScores = (scores || []).filter((score) => String(score.round_id) === String(round.round_id) && String(score.player_id) === String(player.id) && score.strokes !== "" && score.strokes != null);
+        return {
+          round_id: round.round_id,
+          round_name: round.round_name,
+          grossStrokes: roundScores.length ? roundScores.reduce((sum, score) => sum + Number(score.strokes || 0), 0) : null,
+          played: roundScores.length,
+          expected: getRoundHoles(round, holes).length,
+        };
+      });
+      const played = roundResults.reduce((sum, result) => sum + Number(result.played || 0), 0);
+      const grossTotal = roundResults.reduce((sum, result) => sum + Number(result.grossStrokes || 0), 0);
+      const isComplete = expectedHoles > 0 && played >= expectedHoles;
+      return { ...withFallbackAlias(player), roundResults, grossTotal: played ? grossTotal : null, played, expected: expectedHoles, isComplete };
+    })
+    .sort((a, b) => (a.grossTotal == null && b.grossTotal != null ? 1 : b.grossTotal == null && a.grossTotal != null ? -1 : Number(a.grossTotal || 0) - Number(b.grossTotal || 0) || Number(b.played || 0) - Number(a.played || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0)));
 }
 
 function buildFinalNetStandings(players, rounds, holes, scores, courses = fallbackCourses) {
@@ -1153,9 +1178,12 @@ function getFinalWinnerCelebration(players, rounds, holes, scores, roundPlayers,
 function TournamentStandings({ players, rounds, holes, scores, courses = fallbackCourses, activeRoundId = "" }) {
   const standings = useMemo(() => buildTournamentNetStandings(players, rounds, holes, scores, courses), [players, rounds, holes, scores, courses]);
   const finalStandings = useMemo(() => buildFinalNetStandings(players, rounds, holes, scores, courses), [players, rounds, holes, scores, courses]);
+  const grossStrokeStandings = useMemo(() => buildGrossStrokeStandings(players, rounds, holes, scores), [players, rounds, holes, scores]);
   const qualificationRounds = getQualificationRounds(rounds);
   const finalRound = getFinalRound(rounds);
   const isFinalActive = String(activeRoundId) === String(finalRound?.round_id || "r4");
+  const getQualificationRankValue = (player) => player.totalBestTwo ?? "";
+  const isFinalQualified = (player, index) => player.totalBestTwo != null && getCompetitionRank(standings, index, getQualificationRankValue) <= 3;
   return (
     <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm landscape:rounded-xl">
       <CardContent className="p-2">
@@ -1163,7 +1191,17 @@ function TournamentStandings({ players, rounds, holes, scores, courses = fallbac
         <div className="overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <table className="w-full min-w-[360px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">
             <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100"><th className="px-2 py-1.5">#</th><th className="px-2 py-1.5">Spieler</th>{isFinalActive ? <><th className="px-2 py-1.5 text-right">Quali</th><th className="px-2 py-1.5 text-right">Final Strokes HCP</th><th className="px-2 py-1.5 text-right">Löcher</th><th className="px-2 py-1.5 text-right">Gruppe</th></> : <>{qualificationRounds.map((round) => <th key={round.round_id} className="px-2 py-1.5 text-right">{round.round_name}</th>)}<th className="px-2 py-1.5 text-right">Gesamt</th></>}</tr></thead>
-            <tbody>{isFinalActive ? finalStandings.map((player, index) => <React.Fragment key={player.id}>{index === 3 && <tr><td colSpan={6} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-amber-200">Platzierungsgruppe · Plätze 4–6</td></tr>}<tr className={cls("border-t border-amber-700/20", index < 3 && "bg-emerald-500/5")}><td className="px-2 py-1.5 font-serif text-lg font-bold text-amber-300">{formatCompetitionRank(finalStandings, index, (item) => `${item.finalGroup}|${item.finalHcpAdjustedStrokes ?? ""}`)}</td><td className="px-2 py-1.5 font-semibold text-amber-100">{getPlayerLabel(player)}</td><td className="px-2 py-1.5 text-right text-amber-100/75">{player.qualificationRank}</td><td className="px-2 py-1.5 text-right font-serif text-lg font-bold text-amber-300">{player.finalHcpAdjustedStrokes ?? "–"}</td><td className="px-2 py-1.5 text-right text-amber-100">{player.finalPlayed}/18</td><td className="px-2 py-1.5 text-right text-amber-100/75">{player.finalGroup === "championship" ? "1–3" : "4–6"}</td></tr></React.Fragment>) : standings.map((player, index) => <React.Fragment key={player.id}>{index === 3 && <tr><td colSpan={qualificationRounds.length + 3} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-amber-200">Cut-Linie · Top 3 spielen den Finaltag</td></tr>}<tr className={cls("border-t border-amber-700/20", index < 3 && "bg-emerald-500/5")}><td className="px-2 py-1.5 text-amber-200/75">{formatCompetitionRank(players, index, getRankValue)}</td><td className="px-2 py-1.5 font-semibold text-amber-100">{getPlayerLabel(player)}{index < 3 && <span className="ml-2 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-200">Final</span>}</td>{qualificationRounds.map((round) => { const result = player.roundResults.find((item) => item.round_id === round.round_id); const isCounted = player.countedRoundIds.includes(round.round_id); const isDropped = player.droppedRoundId === round.round_id; return <td key={round.round_id} className={cls("px-2 py-1.5 text-right", isCounted && "font-bold text-amber-300", isDropped && "text-amber-100/50 line-through")}>{result?.played ? result.points : "–"}</td>; })}<td className="px-2 py-1.5 text-right font-serif text-lg font-bold text-amber-300">{player.totalBestTwo ?? "–"}</td></tr></React.Fragment>)}</tbody>
+            <tbody>{isFinalActive ? finalStandings.map((player, index) => <React.Fragment key={player.id}>{index === 3 && <tr><td colSpan={6} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-amber-200">Platzierungsgruppe · Plätze 4–6</td></tr>}<tr className={cls("border-t border-amber-700/20", isFinalQualified(player, index) && "bg-emerald-500/5")}><td className="px-2 py-1.5 font-serif text-lg font-bold text-amber-300">{formatCompetitionRank(finalStandings, index, (item) => `${item.finalGroup}|${item.finalHcpAdjustedStrokes ?? ""}`)}</td><td className="px-2 py-1.5 font-semibold text-amber-100">{getPlayerLabel(player)}</td><td className="px-2 py-1.5 text-right text-amber-100/75">{player.qualificationRank}</td><td className="px-2 py-1.5 text-right font-serif text-lg font-bold text-amber-300">{player.finalHcpAdjustedStrokes ?? "–"}</td><td className="px-2 py-1.5 text-right text-amber-100">{player.finalPlayed}/18</td><td className="px-2 py-1.5 text-right text-amber-100/75">{player.finalGroup === "championship" ? "1–3" : "4–6"}</td></tr></React.Fragment>) : standings.map((player, index) => <React.Fragment key={player.id}>{index > 0 && isFinalQualified(standings[index - 1], index - 1) && !isFinalQualified(player, index) && <tr><td colSpan={qualificationRounds.length + 3} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-amber-200">Cut-Linie · Rang 3 inklusive geteilter Plätze spielt den Finaltag</td></tr>}<tr className={cls("border-t border-amber-700/20", isFinalQualified(player, index) && "bg-emerald-500/5")}><td className="px-2 py-1.5 text-amber-200/75">{formatCompetitionRank(players, index, getRankValue)}</td><td className="px-2 py-1.5 font-semibold text-amber-100">{getPlayerLabel(player)}{isFinalQualified(player, index) && <span className="ml-2 rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-200">Final</span>}</td>{qualificationRounds.map((round) => { const result = player.roundResults.find((item) => item.round_id === round.round_id); const isCounted = player.countedRoundIds.includes(round.round_id); const isDropped = player.droppedRoundId === round.round_id; return <td key={round.round_id} className={cls("px-2 py-1.5 text-right", isCounted && "font-bold text-amber-300", isDropped && "text-amber-100/50 line-through")}>{result?.played ? result.points : "–"}</td>; })}<td className="px-2 py-1.5 text-right font-serif text-lg font-bold text-amber-300">{player.totalBestTwo ?? "–"}</td></tr></React.Fragment>)}</tbody>
+          </table>
+        </div>
+        <div className="mt-3 overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="border-b border-amber-700/30 bg-amber-500/10 px-2 py-1.5">
+            <div className="font-serif text-lg text-amber-200">Brutto Strokes · tatsächliche Schläge</div>
+            <div className="text-xs text-amber-100/60">Über alle vier Runden · ohne Gangolf/Achim · Pick-up wird mit der Strichregel gewertet.</div>
+          </div>
+          <table className="w-full min-w-[420px] border-collapse text-sm text-amber-50 landscape:min-w-0 landscape:text-[11px]">
+            <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100"><th className="px-2 py-1.5">#</th><th className="px-2 py-1.5">Spieler</th>{(rounds?.length ? rounds : fallbackRounds).slice().sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0)).map((round) => <th key={round.round_id} className="px-2 py-1.5 text-right">{round.round_name}</th>)}<th className="px-2 py-1.5 text-right">Gesamt</th><th className="px-2 py-1.5 text-right">Löcher</th></tr></thead>
+            <tbody>{grossStrokeStandings.map((player, index) => <tr key={player.id} className="border-t border-amber-700/20"><td className="px-2 py-1.5 text-amber-200/75">{formatCompetitionRank(grossStrokeStandings, index, (item) => item.grossTotal ?? "")}</td><td className="px-2 py-1.5 font-semibold text-amber-100">{getPlayerLabel(player)}</td>{player.roundResults.map((result) => <td key={result.round_id} className="px-2 py-1.5 text-right text-amber-100">{result.grossStrokes ?? "–"}</td>)}<td className="px-2 py-1.5 text-right font-serif text-lg font-bold text-amber-300">{player.grossTotal ?? "–"}</td><td className="px-2 py-1.5 text-right text-amber-100/75">{player.played}/{player.expected || "–"}</td></tr>)}</tbody>
           </table>
         </div>
       </CardContent>
@@ -3249,7 +3287,7 @@ function LordOfTheHolesApp() {
   function getTeamDrawTargetLabel(roundId) {
     const labels = {
       r1: "22.05.2026 · 21:00 Uhr",
-      r2: "23.05.2026 · 21:00 Uhr",
+      r2: "23.05.2026 · 19:30 Uhr",
       r3: "24.05.2026 · 21:00 Uhr",
     };
     return labels[roundId] || "noch nicht festgelegt";
