@@ -1542,6 +1542,7 @@ function LordOfTheHolesApp() {
   const [setupSavedMessage, setSetupSavedMessage] = useState("");
   const [backupSavedMessage, setBackupSavedMessage] = useState("");
   const [scoreHintMessage, setScoreHintMessage] = useState("");
+  const [adminScoreEntryUnlocks, setAdminScoreEntryUnlocks] = useState(() => readLocalJson("lordOfTheHoles.adminScoreEntryUnlocks", {}));
   const [zeroNetTributeDismissedKeys, setZeroNetTributeDismissedKeys] = useState(() => readLocalJson("lordOfTheHoles.zeroNetTributeDismissedKeys", []));
   const [showSplash, setShowSplash] = useState(true);
   const [splashEntering, setSplashEntering] = useState(false);
@@ -1634,7 +1635,9 @@ function LordOfTheHolesApp() {
     const noRoundMismatches = getMismatchesForRound(scores, roundId, roundPlayersForLock).length === 0;
     return allOfficialScoresComplete && allControlScoresComplete && noRoundMismatches;
   }, [displayedActiveRound?.round_id, holes, displayCourseId, visiblePlayers, scores]);
-  const canEnterScores = Boolean(displayedActiveRound?.round_id && myPlayerId && (!isFlightDrawRound || assignedScoredPlayerId) && scoredPlayerId && entryPlayerId && entryPlayer && Number(activeHole) > 0 && !roundScoreEntryClosed);
+  const adminScoreEntryUnlockedForRound = Boolean(adminScoreEntryUnlocks?.[String(displayedActiveRound?.round_id || "")]);
+  const scoreEntryBlockedByRoundLock = roundScoreEntryClosed && !adminScoreEntryUnlockedForRound;
+  const canEnterScores = Boolean(displayedActiveRound?.round_id && myPlayerId && (!isFlightDrawRound || assignedScoredPlayerId) && scoredPlayerId && entryPlayerId && entryPlayer && Number(activeHole) > 0 && !scoreEntryBlockedByRoundLock);
   const currentFlightZeroNetPenalties = useMemo(() => {
     const roundId = String(displayedActiveRound?.round_id || "");
     const holeNumber = Number(activeHole || 0);
@@ -1898,6 +1901,7 @@ function LordOfTheHolesApp() {
   useEffect(() => { writeLocalJson("lordOfTheHoles.teamCeremonyDismissedKeys", teamCeremonyDismissedKeys); }, [teamCeremonyDismissedKeys]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.prizeSettings", prizeSettings); }, [prizeSettings]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.roundSummaryDismissedKeys", roundSummaryDismissedKeys); }, [roundSummaryDismissedKeys]);
+  useEffect(() => { writeLocalJson("lordOfTheHoles.adminScoreEntryUnlocks", adminScoreEntryUnlocks); }, [adminScoreEntryUnlocks]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.zeroNetTributeDismissedKeys", zeroNetTributeDismissedKeys); }, [zeroNetTributeDismissedKeys]);
   useEffect(() => { writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, flightDraw); }, [flightDraw]);
   useEffect(() => { writeLocalJson("lordOfTheHoles.flightCeremonyCompleted", flightCeremonyCompleted); }, [flightCeremonyCompleted]);
@@ -3073,7 +3077,10 @@ function LordOfTheHolesApp() {
                 <div className="mb-3"><ScoreStepper value={normalizeBoolean(currentScore.picked_up) ? 0 : currentScore.strokes ?? ""} par={activeHoleData?.par || 4} pickedUpStrokes={pickedUpStrokes} disabled={!canEnterScores} onChange={(scoreValue) => Number(scoreValue) === 0 || Number(scoreValue) >= Number(pickedUpStrokes || 0) ? saveScore({ strokes: pickedUpStrokes, picked_up: true }) : saveScore({ strokes: scoreValue, picked_up: false })} /></div>
                 <div className="mb-3"><PuttStepper value={currentScore.putts_count} disabled={!canEnterScores || currentEffectiveStrokes <= 1} max={maxPuttsForCurrentScore} onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })} /></div>
                 <div className="mb-3 rounded-2xl border border-[rgb(var(--score-accent)/0.30)] bg-black/25 p-2"><div className="flex items-center justify-between gap-2"><div><div className="text-xs font-semibold text-amber-100">Lady</div><div className="text-[10px] text-amber-100/65">Markiert eine Lady.</div></div><input type="checkbox" disabled={!canEnterScores} checked={normalizeBoolean(currentScore.lady)} onChange={(e) => saveScore({ lady: e.target.checked })} className="h-6 w-6 accent-amber-500 disabled:opacity-40" /></div></div>
-                {roundScoreEntryClosed ? <div className="mb-2 rounded-xl border border-emerald-500/40 bg-emerald-950/45 p-2 text-center text-xs font-semibold text-emerald-100">Diese Runde ist vollständig eingetragen und ohne Palantír-Abweichung. Score-Eingaben sind gesperrt.</div> : null}
+                {roundScoreEntryClosed ? <div className={cls("mb-2 rounded-xl border p-2 text-center text-xs font-semibold", adminScoreEntryUnlockedForRound ? "border-amber-400/45 bg-amber-950/45 text-amber-100" : "border-emerald-500/40 bg-emerald-950/45 text-emerald-100")}>
+                  <div>{adminScoreEntryUnlockedForRound ? "Admin-Übersteuerung aktiv: Score-Eingaben sind für diese Runde wieder geöffnet." : "Diese Runde ist vollständig eingetragen und ohne Palantír-Abweichung. Score-Eingaben sind gesperrt."}</div>
+                  {isAdminUnlocked ? <button type="button" onClick={() => setAdminScoreEntryUnlocks((current) => ({ ...(current || {}), [String(displayedActiveRound?.round_id || "")]: !adminScoreEntryUnlockedForRound }))} className="mt-2 rounded-xl border border-amber-400/45 bg-black/25 px-3 py-1.5 text-xs font-bold text-amber-100">{adminScoreEntryUnlockedForRound ? "Score-Sperre wieder aktivieren" : "Score-Sperre adminseitig aufheben"}</button> : null}
+                </div> : null}
                 {scoreHintMessage ? <div className="mb-2 rounded-xl border border-amber-500/40 bg-amber-950/50 p-1.5 text-center text-xs font-semibold text-amber-100">{scoreHintMessage}</div> : null}
                 <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 py-3 text-base font-bold text-amber-100">Zurück</Button>{activeHole === 18 ? <Button disabled={!canEnterScores || saving} onClick={completeCurrentRound} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-emerald-700" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>{saving ? "Synchronisiere ..." : "Runde abschließen"}</Button> : <Button disabled={!canEnterScores || saving} onClick={goToNextHole} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>{`Loch ${Math.min(18, Number(activeHole || 1) + 1)}`}</Button>}</div>
               </div>
