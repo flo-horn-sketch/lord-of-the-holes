@@ -838,6 +838,80 @@ function LeaderboardTable({ title, players, columns }) {
   );
 }
 
+function TournamentProgressChart({ title, standings = [], rounds = [], valueType = "totalBestTwo" }) {
+  const chartRounds = (rounds || []).filter(Boolean).slice().sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
+  const chartPlayers = (standings || []).filter(Boolean);
+  const palette = ["#fbbf24", "#38bdf8", "#34d399", "#f472b6", "#a78bfa", "#fb923c", "#f87171", "#fde68a"];
+  const getPointValue = (player, roundIndex) => {
+    const roundSlice = chartRounds.slice(0, roundIndex + 1);
+    if (valueType === "grossTotal") {
+      const values = roundSlice.map((round) => player.roundResults?.find((result) => String(result.round_id) === String(round.round_id))?.grossStrokes).filter((value) => value != null);
+      return values.length ? values.reduce((sum, value) => sum + Number(value || 0), 0) : null;
+    }
+    const values = roundSlice.map((round) => player.roundResults?.find((result) => String(result.round_id) === String(round.round_id))?.hcpAdjustedStrokes).filter((value) => value != null);
+    if (values.length < 2) return null;
+    return values.slice().sort((a, b) => Number(a || 0) - Number(b || 0)).slice(0, 2).reduce((sum, value) => sum + Number(value || 0), 0);
+  };
+  const playerLines = chartPlayers.map((player, playerIndex) => {
+    const points = chartRounds.map((round, roundIndex) => ({ round, roundIndex, value: getPointValue(player, roundIndex) })).filter((point) => point.value != null);
+    return { player, points, color: palette[playerIndex % palette.length] };
+  }).filter((line) => line.points.length);
+  const allValues = playerLines.flatMap((line) => line.points.map((point) => point.value));
+  if (!playerLines.length || !chartRounds.length || !allValues.length) return null;
+  const minValue = Math.min(...allValues);
+  const maxValue = Math.max(...allValues);
+  const range = Math.max(1, maxValue - minValue);
+  const width = 720;
+  const height = 250;
+  const padLeft = 46;
+  const padRight = 18;
+  const padTop = 18;
+  const padBottom = 42;
+  const xFor = (roundIndex) => padLeft + (chartRounds.length <= 1 ? 0 : (roundIndex / (chartRounds.length - 1)) * (width - padLeft - padRight));
+  const yFor = (value) => padTop + ((maxValue - value) / range) * (height - padTop - padBottom);
+  const axisTicks = Array.from(new Set([minValue, maxValue, Math.round((minValue + maxValue) / 2)].map((value) => Math.round(value * 10) / 10))).sort((a, b) => a - b);
+  return (
+    <div className="mt-3 overflow-hidden rounded-2xl border border-amber-700/30 bg-black/20">
+      <div className="border-b border-amber-700/30 bg-amber-500/10 px-2 py-1.5">
+        <div className="font-serif text-base text-amber-200">{title} · Turnierverlauf</div>
+        <div className="text-xs text-amber-100/60">X-Achse: Runden · Y-Achse: {valueType === "grossTotal" ? "kumulierte Brutto-Schläge" : "beste zwei Strokes HCP adjusted"}</div>
+      </div>
+      <div className="overflow-x-auto p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <svg viewBox={`0 0 ${width} ${height}`} className="min-w-[620px] rounded-xl bg-black/18">
+          {axisTicks.map((tick) => (
+            <g key={`tick-${tick}`}>
+              <line x1={padLeft} x2={width - padRight} y1={yFor(tick)} y2={yFor(tick)} stroke="rgba(251,191,36,0.16)" strokeDasharray="4 5" />
+              <text x={padLeft - 8} y={yFor(tick) + 4} textAnchor="end" fontSize="11" fill="rgba(254,243,199,0.72)">{tick}</text>
+            </g>
+          ))}
+          {chartRounds.map((round, index) => (
+            <g key={`round-${round.round_id}`}>
+              <line x1={xFor(index)} x2={xFor(index)} y1={padTop} y2={height - padBottom} stroke="rgba(251,191,36,0.08)" />
+              <text x={xFor(index)} y={height - 14} textAnchor="middle" fontSize="10" fill="rgba(254,243,199,0.66)">{round.round_name || round.round_id}</text>
+            </g>
+          ))}
+          <line x1={padLeft} x2={width - padRight} y1={height - padBottom} y2={height - padBottom} stroke="rgba(251,191,36,0.22)" />
+          <line x1={padLeft} x2={padLeft} y1={padTop} y2={height - padBottom} stroke="rgba(251,191,36,0.22)" />
+          {playerLines.map((line) => {
+            const d = line.points.map((point) => `${xFor(point.roundIndex)},${yFor(point.value)}`).join(" ");
+            const lastPoint = line.points[line.points.length - 1];
+            return (
+              <g key={line.player.id}>
+                <polyline points={d} fill="none" stroke={line.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity="0.92" />
+                {line.points.map((point) => <circle key={`${line.player.id}-${point.round?.round_id}`} cx={xFor(point.roundIndex)} cy={yFor(point.value)} r="3.2" fill={line.color} />)}
+                {lastPoint ? <text x={Math.min(width - 92, xFor(lastPoint.roundIndex) + 7)} y={yFor(lastPoint.value) + 4} fontSize="10" fontWeight="700" fill={line.color}>{line.player.alias_name || line.player.character_name || line.player.display_name}</text> : null}
+              </g>
+            );
+          })}
+        </svg>
+        <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-amber-100/75">
+          {playerLines.map((line) => <div key={`tlegend-${line.player.id}`} className="inline-flex items-center gap-1.5 rounded-full border border-amber-700/25 bg-black/25 px-2 py-1"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: line.color }} />{line.player.alias_name || line.player.character_name || line.player.display_name}</div>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RoundProgressChart({ title, players = [], holes = [], scores = [], metric = "strokesHcpAdjusted" }) {
   const chartPlayers = (players || []).filter(Boolean);
   const chartHoles = (holes || []).filter((hole) => Number(hole.hole_number) > 0).sort((a, b) => Number(a.hole_number) - Number(b.hole_number));
@@ -937,6 +1011,39 @@ function getPuttBuckets(playerScores) {
   const fivePlusPutts = playerScores.filter((score) => normalizeBoolean(score.over_two_putts) && Number(score.putts_count) >= 5).length;
   const fourPlusPutts = fourPutts + fivePlusPutts;
   return { threePutts, fourPutts, fivePlusPutts, fourPlusPutts, overTwoPutts: threePutts + fourPlusPutts, puttPenaltyEuro: threePutts * 2 + fourPutts * 4 + fivePlusPutts * 10 };
+}
+
+function getScorecardSegmentSummary(player, holes = [], scores = [], fromHole = 1, toHole = 18) {
+  const segmentHoles = (holes || []).filter((hole) => Number(hole.hole_number) >= fromHole && Number(hole.hole_number) <= toHole);
+  const segmentScores = segmentHoles.map((hole) => {
+    const score = (scores || []).find((item) => String(item.player_id) === String(player.id) && Number(item.hole_number) === Number(hole.hole_number));
+    const strokes = score && score.strokes !== "" && score.strokes != null ? Number(score.strokes || 0) : null;
+    const putts = score && score.putts_count !== "" && score.putts_count != null ? Number(score.putts_count || 0) : null;
+    const shots = getShotsOnHole(player.course_hcp, hole.hcp);
+    return { hole, score, strokes, putts, shots };
+  });
+  const playedRows = segmentScores.filter((row) => row.strokes != null);
+  const par = segmentHoles.reduce((sum, hole) => sum + Number(hole.par || 0), 0);
+  const strokes = playedRows.reduce((sum, row) => sum + Number(row.strokes || 0), 0);
+  const hcpShots = playedRows.reduce((sum, row) => sum + Number(row.shots || 0), 0);
+  const putts = segmentScores.filter((row) => row.putts != null).reduce((sum, row) => sum + Number(row.putts || 0), 0);
+  const netStableford = playedRows.reduce((sum, row) => sum + getScoreStablefordPoints(row.score, row.hole.par, row.shots), 0);
+  const grossStableford = playedRows.reduce((sum, row) => sum + getScoreStablefordPoints(row.score, row.hole.par, 0), 0);
+  const toPar = playedRows.length ? strokes - segmentHoles.reduce((sum, hole) => sum + Number(hole.par || 0), 0) : null;
+  const hcpAdjustedToPar = playedRows.length ? strokes - hcpShots - segmentHoles.reduce((sum, hole) => sum + Number(hole.par || 0), 0) : null;
+  return { par, strokes: playedRows.length ? strokes : null, hcpAdjusted: playedRows.length ? strokes - hcpShots : null, toPar, hcpAdjustedToPar, hcpShots, putts: playedRows.length ? putts : null, netStableford, grossStableford, played: playedRows.length, holes: segmentHoles.length };
+}
+
+function renderScorecardCellsWithSummaries(holes = [], renderHoleCell, renderOutCell, renderInCell, renderTotalCell) {
+  return (holes || []).flatMap((hole) => {
+    const cells = [renderHoleCell(hole)];
+    if (Number(hole.hole_number) === 9) cells.push(renderOutCell());
+    if (Number(hole.hole_number) === 18) {
+      cells.push(renderInCell());
+      cells.push(renderTotalCell());
+    }
+    return cells;
+  });
 }
 
 function getScoreDiffToPar(score, hole) {
@@ -1368,6 +1475,7 @@ function TournamentStandings({ players, rounds, holes, scores, courses = fallbac
             </tbody>
           </table>
         </div>
+        {!isFinalActive ? <TournamentProgressChart title="Gesamtwertung Strokes HCP adjusted" standings={standings} rounds={qualificationRounds} valueType="totalBestTwo" /> : null}
 
         <div className="mt-3 overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="border-b border-amber-700/30 bg-amber-500/10 px-2 py-1.5">
@@ -1387,6 +1495,7 @@ function TournamentStandings({ players, rounds, holes, scores, courses = fallbac
             <tbody>{grossStrokeStandings.map((player, index) => <tr key={player.id} className="border-t border-amber-700/20"><td className="px-2 py-1.5 text-amber-200/75">{formatCompetitionRank(grossStrokeStandings, index, (item) => item.grossTotal ?? "")}</td><td className="px-2 py-1.5 font-semibold text-amber-100">{getPlayerLabel(player)}</td>{player.roundResults.map((result) => <td key={result.round_id} className="px-2 py-1.5 text-right text-amber-100">{result.grossStrokes ?? "–"}</td>)}<td className="px-2 py-1.5 text-right font-serif text-lg font-bold text-amber-300">{player.grossTotal ?? "–"}</td><td className="px-2 py-1.5 text-right text-amber-100/75">{player.played}/{player.expected || "–"}</td></tr>)}</tbody>
           </table>
         </div>
+        <TournamentProgressChart title="Brutto Strokes" standings={grossStrokeStandings} rounds={orderedRounds} valueType="grossTotal" />
       </CardContent>
     </Card>
   );
@@ -3212,6 +3321,9 @@ function LordOfTheHolesApp() {
               const hcpAdjustedToPar = hcpAdjustedStrokes != null ? hcpAdjustedStrokes - Number(hole.par || 0) : null;
               return { hole, score, shots, grossStableford, netStableford, hcpAdjustedStrokes, hcpAdjustedToPar };
             });
+            const outSummary = getScorecardSegmentSummary(player, scorecardHoles, scorecardScores, 1, 9);
+            const inSummary = getScorecardSegmentSummary(player, scorecardHoles, scorecardScores, 10, 18);
+            const totalSummary = getScorecardSegmentSummary(player, scorecardHoles, scorecardScores, 1, 18);
             const playedRows = playerScores.filter((row) => row.score && row.score.strokes !== "" && row.score.strokes != null);
             const totalStrokes = playedRows.reduce((sum, row) => sum + Number(row.score?.strokes || 0), 0);
             const totalGrossStableford = playedRows.reduce((sum, row) => sum + Number(row.grossStableford || 0), 0);
@@ -3225,15 +3337,15 @@ function LordOfTheHolesApp() {
                   <div className="mb-3 flex items-start justify-between gap-2"><div><div className="font-serif text-lg font-bold text-amber-200">{getPlayerLabel(player)}</div><div className="text-xs text-amber-100/65">SpV {Number(player.course_hcp || 0)} · {playedRows.length}/18 Löcher</div></div><div className="rounded-2xl border border-amber-700/30 bg-black/25 px-3 py-2 text-right text-xs text-amber-100/80"><div>Strokes HCP adjusted</div><b className="font-serif text-lg text-amber-300">{playedRows.length ? totalHcpAdjustedStrokes : "–"}</b></div></div>
                   <div className="overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     <table className="w-full min-w-[760px] border-collapse text-xs text-amber-50 landscape:min-w-0 landscape:text-[11px]">
-                      <thead><tr className="text-left uppercase tracking-wider text-amber-100/80"><th className="px-2 py-1.5">Loch</th>{scorecardHoles.map((hole) => <th key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hole.hole_number}</th>)}<th className="px-2 py-1.5 text-center">Σ</th></tr></thead>
+                      <thead><tr className="text-left uppercase tracking-wider text-amber-100/80"><th className="px-2 py-1.5">Loch</th>{renderScorecardCellsWithSummaries(scorecardHoles, (hole) => <th key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hole.hole_number}</th>, () => <th key="out-header" className="px-2 py-1.5 text-center bg-amber-500/10 text-amber-200">OUT</th>, () => <th key="in-header" className="px-2 py-1.5 text-center bg-amber-500/10 text-amber-200">IN</th>, () => <th key="total-header" className="px-2 py-1.5 text-center bg-amber-500/15 text-amber-200">TOTAL</th>)}</tr></thead>
                       <tbody>
-                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Par</td>{scorecardHoles.map((hole) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hole.par}</td>)}<td className="px-2 py-1.5 text-center font-bold text-amber-200">{scorecardHoles.reduce((sum, hole) => sum + Number(hole.par || 0), 0)}</td></tr>
-                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Vorgabe</td>{playerScores.map(({ hole, shots }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center font-bold tracking-[0.18em] text-amber-300">{Number(shots || 0) > 0 ? "|".repeat(Number(shots || 0)) : ""}</td>)}<td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? playedRows.reduce((sum, row) => sum + Number(row.shots || 0), 0) : ""}</td></tr>
-                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Strokes</td>{playerScores.map(({ hole, score }) => <td key={hole.hole_number} className="px-1 py-1.5 text-center"><span className={cls("inline-flex min-w-[26px] justify-center rounded-lg px-1.5 py-0.5 font-bold", getStrokesCellClass(score, hole))}>{score ? normalizeBoolean(score.picked_up) ? "X" : score.strokes || "–" : "–"}</span></td>)}<td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? totalStrokes : "–"}</td></tr>
-                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Strokes HCP adjusted</td>{playerScores.map(({ hole, hcpAdjustedStrokes }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hcpAdjustedStrokes ?? "–"}</td>)}<td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? totalHcpAdjustedStrokes : "–"}</td></tr>
-                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">+/− HCP adjusted</td>{playerScores.map(({ hole, hcpAdjustedToPar }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hcpAdjustedToPar == null ? "–" : formatToPar(hcpAdjustedToPar, true)}</td>)}<td className="px-2 py-1.5 text-center font-bold text-amber-300">{totalHcpAdjustedToPar == null ? "–" : formatToPar(totalHcpAdjustedToPar, true)}</td></tr>
-                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Netto Stblf.</td>{playerScores.map(({ hole, score, netStableford }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{score ? netStableford : "–"}</td>)}<td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? totalNetStableford : "–"}</td></tr>
-                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Brutto</td>{playerScores.map(({ hole, score, grossStableford }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{score ? grossStableford : "–"}</td>)}<td className="px-2 py-1.5 text-center font-bold text-amber-300">{playedRows.length ? totalGrossStableford : "–"}</td></tr>
+                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Par</td>{renderScorecardCellsWithSummaries(scorecardHoles, (hole) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hole.par}</td>, () => <td key="par-out" className="px-2 py-1.5 text-center font-bold text-amber-200 bg-amber-500/10">{outSummary.par}</td>, () => <td key="par-in" className="px-2 py-1.5 text-center font-bold text-amber-200 bg-amber-500/10">{inSummary.par}</td>, () => <td key="par-total" className="px-2 py-1.5 text-center font-bold text-amber-200 bg-amber-500/15">{totalSummary.par}</td>)}</tr>
+                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Vorgabe</td>{renderScorecardCellsWithSummaries(playerScores, ({ hole, shots }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center font-bold tracking-[0.18em] text-amber-300">{Number(shots || 0) > 0 ? "|".repeat(Number(shots || 0)) : ""}</td>, () => <td key="shots-out" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/10">{outSummary.hcpShots || ""}</td>, () => <td key="shots-in" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/10">{inSummary.hcpShots || ""}</td>, () => <td key="shots-total" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/15">{totalSummary.hcpShots || ""}</td>)}</tr>
+                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Strokes</td>{renderScorecardCellsWithSummaries(playerScores, ({ hole, score }) => <td key={hole.hole_number} className="px-1 py-1.5 text-center"><span className={cls("inline-flex min-w-[26px] justify-center rounded-lg px-1.5 py-0.5 font-bold", getStrokesCellClass(score, hole))}>{score ? normalizeBoolean(score.picked_up) ? "X" : score.strokes || "–" : "–"}</span></td>, () => <td key="strokes-out" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/10">{outSummary.strokes ?? "–"}</td>, () => <td key="strokes-in" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/10">{inSummary.strokes ?? "–"}</td>, () => <td key="strokes-total" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/15">{totalSummary.strokes ?? "–"}</td>)}</tr>
+                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Strokes HCP adjusted</td>{renderScorecardCellsWithSummaries(playerScores, ({ hole, hcpAdjustedStrokes }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hcpAdjustedStrokes ?? "–"}</td>, () => <td key="hcp-out" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/10">{outSummary.hcpAdjusted ?? "–"}</td>, () => <td key="hcp-in" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/10">{inSummary.hcpAdjusted ?? "–"}</td>, () => <td key="hcp-total" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/15">{totalSummary.hcpAdjusted ?? "–"}</td>)}</tr>
+                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">+/− HCP adjusted</td>{renderScorecardCellsWithSummaries(playerScores, ({ hole, hcpAdjustedToPar }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hcpAdjustedToPar == null ? "–" : formatToPar(hcpAdjustedToPar, true)}</td>, () => <td key="hcptopar-out" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/10">{outSummary.hcpAdjustedToPar == null ? "–" : formatToPar(outSummary.hcpAdjustedToPar, true)}</td>, () => <td key="hcptopar-in" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/10">{inSummary.hcpAdjustedToPar == null ? "–" : formatToPar(inSummary.hcpAdjustedToPar, true)}</td>, () => <td key="hcptopar-total" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/15">{totalSummary.hcpAdjustedToPar == null ? "–" : formatToPar(totalSummary.hcpAdjustedToPar, true)}</td>)}</tr>
+                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Netto Stblf.</td>{renderScorecardCellsWithSummaries(playerScores, ({ hole, score, netStableford }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{score ? netStableford : "–"}</td>, () => <td key="net-out" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/10">{outSummary.played ? outSummary.netStableford : "–"}</td>, () => <td key="net-in" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/10">{inSummary.played ? inSummary.netStableford : "–"}</td>, () => <td key="net-total" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/15">{totalSummary.played ? totalSummary.netStableford : "–"}</td>)}</tr>
+                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Brutto</td>{renderScorecardCellsWithSummaries(playerScores, ({ hole, score, grossStableford }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{score ? grossStableford : "–"}</td>, () => <td key="gross-out" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/10">{outSummary.played ? outSummary.grossStableford : "–"}</td>, () => <td key="gross-in" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/10">{inSummary.played ? inSummary.grossStableford : "–"}</td>, () => <td key="gross-total" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/15">{totalSummary.played ? totalSummary.grossStableford : "–"}</td>)}</tr>
                       </tbody>
                     </table>
                   </div>
