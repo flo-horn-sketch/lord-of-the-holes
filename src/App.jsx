@@ -536,6 +536,10 @@ function formatCompetitionRank(items = [], index = 0, getValue) {
   return isTiedAtRank(items, index, getValue) ? `T${rank}` : String(rank);
 }
 
+function getQualificationRankLabel(index) {
+  return String(Number(index || 0) + 1);
+}
+
 function getRankValue(item) {
   if (!item) return "";
   if (item.totalBestTwo !== undefined && item.totalBestTwo !== null) return item.totalBestTwo;
