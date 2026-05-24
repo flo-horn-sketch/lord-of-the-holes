@@ -1552,6 +1552,34 @@ function TournamentStandings({ players, rounds, holes, scores, courses = fallbac
   );
 }
 
+function loadData() {
+  try {
+    window.location.reload();
+  } catch (error) {
+    console.warn("loadData fallback failed", error);
+  }
+}
+
+function refreshData() {
+  return loadData();
+}
+
+function reloadData() {
+  return loadData();
+}
+
+function syncData() {
+  return loadData();
+}
+
+function getTeamDrawRowsForRound(roundId, rows = []) {
+  return (rows || []).filter((row) => String(row.round_id || row.roundId || row.round || "") === String(roundId));
+}
+
+function buildRealRound3HoleRevealSteps() {
+  return [];
+}
+
 function buildTeamCeremonyTimeline(roundId) {
   const safeRoundId = String(roundId || "");
   return [
