@@ -3810,8 +3810,7 @@ function LordOfTheHolesApp() {
           return `${playerRow.player?.alias_name || playerRow.player?.character_name || playerRow.player?.display_name || playerRow.player?.id}: ${scoreValue}${putts} · ${playerRow.points} Netto`;
         }).join(" · ");
         return `Team ${team.teamId}: ${playerBits} → Best Ball ${team.value}`;
-      }).join("
-");
+      }).join("\\n");
       const standings = Object.entries(running)
         .map(([teamId, points]) => ({ teamId, points }))
         .sort((a, b) => Number(b.points || 0) - Number(a.points || 0) || String(a.teamId).localeCompare(String(b.teamId)));
