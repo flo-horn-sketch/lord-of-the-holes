@@ -1093,13 +1093,47 @@ function buildFunPlayerStats(players, holes, scores) {
 }
 
 function buildFunHoleStats(players, holes, scores) {
-  return (holes || []).map((hole) => {
-    const holeScores = (scores || []).filter((score) => (!hole.round_id || String(score.round_id) === String(hole.round_id)) && Number(score.hole_number) === Number(hole.hole_number) && score.strokes !== "" && score.strokes != null);
+  const groupedHoles = new Map();
+  (holes || []).forEach((hole) => {
+    const key = `${String(hole.course_id || "").trim()}|${Number(hole.hole_number || 0)}`;
+    if (!groupedHoles.has(key)) {
+      groupedHoles.set(key, {
+        ...hole,
+        course_name: getCourseShortName(hole.course_id),
+        roundIds: [],
+      });
+    }
+    const current = groupedHoles.get(key);
+    if (hole.round_id && !current.roundIds.includes(String(hole.round_id))) current.roundIds.push(String(hole.round_id));
+  });
+
+  return Array.from(groupedHoles.values()).map((hole) => {
+    const allowedRoundIds = Array.isArray(hole.roundIds) ? hole.roundIds.map(String) : [];
+    const holeScores = (scores || []).filter((score) => {
+      const sameHole = Number(score.hole_number) === Number(hole.hole_number);
+      const hasScore = score.strokes !== "" && score.strokes != null;
+      const roundMatches = allowedRoundIds.length ? allowedRoundIds.includes(String(score.round_id || "")) : true;
+      return sameHole && hasScore && roundMatches;
+    });
     const played = holeScores.length;
     const totalStrokes = holeScores.reduce((sum, score) => sum + Number(score.strokes || 0), 0);
     const avgScore = played ? totalStrokes / played : 0;
     const avgToPar = played ? avgScore - Number(hole.par || 0) : 0;
-    return { course_id: hole.course_id || "", course_name: hole.course_name || getCourseShortName(hole.course_id), hole_number: hole.hole_number, par: hole.par, hcp: hole.hcp, played, avgScore, avgToPar, birdies: holeScores.filter((score) => getScoreDiffToPar(score, hole) === -1 && !normalizeBoolean(score.picked_up)).length, pars: holeScores.filter((score) => getScoreDiffToPar(score, hole) === 0 && !normalizeBoolean(score.picked_up)).length, pickedUpCount: holeScores.filter((score) => normalizeBoolean(score.picked_up)).length, ladies: holeScores.filter((score) => normalizeBoolean(score.lady)).length, snakes: holeScores.filter((score) => normalizeBoolean(score.over_two_putts)).length };
+    return {
+      course_id: hole.course_id || "",
+      course_name: getCourseShortName(hole.course_id),
+      hole_number: hole.hole_number,
+      par: hole.par,
+      hcp: hole.hcp,
+      played,
+      avgScore,
+      avgToPar,
+      birdies: holeScores.filter((score) => getScoreDiffToPar(score, hole) === -1 && !normalizeBoolean(score.picked_up)).length,
+      pars: holeScores.filter((score) => getScoreDiffToPar(score, hole) === 0 && !normalizeBoolean(score.picked_up)).length,
+      pickedUpCount: holeScores.filter((score) => normalizeBoolean(score.picked_up)).length,
+      ladies: holeScores.filter((score) => normalizeBoolean(score.lady)).length,
+      snakes: holeScores.filter((score) => normalizeBoolean(score.over_two_putts)).length,
+    };
   }).filter((item) => item.played > 0);
 }
 
