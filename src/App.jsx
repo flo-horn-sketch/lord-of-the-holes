@@ -1154,6 +1154,22 @@ function buildTournamentNetStandings(players, rounds, holes, scores, courses = f
   }).sort((a, b) => (a.totalBestTwo == null && b.totalBestTwo != null ? 1 : b.totalBestTwo == null && a.totalBestTwo != null ? -1 : Number(a.totalBestTwo || 0) - Number(b.totalBestTwo || 0) || Number(b.roundsPlayed || 0) - Number(a.roundsPlayed || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0)));
 }
 
+function buildDgvRoundStats(players = [], round = null, holes = [], scores = [], courses = fallbackCourses) {
+  if (!round?.round_id) return [];
+  const course = getCourseSettings(round.course_id || "goethe", courses);
+  const slope = Number(course?.slope_rating || 113);
+  const courseRating = Number(course?.course_rating || course?.rating || course?.cr || 72);
+  const roundHoles = (holes || []).filter((hole) => Number(hole.hole_number) > 0).sort((a, b) => Number(a.hole_number) - Number(b.hole_number));
+  return (players || []).map((player) => {
+    const playerScores = (scores || []).filter((score) => String(score.round_id || "") === String(round.round_id) && String(score.player_id || "") === String(player.id) && score.strokes !== "" && score.strokes != null);
+    const strokes = playerScores.reduce((sum, score) => sum + Number(score.strokes || 0), 0);
+    const played = playerScores.length;
+    const isComplete = roundHoles.length > 0 && played >= roundHoles.length;
+    const differential = isComplete ? ((strokes - courseRating) * 113) / slope : null;
+    return { ...withFallbackAlias(player), strokes: played ? strokes : null, played, expected: roundHoles.length, courseRating, slope, differential };
+  }).sort((a, b) => (a.differential == null && b.differential != null ? 1 : b.differential == null && a.differential != null ? -1 : Number(a.differential || 0) - Number(b.differential || 0) || Number(a.strokes || 0) - Number(b.strokes || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0)));
+}
+
 function buildGrossStrokeStandings(players, rounds, holes, scores) {
   const roundList = (rounds?.length ? rounds : fallbackRounds).slice().sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
   const expectedHoles = roundList.reduce((sum, round) => sum + getRoundHoles(round, holes).length, 0);
@@ -3102,6 +3118,7 @@ function LordOfTheHolesApp() {
     const tablePlayers = getPlayersForCourse(getRoundPlayers(tableRound?.round_id, allPlayers, roundPlayers), tableCourseId, courses);
     const tableScores = officialAllScores.filter((score) => String(score.round_id || "") === String(tableRound?.round_id || ""));
     const tableStats = buildPlayerStats(tablePlayers, tableHoles, tableScores);
+    const dgvRoundStats = buildDgvRoundStats(tablePlayers, tableRound, tableHoles, tableScores, courses);
     return (
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
         <div className="landscape:mx-auto landscape:max-w-none landscape:pb-6">
@@ -3111,6 +3128,7 @@ function LordOfTheHolesApp() {
           <Card className="mb-2 rounded-2xl border border-amber-500/30 bg-[linear-gradient(180deg,rgba(48,35,22,0.86),rgba(18,13,9,0.82))] shadow-[inset_0_1px_0_rgba(251,191,36,0.10),0_18px_46px_rgba(0,0,0,0.38)] backdrop-blur-sm">
             <CardContent className="p-3"><div className="mb-2"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Leaderboard</p></div><LeaderboardTable title="Strokes HCP adjusted" players={sortHcpAdjustedStrokePlay(tableStats)} columns={[{ label: "+/−", render: (p) => formatToPar(p.hcpAdjustedToPar, p.played), emphasize: true }, { label: "Netto", render: (p) => p.played ? p.hcpAdjustedTotal : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} />
               <RoundProgressChart title="Strokes HCP adjusted" players={tablePlayers} holes={tableHoles} scores={tableScores} metric="strokesHcpAdjusted" /><LeaderboardTable title="Strokes" players={sortStrokePlay(tableStats)} columns={[{ label: "+/−", render: (p) => formatToPar(p.toPar, p.played), emphasize: true }, { label: "Schläge", render: (p) => p.played ? p.total : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} />
+              <LeaderboardTable title="DGV-Schlagzahl / HCP-Differential" players={dgvRoundStats} columns={[{ label: "Schläge", render: (p) => p.strokes ?? "–" }, { label: "CR/Slope", render: (p) => `${Number(p.courseRating || 0).toFixed(1)} / ${p.slope || "–"}` }, { label: "Diff.", render: (p) => p.differential == null ? "nach 18" : Number(p.differential).toFixed(1), emphasize: true }, { label: "Löcher", render: (p) => `${p.played}/${p.expected || 18}` }]} />
               <RoundProgressChart title="Strokes" players={tablePlayers} holes={tableHoles} scores={tableScores} metric="strokes" /><LeaderboardTable title="Netto Stableford" players={sortStableford(tableStats, "netStableford")} columns={[{ label: "Punkte", render: (p) => p.netStableford, emphasize: true }, { label: "Löcher", render: (p) => `${p.played}/18` }]} />
               <RoundProgressChart title="Netto Stableford" players={tablePlayers} holes={tableHoles} scores={tableScores} metric="netStableford" /><LeaderboardTable title="Brutto Punkte" players={sortStableford(tableStats, "grossStableford")} columns={[{ label: "Punkte", render: (p) => p.grossStableford, emphasize: true }, { label: "Schläge", render: (p) => p.played ? p.total : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} />
               <RoundProgressChart title="Brutto Punkte" players={tablePlayers} holes={tableHoles} scores={tableScores} metric="grossStableford" /><LeaderboardTable title="Putt-Kasse" players={[...tableStats].sort((a, b) => Number(b.puttPenaltyEuro || 0) - Number(a.puttPenaltyEuro || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0))} columns={[{ label: "3 Putts", render: (p) => `${p.threePutts} × 2 €` }, { label: "4+ Putts", render: (p) => `${p.fourPlusPutts} × 4 €` }, { label: "Gesamt", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} />
@@ -4246,6 +4264,12 @@ function LordOfTheHolesApp() {
       const winner = completeTeams[0];
       const second = completeTeams[1];
       const loser = completeTeams[completeTeams.length - 1];
+      const bestValue = Number(winner?.value || 0);
+      const worstValue = Number(loser?.value || 0);
+      const allTeamsTied = completeTeams.length > 1 && bestValue === worstValue;
+      if (allTeamsTied) return;
+      const winnerTeams = completeTeams.filter((team) => Number(team.value || 0) === bestValue);
+      const loserTeams = completeTeams.filter((team) => Number(team.value || 0) === worstValue);
       const teamWithLoan = (team) => String(roundId) === "r1" && (team.players || []).some((player, index) => getDailyTeamPlayerMeta(roundId, team.teamId, player.id, index).isLoanPlayer);
       const realTeamPlayers = (team) => (team.players || []).filter((player, index) => !getDailyTeamPlayerMeta(roundId, team.teamId, player.id, index).isLoanPlayer);
       const addDaily = (player, amount, label) => addPrizeLedgerEntry(ledger, player.id, amount, `${standings.title}: ${label} ${formatEuroValue(amount)}`, "money", "daily");
@@ -4263,11 +4287,13 @@ function LordOfTheHolesApp() {
         return;
       }
 
-      const winnerShare = winner.players.length ? 100 / winner.players.length : 0;
-      const loserShare = loser.players.length ? -100 / loser.players.length : 0;
+      const winnerPlayers = winnerTeams.flatMap((team) => team.players || []);
+      const loserPlayers = loserTeams.flatMap((team) => team.players || []);
+      const winnerShare = winnerPlayers.length ? 100 / winnerPlayers.length : 0;
+      const loserShare = loserPlayers.length ? -100 / loserPlayers.length : 0;
 
-      winner.players.forEach((player) => addDaily(player, winnerShare, "Siegermannschaft"));
-      loser.players.forEach((player) => addDaily(player, loserShare, "letzter Platz"));
+      winnerPlayers.forEach((player) => addDaily(player, winnerShare, winnerTeams.length > 1 ? "geteilter Sieg" : "Siegermannschaft"));
+      loserPlayers.forEach((player) => addDaily(player, loserShare, loserTeams.length > 1 ? "geteilter letzter Platz" : "letzter Platz"));
     });
 
     const snakeStats = buildFunPlayerStats(getPlayersForCourse(allPlayers, displayCourseId, courses), allHoles, officialAllScores);
