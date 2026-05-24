@@ -1981,7 +1981,7 @@ function LordOfTheHolesApp() {
   const flightCeremonyTimeline = useMemo(() => buildFlightCeremonyTimeline(flightDraw), [flightDraw]);
   const unlockedTeamDrawRoundIds = useMemo(() => atomicTimeActive ? Object.entries(TEAM_DRAW_TARGETS).filter(([, target]) => syncedNow.getTime() >= target.getTime()).map(([roundId]) => roundId) : [], [syncedNow, atomicTimeActive]);
   function buildRealTeamCeremonyTimeline(roundId) {
-    const rows = getTeamDrawRowsForRound(roundId);
+    const rows = (teamDrawRows || []).filter((row) => String(row.round_id || row.roundId || row.round || "") === String(roundId));
     if (!roundId || !rows.length) return buildTeamCeremonyTimeline(roundId);
     const round = (rounds.length ? rounds : fallbackRounds).find((item) => String(item.round_id) === String(roundId));
     const teamMap = { A: [], B: [], C: [] };
