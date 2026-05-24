@@ -1552,6 +1552,24 @@ function TournamentStandings({ players, rounds, holes, scores, courses = fallbac
   );
 }
 
+function buildTeamCeremonyTimeline(roundId) {
+  const safeRoundId = String(roundId || "");
+  return [
+    {
+      type: "text",
+      title: safeRoundId === "r3" ? "Die Bündnisse vor Mordor" : safeRoundId === "r2" ? "Die Bündnisse aus den Minen" : "Die Bündnisse des Tages",
+      text: "Die Team-Zeremonie wird vorbereitet. Falls diese Meldung erscheint, ist die sichere Fallback-Zeremonie aktiv.",
+      waitLabel: "Die Chronik wird geöffnet ...",
+    },
+    {
+      type: "text",
+      title: "Zeremonie gesichert",
+      text: "Die App läuft wieder. Die detaillierte Team-Zeremonie kann danach sauber neu aufgebaut werden.",
+      waitLabel: "Die Chronik wird versiegelt ...",
+    },
+  ];
+}
+
 function buildFlightCeremonyTimeline(draw) {
   const rounds = Array.isArray(draw?.rounds) ? draw.rounds : [];
   if (!rounds.length) return [];
@@ -1962,7 +1980,79 @@ function LordOfTheHolesApp() {
   const flightDrawUnlocked = atomicTimeActive && syncedNow.getTime() >= FLIGHT_DRAW_TARGET.getTime();
   const flightCeremonyTimeline = useMemo(() => buildFlightCeremonyTimeline(flightDraw), [flightDraw]);
   const unlockedTeamDrawRoundIds = useMemo(() => atomicTimeActive ? Object.entries(TEAM_DRAW_TARGETS).filter(([, target]) => syncedNow.getTime() >= target.getTime()).map(([roundId]) => roundId) : [], [syncedNow, atomicTimeActive]);
-  const teamCeremonyTimeline = useMemo(() => ensureSecondSealWaitStep(teamCeremonyTestMode && String(teamCeremonyRoundId) === "r3" ? buildDummyRound3TeamCeremonyTimeline() : buildTeamCeremonyTimeline(teamCeremonyRoundId)), [teamCeremonyTestMode, teamCeremonyRoundId, teamDrawRows, allPlayers, officialAllScores]);
+  function buildRealTeamCeremonyTimeline(roundId) {
+    const rows = getTeamDrawRowsForRound(roundId);
+    if (!roundId || !rows.length) return buildTeamCeremonyTimeline(roundId);
+    const round = (rounds.length ? rounds : fallbackRounds).find((item) => String(item.round_id) === String(roundId));
+    const teamMap = { A: [], B: [], C: [] };
+    rows.forEach((row) => {
+      const teamId = String(row.team_number || row.team_id || "").toUpperCase();
+      if (!teamMap[teamId]) teamMap[teamId] = [];
+      teamMap[teamId].push(row);
+    });
+
+    const playerLabel = (row) => {
+      const alias = row?.player_alias || row?.alias_name || "";
+      const name = row?.player_name || row?.character_name || row?.display_name || row?.player_id || row?.id || "";
+      return alias ? `${alias} (${name})` : name;
+    };
+    const teamPlayersText = (team) => (team.players || []).map(playerLabel).filter(Boolean).join(" und ") || `Team ${team.teamId}`;
+
+    const standingData = buildDailyTeamStandings(roundId, true);
+    const standingMap = new Map((standingData?.teams || []).map((team) => [String(team.teamId || team.team_id || "").toUpperCase(), team]));
+    const teamsByLetter = ["A", "B", "C"].map((teamId) => {
+      const standing = standingMap.get(teamId) || { teamId, value: 0, detail: "noch ohne Wertung" };
+      return { ...standing, teamId, players: teamMap[teamId] || [] };
+    });
+    const rankedTeams = teamsByLetter.slice().sort((a, b) => Number(b.value || 0) - Number(a.value || 0) || String(a.teamId).localeCompare(String(b.teamId)));
+    rankedTeams.forEach((team, index) => {
+      team.ceremonyRank = getCompetitionRank(rankedTeams, index, (item) => Number(item.value || 0));
+      team.ceremonyRankLabel = formatCompetitionRank(rankedTeams, index, (item) => Number(item.value || 0));
+    });
+    const resultRevealTeams = rankedTeams.slice().sort((a, b) => Number(b.ceremonyRank || 0) - Number(a.ceremonyRank || 0) || String(a.teamId).localeCompare(String(b.teamId)));
+
+    const modeText = String(roundId) === "r3"
+      ? "Vor den Toren Mordors wird Loch für Loch gerichtet. Wer das bessere Netto-Ergebnis bringt, nimmt das Loch — bei Gleichstand wird geteilt."
+      : String(roundId) === "r2"
+        ? "Runde zwei führt durch die Minen. Heute zählt pro Loch nur der bessere Ball."
+        : "Der erste Tag ist geschlagen. Heute zählt die rohe Macht der Netto-Punkte.";
+    const rankTexts = {
+      1: "Dieses Bündnis steht oben auf dem Pergament.",
+      2: "Dieses Bündnis hält die Mitte — gefährlich genug, um noch darüber zu reden.",
+      3: "Dieses Bündnis trägt die Last des Tages. Der Palantír hat alles gesehen.",
+    };
+
+    const steps = [
+      { type: "text", title: String(roundId) === "r3" ? "Die Bündnisse vor Mordor" : "Die Bündnisse des Tages", text: `${getRoundChapterLabel(round)} ist geschlagen. Der Rat öffnet das versiegelte Pergament der Tageswertung.`, waitLabel: "Das Pergament wird entrollt ..." },
+      { type: "text", title: "Die Mannschaften werden offenbart", text: `${modeText} Zuerst werden nur die Bündnisse gezogen. Die Wertung bleibt noch im Schatten, bis alle Namen gefallen sind.`, waitLabel: "Die Bündnisse werden entrollt ..." },
+      { type: "teamBoard", title: "Drei leere Banner", teams: teamsByLetter, revealCounts: { A: 0, B: 0, C: 0 }, revealLine: "Drei Banner werden erhoben. Noch ist kein Name sichtbar. Der Palantír sammelt Atem.", waitLabel: "Die ersten Namen werden gerufen ..." },
+      { type: "teamBoard", title: "Die ersten Namen fallen", teams: teamsByLetter, revealCounts: { A: 1, B: 0, C: 0 }, revealLine: "Das erste Siegel bricht. Ein Name tritt aus dem Pergament.", waitLabel: "Team A erhält den ersten Gefährten ..." },
+      { type: "teamBoard", title: "Die ersten Namen fallen", teams: teamsByLetter, revealCounts: { A: 1, B: 1, C: 0 }, revealLine: "Das Pergament wandert weiter. Auch Team B wird berufen.", waitLabel: "Team B erhält den ersten Gefährten ..." },
+      { type: "teamBoard", title: "Die ersten Namen fallen", teams: teamsByLetter, revealCounts: { A: 1, B: 1, C: 1 }, revealLine: "Das dritte Fenster glimmt. Team C bekommt seinen ersten Namen.", waitLabel: "Team C erhält den ersten Gefährten ..." },
+      { type: "text", title: "Die halben Bündnisse stehen", text: "Drei Namen sind gefallen. Drei Schatten fehlen noch. Der Rat tuschelt, der Palantír glimmt, und irgendwo rechnet jemand bereits heimlich Netto-Punkte nach.", waitLabel: "Die zweiten Siegel werden vorbereitet ..." },
+      { type: "teamBoard", title: "Die zweiten Siegel warten", teams: teamsByLetter, revealCounts: { A: 1, B: 1, C: 1 }, revealLine: "Noch bleibt jedes Banner halb gefüllt. Kein zweiter Name ist gefallen — der Palantír lässt den Moment kurz hängen.", waitLabel: "Der zweite Name nähert sich ..." },
+      { type: "teamBoard", title: "Die Bündnisse schließen sich", teams: teamsByLetter, revealCounts: { A: 2, B: 1, C: 1 }, revealLine: "Das zweite Siegel glimmt. Team A wird vollständig.", waitLabel: "Team A wird vollständig ..." },
+      { type: "teamBoard", title: "Die Bündnisse schließen sich", teams: teamsByLetter, revealCounts: { A: 2, B: 2, C: 1 }, revealLine: "Ein weiterer Name fällt. Team B ist nun vollständig.", waitLabel: "Team B wird vollständig ..." },
+      { type: "teamBoard", title: "Die Bündnisse schließen sich", teams: teamsByLetter, revealCounts: { A: 2, B: 2, C: 2 }, revealLine: "Das letzte Siegel bricht. Auch Team C steht nun vollständig im Licht.", waitLabel: "Alle Bündnisse sind offenbart ..." },
+    ];
+
+    if (String(roundId) === "r3") {
+      steps.push(...buildRealRound3HoleRevealSteps(roundId));
+    } else {
+      steps.push({ type: "text", title: "Alle Bündnisse sind offenbart", text: "Die Namen sind gefallen. Nun richtet der Palantír die Teams nach ihrer Tageswertung.", waitLabel: "Die Rangfolge wird enthüllt ..." });
+    }
+
+    resultRevealTeams.forEach((team) => {
+      const rank = Number(team.ceremonyRank || 0);
+      const rankLabel = team.ceremonyRankLabel || String(rank);
+      steps.push({ type: "teamResult", title: `${rankLabel}. Platz`, text: `Auf Platz ${rankLabel} landen ${teamPlayersText(team)} mit ${team.detail}. ${rankTexts[rank] || "Das Schicksal hat gesprochen."}`, teamId: team.teamId, rank, detail: team.detail, waitLabel: "Die Chronisten notieren ..." });
+    });
+
+    steps.push({ type: "text", title: "Die Teams sind gesprochen", text: "Die Bündnisse stehen. Die Rangfolge ist bekannt. Wer nun klagt, möge dies mit Netto-Punkten widerlegen.", waitLabel: "Die Chronik wird versiegelt ..." });
+    return steps;
+  }
+
+  const teamCeremonyTimeline = useMemo(() => ensureSecondSealWaitStep(teamCeremonyTestMode && String(teamCeremonyRoundId) === "r3" ? buildDummyRound3TeamCeremonyTimeline() : buildRealTeamCeremonyTimeline(teamCeremonyRoundId)), [teamCeremonyTestMode, teamCeremonyRoundId, teamDrawRows, allPlayers, officialAllScores, rounds, roundPlayers, allHoles]);
   const isTeamDrawRoundVisible = (roundId) => {
     const key = `team_ceremony_${roundId}`;
     return Boolean((teamCeremonyDismissedKeys || []).includes(key));
