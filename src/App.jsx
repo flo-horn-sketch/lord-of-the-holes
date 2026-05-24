@@ -57,7 +57,7 @@ const TEAM_DRAW_STORAGE_KEY = "lordOfTheHoles.teamDraw";
 const TEAM_DRAW_TARGETS = {
   r1: new Date("2026-05-22T21:00:00+02:00"),
   r2: new Date("2026-05-23T19:30:00+02:00"),
-  r3: new Date("2026-05-24T19:45:00+02:00"),
+  r3: new Date("2026-05-24T21:00:00+02:00"),
 };
 
 const fallbackAliases = {
@@ -1552,98 +1552,6 @@ function TournamentStandings({ players, rounds, holes, scores, courses = fallbac
   );
 }
 
-function loadData() {
-  try {
-    window.location.reload();
-  } catch (error) {
-    console.warn("loadData fallback failed", error);
-  }
-}
-
-function refreshData() {
-  return loadData();
-}
-
-function reloadData() {
-  return loadData();
-}
-
-function syncData() {
-  return loadData();
-}
-
-function getTeamDrawRowsForRound(roundId, rows = []) {
-  return (rows || []).filter((row) => String(row.round_id || row.roundId || row.round || "") === String(roundId));
-}
-
-function buildRealRound3HoleRevealSteps() {
-  return [];
-}
-
-function buildTeamCeremonyTimeline(roundId) {
-  const safeRoundId = String(roundId || "");
-  return [
-    {
-      type: "text",
-      title: safeRoundId === "r3" ? "Die Bündnisse vor Mordor" : safeRoundId === "r2" ? "Die Bündnisse aus den Minen" : "Die Bündnisse des Tages",
-      text: "Die Team-Zeremonie wird vorbereitet. Falls diese Meldung erscheint, ist die sichere Fallback-Zeremonie aktiv.",
-      waitLabel: "Die Chronik wird geöffnet ...",
-    },
-    {
-      type: "text",
-      title: "Zeremonie gesichert",
-      text: "Die App läuft wieder. Die detaillierte Team-Zeremonie kann danach sauber neu aufgebaut werden.",
-      waitLabel: "Die Chronik wird versiegelt ...",
-    },
-  ];
-}
-
-function buildFlightCeremonyTimeline(draw) {
-  const rounds = Array.isArray(draw?.rounds) ? draw.rounds : [];
-  if (!rounds.length) return [];
-  const steps = [
-    {
-      type: "text",
-      title: "Die Flüge werden offenbart",
-      text: "Der Rat von Bruchtal öffnet das Pergament der Flight-Auslosung. Runde für Runde treten die Gefährten hervor.",
-    },
-  ];
-
-  rounds.forEach((roundPlan) => {
-    const flights = Array.isArray(roundPlan?.flights) ? roundPlan.flights : [];
-    const totalPlayers = flights.reduce((sum, flight) => sum + (Array.isArray(flight.players) ? flight.players.length : 0), 0);
-    steps.push({
-      type: "text",
-      title: roundPlan.round_name || roundPlan.round_id || "Runde",
-      text: roundPlan.note || "Ein neues Kapitel wird geöffnet. Die Flights treten aus dem Nebel.",
-      roundPlan,
-    });
-    for (let revealCount = 1; revealCount <= totalPlayers; revealCount += 1) {
-      steps.push({
-        type: "reveal",
-        title: roundPlan.round_name || roundPlan.round_id || "Runde",
-        text: "Die Namen erscheinen nacheinander im Pergament.",
-        roundPlan,
-        revealCount,
-      });
-    }
-    steps.push({
-      type: "reveal",
-      title: `${roundPlan.round_name || roundPlan.round_id || "Runde"} · vollständig`,
-      text: "Der Flight ist besiegelt. Ab jetzt gibt es keine Ausreden mehr, nur noch Zeugen.",
-      roundPlan,
-      revealCount: totalPlayers,
-    });
-  });
-
-  steps.push({
-    type: "text",
-    title: "Die Flights sind gesprochen",
-    text: "Die Chronik ist versiegelt. Wer nun klagt, möge dies bitte vor dem ersten Abschlag erledigen.",
-  });
-  return steps;
-}
-
 function LordOfTheHolesApp() {
   const cachedState = readLocalJson("lordOfTheHoles.cachedState", null);
   const [players, setPlayers] = useState(cachedState?.players?.length ? cachedState.players : fallbackPlayers);
@@ -2008,79 +1916,7 @@ function LordOfTheHolesApp() {
   const flightDrawUnlocked = atomicTimeActive && syncedNow.getTime() >= FLIGHT_DRAW_TARGET.getTime();
   const flightCeremonyTimeline = useMemo(() => buildFlightCeremonyTimeline(flightDraw), [flightDraw]);
   const unlockedTeamDrawRoundIds = useMemo(() => atomicTimeActive ? Object.entries(TEAM_DRAW_TARGETS).filter(([, target]) => syncedNow.getTime() >= target.getTime()).map(([roundId]) => roundId) : [], [syncedNow, atomicTimeActive]);
-  function buildRealTeamCeremonyTimeline(roundId) {
-    const rows = (teamDrawRows || []).filter((row) => String(row.round_id || row.roundId || row.round || "") === String(roundId));
-    if (!roundId || !rows.length) return buildTeamCeremonyTimeline(roundId);
-    const round = (rounds.length ? rounds : fallbackRounds).find((item) => String(item.round_id) === String(roundId));
-    const teamMap = { A: [], B: [], C: [] };
-    rows.forEach((row) => {
-      const teamId = String(row.team_number || row.team_id || "").toUpperCase();
-      if (!teamMap[teamId]) teamMap[teamId] = [];
-      teamMap[teamId].push(row);
-    });
-
-    const playerLabel = (row) => {
-      const alias = row?.player_alias || row?.alias_name || "";
-      const name = row?.player_name || row?.character_name || row?.display_name || row?.player_id || row?.id || "";
-      return alias ? `${alias} (${name})` : name;
-    };
-    const teamPlayersText = (team) => (team.players || []).map(playerLabel).filter(Boolean).join(" und ") || `Team ${team.teamId}`;
-
-    const standingData = buildDailyTeamStandings(roundId, true);
-    const standingMap = new Map((standingData?.teams || []).map((team) => [String(team.teamId || team.team_id || "").toUpperCase(), team]));
-    const teamsByLetter = ["A", "B", "C"].map((teamId) => {
-      const standing = standingMap.get(teamId) || { teamId, value: 0, detail: "noch ohne Wertung" };
-      return { ...standing, teamId, players: teamMap[teamId] || [] };
-    });
-    const rankedTeams = teamsByLetter.slice().sort((a, b) => Number(b.value || 0) - Number(a.value || 0) || String(a.teamId).localeCompare(String(b.teamId)));
-    rankedTeams.forEach((team, index) => {
-      team.ceremonyRank = getCompetitionRank(rankedTeams, index, (item) => Number(item.value || 0));
-      team.ceremonyRankLabel = formatCompetitionRank(rankedTeams, index, (item) => Number(item.value || 0));
-    });
-    const resultRevealTeams = rankedTeams.slice().sort((a, b) => Number(b.ceremonyRank || 0) - Number(a.ceremonyRank || 0) || String(a.teamId).localeCompare(String(b.teamId)));
-
-    const modeText = String(roundId) === "r3"
-      ? "Vor den Toren Mordors wird Loch für Loch gerichtet. Wer das bessere Netto-Ergebnis bringt, nimmt das Loch — bei Gleichstand wird geteilt."
-      : String(roundId) === "r2"
-        ? "Runde zwei führt durch die Minen. Heute zählt pro Loch nur der bessere Ball."
-        : "Der erste Tag ist geschlagen. Heute zählt die rohe Macht der Netto-Punkte.";
-    const rankTexts = {
-      1: "Dieses Bündnis steht oben auf dem Pergament.",
-      2: "Dieses Bündnis hält die Mitte — gefährlich genug, um noch darüber zu reden.",
-      3: "Dieses Bündnis trägt die Last des Tages. Der Palantír hat alles gesehen.",
-    };
-
-    const steps = [
-      { type: "text", title: String(roundId) === "r3" ? "Die Bündnisse vor Mordor" : "Die Bündnisse des Tages", text: `${getRoundChapterLabel(round)} ist geschlagen. Der Rat öffnet das versiegelte Pergament der Tageswertung.`, waitLabel: "Das Pergament wird entrollt ..." },
-      { type: "text", title: "Die Mannschaften werden offenbart", text: `${modeText} Zuerst werden nur die Bündnisse gezogen. Die Wertung bleibt noch im Schatten, bis alle Namen gefallen sind.`, waitLabel: "Die Bündnisse werden entrollt ..." },
-      { type: "teamBoard", title: "Drei leere Banner", teams: teamsByLetter, revealCounts: { A: 0, B: 0, C: 0 }, revealLine: "Drei Banner werden erhoben. Noch ist kein Name sichtbar. Der Palantír sammelt Atem.", waitLabel: "Die ersten Namen werden gerufen ..." },
-      { type: "teamBoard", title: "Die ersten Namen fallen", teams: teamsByLetter, revealCounts: { A: 1, B: 0, C: 0 }, revealLine: "Das erste Siegel bricht. Ein Name tritt aus dem Pergament.", waitLabel: "Team A erhält den ersten Gefährten ..." },
-      { type: "teamBoard", title: "Die ersten Namen fallen", teams: teamsByLetter, revealCounts: { A: 1, B: 1, C: 0 }, revealLine: "Das Pergament wandert weiter. Auch Team B wird berufen.", waitLabel: "Team B erhält den ersten Gefährten ..." },
-      { type: "teamBoard", title: "Die ersten Namen fallen", teams: teamsByLetter, revealCounts: { A: 1, B: 1, C: 1 }, revealLine: "Das dritte Fenster glimmt. Team C bekommt seinen ersten Namen.", waitLabel: "Team C erhält den ersten Gefährten ..." },
-      { type: "text", title: "Die halben Bündnisse stehen", text: "Drei Namen sind gefallen. Drei Schatten fehlen noch. Der Rat tuschelt, der Palantír glimmt, und irgendwo rechnet jemand bereits heimlich Netto-Punkte nach.", waitLabel: "Die zweiten Siegel werden vorbereitet ..." },
-      { type: "teamBoard", title: "Die zweiten Siegel warten", teams: teamsByLetter, revealCounts: { A: 1, B: 1, C: 1 }, revealLine: "Noch bleibt jedes Banner halb gefüllt. Kein zweiter Name ist gefallen — der Palantír lässt den Moment kurz hängen.", waitLabel: "Der zweite Name nähert sich ..." },
-      { type: "teamBoard", title: "Die Bündnisse schließen sich", teams: teamsByLetter, revealCounts: { A: 2, B: 1, C: 1 }, revealLine: "Das zweite Siegel glimmt. Team A wird vollständig.", waitLabel: "Team A wird vollständig ..." },
-      { type: "teamBoard", title: "Die Bündnisse schließen sich", teams: teamsByLetter, revealCounts: { A: 2, B: 2, C: 1 }, revealLine: "Ein weiterer Name fällt. Team B ist nun vollständig.", waitLabel: "Team B wird vollständig ..." },
-      { type: "teamBoard", title: "Die Bündnisse schließen sich", teams: teamsByLetter, revealCounts: { A: 2, B: 2, C: 2 }, revealLine: "Das letzte Siegel bricht. Auch Team C steht nun vollständig im Licht.", waitLabel: "Alle Bündnisse sind offenbart ..." },
-    ];
-
-    if (String(roundId) === "r3") {
-      steps.push(...buildRealRound3HoleRevealSteps(roundId));
-    } else {
-      steps.push({ type: "text", title: "Alle Bündnisse sind offenbart", text: "Die Namen sind gefallen. Nun richtet der Palantír die Teams nach ihrer Tageswertung.", waitLabel: "Die Rangfolge wird enthüllt ..." });
-    }
-
-    resultRevealTeams.forEach((team) => {
-      const rank = Number(team.ceremonyRank || 0);
-      const rankLabel = team.ceremonyRankLabel || String(rank);
-      steps.push({ type: "teamResult", title: `${rankLabel}. Platz`, text: `Auf Platz ${rankLabel} landen ${teamPlayersText(team)} mit ${team.detail}. ${rankTexts[rank] || "Das Schicksal hat gesprochen."}`, teamId: team.teamId, rank, detail: team.detail, waitLabel: "Die Chronisten notieren ..." });
-    });
-
-    steps.push({ type: "text", title: "Die Teams sind gesprochen", text: "Die Bündnisse stehen. Die Rangfolge ist bekannt. Wer nun klagt, möge dies mit Netto-Punkten widerlegen.", waitLabel: "Die Chronik wird versiegelt ..." });
-    return steps;
-  }
-
-  const teamCeremonyTimeline = useMemo(() => ensureSecondSealWaitStep(teamCeremonyTestMode && String(teamCeremonyRoundId) === "r3" ? buildDummyRound3TeamCeremonyTimeline() : buildRealTeamCeremonyTimeline(teamCeremonyRoundId)), [teamCeremonyTestMode, teamCeremonyRoundId, teamDrawRows, allPlayers, officialAllScores, rounds, roundPlayers, allHoles]);
+  const teamCeremonyTimeline = useMemo(() => teamCeremonyTestMode && String(teamCeremonyRoundId) === "r3" ? buildDummyRound3TeamCeremonyTimeline() : buildTeamCeremonyTimeline(teamCeremonyRoundId), [teamCeremonyTestMode, teamCeremonyRoundId, teamDrawRows, allPlayers, officialAllScores]);
   const isTeamDrawRoundVisible = (roundId) => {
     const key = `team_ceremony_${roundId}`;
     return Boolean((teamCeremonyDismissedKeys || []).includes(key));
@@ -2212,31 +2048,3084 @@ function LordOfTheHolesApp() {
   }, [flightCeremonyRunning, flightCeremonyTimeline, flightCeremonySyncStartAt, serverTimeOffsetMs]);
 
   function getTeamCeremonyStepDuration(step) {
-  if (!step) return 3200;
-  if (step.type === "holeReveal") return 9500;
-  return 3600;
-}
+    const textLength = String(step?.text || step?.revealLine || "").length + (step?.type === "teamBoard" ? 120 : step?.type === "team" ? 110 : 0);
+    return Math.max(4200, Math.min(9000, 2500 + textLength * 28));
+  }
 
-function ensureSecondSealWaitStep(timeline = []) {
-  const steps = Array.isArray(timeline) ? [...timeline] : [];
-  const halfIndex = steps.findIndex((step) => String(step?.title || "") === "Die halben Bündnisse stehen");
-  if (halfIndex < 0) return steps;
-  const nextStep = steps[halfIndex + 1];
-  if (String(nextStep?.title || "") === "Die zweiten Siegel warten") return steps;
-  const teamSourceStep = steps.find((step) => step?.type === "teamBoard" && step?.teams?.length) || nextStep;
-  const waitStep = {
-    type: "teamBoard",
-    testMode: Boolean(steps[halfIndex]?.testMode || teamSourceStep?.testMode),
-    title: "Die zweiten Siegel warten",
-    teams: teamSourceStep?.teams || [],
-    revealCounts: { A: 1, B: 1, C: 1 },
-    revealLine: "Noch bleibt jedes Banner halb gefüllt. Kein zweiter Name ist gefallen — der Palantír lässt den Moment kurz hängen.",
-    waitLabel: "Der zweite Name nähert sich ...",
-  };
-  steps.splice(halfIndex + 1, 0, waitStep);
-  return steps;
-}
+  function getTeamCeremonyTotalDuration(timeline) {
+    return (timeline || []).reduce((sum, step) => sum + getTeamCeremonyStepDuration(step), 0);
+  }
 
+  function getNextSyncedCeremonyStart(roundId, timeline = [], forceImmediate = false) {
+    const target = TEAM_DRAW_TARGETS[roundId];
+    const now = getSyncedNowMs();
+    if (!forceImmediate && target && now < target.getTime()) return target.toISOString();
+    const totalDuration = getTeamCeremonyTotalDuration(timeline);
+    if (!forceImmediate && target && totalDuration > 0 && now - target.getTime() < totalDuration) return target.toISOString();
+    const nextBoundary = Math.ceil((now + 2500) / 10000) * 10000;
+    return new Date(nextBoundary).toISOString();
+  }
+
+  function getSyncedTeamCeremonyIndex(timeline, syncStartAt) {
+    const startMs = Date.parse(syncStartAt || "");
+    if (!timeline.length || Number.isNaN(startMs)) return 0;
+    const elapsed = getSyncedNowMs() - startMs;
+    if (elapsed <= 0) return 0;
+    let cursor = 0;
+    for (let index = 0; index < timeline.length; index += 1) {
+      cursor += getTeamCeremonyStepDuration(timeline[index]);
+      if (elapsed < cursor) return index;
+    }
+    return timeline.length;
+  }
+
+  useEffect(() => {
+    if (!teamCeremonyRunning) return undefined;
+    const timeline = teamCeremonyTimeline;
+    if (!timeline.length) return undefined;
+    const timer = window.setInterval(() => {
+      const syncedIndex = getSyncedTeamCeremonyIndex(timeline, teamCeremonySyncStartAt);
+      if (syncedIndex >= timeline.length) {
+        const key = `team_ceremony_${teamCeremonyRoundId}`;
+        if (!teamCeremonyTestMode) setTeamCeremonyDismissedKeys((current) => Array.from(new Set([...(current || []), key])));
+        setTeamCeremonyRunning(false);
+        setTeamCeremonyTestMode(false);
+        setTeamCeremonyRoundId("");
+        setTeamCeremonyStepIndex(0);
+        setTeamCeremonySyncStartAt("");
+        return;
+      }
+      setTeamCeremonyStepIndex(syncedIndex);
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [teamCeremonyRunning, teamCeremonyTimeline, teamCeremonyRoundId, teamCeremonySyncStartAt, teamCeremonyTestMode]);
+  useEffect(() => {
+    if (!appLocked || lockAdminBypass || flightCeremonyRunning || flightCeremonyCompleted) return;
+    if (!flightDrawUnlocked || !flightDraw?.rounds?.length) return;
+    startFlightCeremony();
+  }, [appLocked, lockAdminBypass, flightCeremonyRunning, flightCeremonyCompleted, flightDrawUnlocked, flightDraw]);
+
+  useEffect(() => {
+    if (teamCeremonyRunning || flightCeremonyRunning || showSplash || appLocked || !atomicTimeActive) return;
+    const nextRoundId = ["r1", "r2", "r3"].find((roundId) => {
+      const target = TEAM_DRAW_TARGETS[roundId];
+      const key = `team_ceremony_${roundId}`;
+      return atomicTimeActive && target && syncedNow.getTime() >= target.getTime() && !(teamCeremonyDismissedKeys || []).includes(key) && getTeamDrawRowsForRound(roundId).length;
+    });
+    if (!nextRoundId) return;
+    setTeamCeremonyRoundId(nextRoundId);
+    setTeamCeremonyStepIndex(0);
+    setTeamCeremonySyncStartAt(getNextSyncedCeremonyStart(nextRoundId, buildTeamCeremonyTimeline(nextRoundId)));
+    setTeamCeremonyRunning(true);
+  }, [teamCeremonyRunning, flightCeremonyRunning, showSplash, appLocked, syncedNow, atomicTimeActive, teamCeremonyDismissedKeys, teamDrawRows]);
+  useEffect(() => {
+    if (!myPlayerId && scoreEntryMode === "scorer") setScoreEntryMode("player");
+    if (Number(activeHole) < 1 || Number(activeHole) > 18) setActiveHole(1);
+  }, [myPlayerId, scoreEntryMode, activeHole]);
+  useEffect(() => {
+    const storedDraw = readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null);
+    if (!flightDraw?.rounds?.length && (storedDraw?.rounds?.length || storedDraw?.rows?.length || storedDraw?.flight_draw_rows?.length || storedDraw?.flightDrawRows?.length || Array.isArray(storedDraw))) {
+      setFlightDraw(storedDraw);
+    }
+  }, [flightDraw]);
+  useEffect(() => {
+    const roundId = String(displayedActiveRound?.round_id || "");
+    if (!roundId || !myPlayerId || !["r1", "r2", "r3"].includes(roundId)) return;
+    const draw = effectiveFlightDraw || readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null);
+    const nextAssignedPlayerId = getAssignedScoredPlayerIdFromDraw(draw, roundId, myPlayerId);
+    if (!nextAssignedPlayerId) return;
+    if (String(scoredPlayerId || "") !== String(nextAssignedPlayerId)) {
+      setScoredPlayerId(nextAssignedPlayerId);
+      saveLocalScoredPlayerForRound(roundId, nextAssignedPlayerId);
+      setScoreEntryMode("player");
+    }
+  }, [displayedActiveRound?.round_id, myPlayerId, effectiveFlightDraw, scoredPlayerId]);
+  useEffect(() => {
+    const roundId = String(displayedActiveRound?.round_id || "");
+    if (!roundId || !myPlayerId || showSplash || (appLocked && !lockAdminBypass)) return;
+
+    if (lastLoadedRoundRef.current !== roundId) {
+      lastLoadedRoundRef.current = roundId;
+      setScoreEntryMode("player");
+    }
+
+    if (isFlightDrawRound) {
+      if (assignedScoredPlayerId) {
+        if (String(scoredPlayerId || "") !== String(assignedScoredPlayerId)) {
+          setScoredPlayerId(assignedScoredPlayerId);
+          saveLocalScoredPlayerForRound(roundId, assignedScoredPlayerId);
+        }
+        return;
+      }
+
+      if (scoredPlayerId) {
+        setScoredPlayerId("");
+        removeLocalScoredPlayerForRound(roundId);
+      }
+      return;
+    }
+
+    const storedPlayerId = String(scoredPlayerByRound?.[roundId] || "");
+    const storedPlayerIsValid = Boolean(storedPlayerId && scoreablePlayers.some((player) => String(player.id) === String(storedPlayerId)));
+    if (storedPlayerIsValid && String(scoredPlayerId || "") !== String(storedPlayerId)) {
+      setScoredPlayerId(storedPlayerId);
+    }
+  }, [displayedActiveRound?.round_id, myPlayerId, assignedScoredPlayerId, scoredPlayerId, showSplash, appLocked, lockAdminBypass, scoreablePlayers, scoredPlayerByRound]);
+
+  function applyTimeSyncOffset(source, sourceNowMs, requestStartedAt, responseReceivedAt) {
+    if (Number.isNaN(sourceNowMs)) return false;
+    const rttMs = requestStartedAt ? Math.max(0, responseReceivedAt - requestStartedAt) : 0;
+    const estimatedNowAtReceive = sourceNowMs + (rttMs ? rttMs / 2 : 0);
+    const nextOffset = estimatedNowAtReceive - responseReceivedAt;
+    setServerTimeOffsetMs(nextOffset);
+    setLastServerSync({ offsetMs: nextOffset, rttMs, syncedAt: new Date(responseReceivedAt).toISOString(), source });
+    return true;
+  }
+
+  function readAtomicTimePayload(data, requestStartedAt, responseReceivedAt, source = "itime.live") {
+    const timestampValue = data?.timestamp;
+    const timestampMs = Number(timestampValue);
+    const fallbackMs = Date.parse(data?.utc || data?.time || data?.atomic_now || data?.atomicNow || "");
+    const atomicMs = !Number.isNaN(timestampMs) && timestampMs > 1000000000000 ? timestampMs : fallbackMs;
+    const plausible = !Number.isNaN(atomicMs) && Math.abs(atomicMs - responseReceivedAt) < 5 * 60 * 1000;
+    if (!plausible) {
+      setAtomicTimeStatus("invalid");
+      return false;
+    }
+    const ok = applyTimeSyncOffset(source, atomicMs, requestStartedAt, responseReceivedAt);
+    setAtomicTimeStatus(ok ? "online" : "invalid");
+    return ok;
+  }
+
+  async function syncAtomicTime() {
+    const sequenceId = atomicSyncSequenceRef.current + 1;
+    atomicSyncSequenceRef.current = sequenceId;
+    const requestStartedAt = Date.now();
+
+    try {
+      setAtomicTimeStatus("syncing");
+      const response = await fetch("/api/atomic-time", { method: "GET", cache: "no-store" });
+      const responseReceivedAt = Date.now();
+      if (sequenceId !== atomicSyncSequenceRef.current) return false;
+      if (!response.ok) throw new Error(`Atomzeit HTTP ${response.status}`);
+      const data = await response.json();
+      return readAtomicTimePayload(data, requestStartedAt, responseReceivedAt, "itime.live-vercel");
+    } catch (err) {
+      if (sequenceId === atomicSyncSequenceRef.current) setAtomicTimeStatus("fallback");
+      return false;
+    }
+  }
+
+  async function callSheetApi(payload) {
+    const requestStartedAt = Date.now();
+    const response = await fetch(GOOGLE_SHEETS_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ ...(payload || {}), _client_request_started_at: requestStartedAt }),
+    });
+
+    if (!response.ok) throw new Error("Datenbank nicht erreichbar.");
+    const responseReceivedAt = Date.now();
+    const data = await response.json();
+    const atomicSynced = false;
+    const serverNowValue = data?.server_now || data?.serverNow || "";
+    const serverNowMs = Date.parse(serverNowValue);
+    if (!atomicSynced && !Number.isNaN(serverNowMs) && atomicTimeStatus !== "online") {
+      setLastServerSync((current) => String(current?.source || "").startsWith("itime.live") ? current : { ...(current || {}), source: "apps-script-available", syncedAt: new Date(responseReceivedAt).toISOString() });
+    }
+    if (data && data.ok === false) throw new Error(data.error || "Datenbank meldet einen Fehler.");
+    return data;
+  }
+
+  function applyPlayers(nextActivePlayers, nextAllPlayers = nextActivePlayers) {
+    setPlayers(nextActivePlayers.map(withFallbackAlias));
+    setAllPlayers(nextAllPlayers.map(withFallbackAlias));
+    if (adminEditing) return;
+    const nextHandicaps = {};
+    nextAllPlayers.forEach((player) => { nextHandicaps[`hcp_index_${player.id}`] = String(player.handicap_index ?? player.dgv_hcp ?? player.hcp_index ?? ""); });
+    setLocalHandicaps(nextHandicaps);
+  }
+
+  async function loadData({ silent = false } = {}) {
+    if (!silent) setLoading(true);
+    try {
+      const data = await callSheetApi({ action: "getState" });
+      if (data.app_locked != null || data.appLocked != null) {
+        const nextAppLocked = normalizeBoolean(data.app_locked ?? data.appLocked);
+        setAppLocked(nextAppLocked);
+        if (nextAppLocked && !lockAdminBypassRef.current) setShowSplash(true);
+      }
+      const nextFullResetAt = String(data.full_reset_at || data.fullResetAt || "");
+      const localFullResetAt = String(readLocalJson("lordOfTheHoles.fullResetAt", "") || "");
+      if (nextFullResetAt && nextFullResetAt !== localFullResetAt) applyLocalCacheClear(nextFullResetAt, "Kompletter Reset wurde übernommen.");
+      const nextScoresResetAt = String(data.scores_reset_at || data.scoresResetAt || "");
+      const localScoresResetAt = String(readLocalJson("lordOfTheHoles.scoresResetAt", "") || "");
+      if (nextScoresResetAt && nextScoresResetAt !== localScoresResetAt) {
+        const emptyScores = [];
+        setScores(emptyScores);
+        setAllScores(emptyScores);
+        setPendingScores(emptyScores);
+        pendingScoresRef.current = emptyScores;
+        setLocalScoreDrafts(emptyScores);
+        localScoreDraftsRef.current = emptyScores;
+        clearLocalScoreStorage();
+        writeLocalJson("lordOfTheHoles.scoresResetAt", nextScoresResetAt);
+        setScoresResetAt(nextScoresResetAt);
+        setActiveHole(1);
+      }
+      const nextDeviceAssignmentsResetAt = String(data.device_assignments_reset_at || data.deviceAssignmentsResetAt || "");
+      const localDeviceAssignmentsResetAt = String(readLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", "") || "");
+      if (nextDeviceAssignmentsResetAt && nextDeviceAssignmentsResetAt !== localDeviceAssignmentsResetAt) {
+        writeLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", nextDeviceAssignmentsResetAt);
+        setDeviceAssignmentsResetAt(nextDeviceAssignmentsResetAt);
+      } else if (nextDeviceAssignmentsResetAt && nextDeviceAssignmentsResetAt !== deviceAssignmentsResetAt) {
+        setDeviceAssignmentsResetAt(nextDeviceAssignmentsResetAt);
+      }
+      const serverTeamDrawRows = data.team_draw_rows || data.teamDrawRows || [];
+      if (Array.isArray(serverTeamDrawRows)) {
+        setTeamDrawRows(serverTeamDrawRows);
+        const selectionsFromTeamDraw = buildDailyTeamSelectionsFromRows(serverTeamDrawRows, true);
+        if (Object.keys(selectionsFromTeamDraw).length) setDailyTeamSelections((current) => ({ ...(current || {}), ...selectionsFromTeamDraw }));
+      }
+
+      const serverFlightDraw = data.flight_draw || data.flightDraw || null;
+      const serverSentFlightDraw = Object.prototype.hasOwnProperty.call(data, "flight_draw") || Object.prototype.hasOwnProperty.call(data, "flightDraw");
+      if (serverFlightDraw && (serverFlightDraw.rounds?.length || serverFlightDraw.rows?.length || serverFlightDraw.flight_draw_rows?.length || serverFlightDraw.flightDrawRows?.length || Array.isArray(serverFlightDraw))) {
+        setFlightDraw(serverFlightDraw);
+        writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, serverFlightDraw);
+      } else if (serverSentFlightDraw) {
+        setFlightDraw(null);
+        window.localStorage.removeItem(FLIGHT_DRAW_STORAGE_KEY);
+      }
+
+      const nextAllPlayers = (data.players?.length ? data.players : fallbackPlayers).map(withFallbackAlias);
+      const nextRounds = data.rounds?.length ? data.rounds : fallbackRounds;
+      const nextCourses = data.courses?.length ? data.courses : fallbackCourses;
+      const nextActiveRound = data.activeRound || nextRounds.find((round) => String(round.status).toLowerCase() === "active") || nextRounds[0] || fallbackRounds[0];
+      const nextActiveRoundId = String(nextActiveRound?.round_id || "");
+      const lastSeenActiveRoundId = String(readLocalJson("lordOfTheHoles.lastSeenActiveRoundId", "") || "");
+      const roundChanged = Boolean(nextActiveRoundId && lastSeenActiveRoundId && nextActiveRoundId !== lastSeenActiveRoundId);
+      if (nextActiveRoundId) writeLocalJson("lordOfTheHoles.lastSeenActiveRoundId", nextActiveRoundId);
+      const nextActivePlayers = data.activePlayers?.length ? data.activePlayers.map(withFallbackAlias) : getRoundPlayers(nextActiveRound?.round_id, nextAllPlayers, data.roundPlayers || []);
+      setCourses(nextCourses);
+      setRounds(nextRounds);
+      setRoundPlayers(data.roundPlayers || []);
+      setActiveRound(nextActiveRound);
+      const previousRoundId = String(selectedActiveRoundIdRef.current || "");
+      const nextRoundId = String(nextActiveRound?.round_id || fallbackRounds[0].round_id);
+      const nextIsFlightDrawRound = ["r1", "r2", "r3"].includes(nextRoundId);
+      const storedScoredPlayerForNextRound = String(scoredPlayerByRoundRef.current?.[nextRoundId] || "");
+      setSelectedCourseId(nextActiveRound?.course_id || "");
+      selectedActiveRoundIdRef.current = nextRoundId;
+      setSelectedActiveRoundId(nextRoundId);
+      if (previousRoundId !== nextRoundId || roundChanged) {
+        setScoreEntryMode("player");
+        lastLoadedRoundRef.current = "";
+        if (nextIsFlightDrawRound) {
+          setScoredPlayerId("");
+        } else if (storedScoredPlayerForNextRound) {
+          setScoredPlayerId(storedScoredPlayerForNextRound);
+        } else {
+          setScoredPlayerId("");
+        }
+      }
+      applyPlayers(nextActivePlayers, nextAllPlayers);
+      setHoles(normalizeHoles(data.activeHoles?.length ? data.activeHoles : data.holes).filter((hole) => !nextActiveRound?.course_id || String(hole.course_id) === String(nextActiveRound.course_id)));
+      setAllHoles(normalizeHoles(data.holes));
+      const sheetAllScores = (data.scores || []).map(normalizeScoreRecord);
+      const sheetActiveScores = (data.activeScores || []).map(normalizeScoreRecord);
+      const livePendingScores = pendingScoresRef.current;
+      const liveLocalDrafts = localScoreDraftsRef.current;
+      const nextAllScores = mergeScoresPreservingPending(sheetAllScores, livePendingScores, liveLocalDrafts);
+      const nextActiveScores = mergeScoresPreservingPending(
+        sheetActiveScores,
+        livePendingScores.filter((score) => String(score.round_id || "") === String(nextActiveRound?.round_id || "")),
+        liveLocalDrafts.filter((score) => String(score.round_id || "") === String(nextActiveRound?.round_id || ""))
+      );
+      setAllScores(nextAllScores);
+      setScores(nextActiveScores);
+      setConnectionStatus("online");
+      setError("");
+      return data;
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Datenbank konnte nicht geladen werden.");
+      return null;
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }
+
+  function upsertVisibleScore(nextScore) {
+    if (!isValidScorePayload(nextScore)) return;
+    const normalizedScore = normalizeScoreRecord(nextScore);
+    const sameScore = (score) => getScoreIdentityKey(score) === getScoreIdentityKey(normalizedScore);
+    const updateList = (current) => current.some(sameScore) ? current.map((score) => sameScore(score) ? normalizedScore : score) : [...current, normalizedScore];
+    setScores((current) => {
+      const nextScores = updateList(current);
+      scoresRef.current = nextScores;
+      return nextScores;
+    });
+    setAllScores((current) => {
+      const nextAllScores = updateList(current);
+      allScoresRef.current = nextAllScores;
+      return nextAllScores;
+    });
+  }
+
+  function addLocalScoreDraft(score) {
+    if (!isValidScorePayload(score)) return;
+    const normalizedScore = normalizeScoreRecord(score);
+    const key = getScoreIdentityKey(normalizedScore);
+    const currentDrafts = Array.isArray(localScoreDraftsRef.current) ? localScoreDraftsRef.current : [];
+    const nextDrafts = [...currentDrafts.filter((item) => getScoreIdentityKey(item) !== key), normalizedScore];
+    localScoreDraftsRef.current = nextDrafts;
+    writeLocalJson("lordOfTheHoles.localScoreDrafts", nextDrafts);
+    setLocalScoreDrafts(nextDrafts);
+    upsertVisibleScore(normalizedScore);
+  }
+
+  function removeLocalScoreDraft(score) {
+    if (!isValidScorePayload(score)) return;
+    const key = getScoreIdentityKey(score);
+    const currentDrafts = Array.isArray(localScoreDraftsRef.current) ? localScoreDraftsRef.current : [];
+    const nextDrafts = currentDrafts.filter((item) => getScoreIdentityKey(item) !== key);
+    localScoreDraftsRef.current = nextDrafts;
+    writeLocalJson("lordOfTheHoles.localScoreDrafts", nextDrafts);
+    setLocalScoreDrafts(nextDrafts);
+  }
+
+  function optimisticUpdate(patch) {
+    const safeRoundId = String(displayedActiveRound?.round_id || "").trim();
+    const safePlayerId = String(entryPlayerId || "").trim();
+    const safeHoleNumber = Number(activeHole || 0);
+    if (!safeRoundId || !safePlayerId || !safeHoleNumber) throw new Error("Score kann noch nicht gespeichert werden: Runde, Spieler oder Loch fehlt.");
+    const targetIsControl = Boolean(isScorerEntryMode);
+    const findSameScore = (score) => String(score.round_id) === safeRoundId && String(score.player_id) === safePlayerId && Number(score.hole_number) === safeHoleNumber && isScorerControlScore(score) === targetIsControl;
+    const baseScore = localScoreDraftsRef.current.find(findSameScore)
+      || pendingScoresRef.current.find(findSameScore)
+      || scoresRef.current.find(findSameScore)
+      || allScoresRef.current.find(findSameScore)
+      || currentScore
+      || {};
+    const next = normalizeScoreRecord({
+      round_id: safeRoundId,
+      player_id: safePlayerId,
+      hole_number: safeHoleNumber,
+      strokes: baseScore.strokes ?? "",
+      picked_up: normalizeBoolean(baseScore.picked_up),
+      over_two_putts: normalizeBoolean(baseScore.over_two_putts),
+      putts_count: baseScore.putts_count ?? "",
+      lady: normalizeBoolean(baseScore.lady),
+      scorer_player_id: targetIsControl ? safePlayerId : myPlayerId || "",
+      updated_at: new Date().toISOString(),
+      client_version: makeScoreClientVersion(),
+      ...patch,
+    });
+    addLocalScoreDraft(next);
+    return next;
+  }
+
+  function addPendingScore(score) {
+    if (!isValidScorePayload(score)) return;
+    const normalizedScore = normalizeScoreRecord(score);
+    const key = getScoreIdentityKey(normalizedScore);
+    const currentPendingScores = Array.isArray(pendingScoresRef.current) ? pendingScoresRef.current : [];
+    const nextPendingScores = [
+      ...currentPendingScores.filter((item) => getScoreIdentityKey(item) !== key),
+      normalizedScore,
+    ];
+    pendingScoresRef.current = nextPendingScores;
+    writeLocalJson("lordOfTheHoles.pendingScores", nextPendingScores);
+    setPendingScores(nextPendingScores);
+  }
+
+  function queueScoreForSync(score, overrides = {}) {
+    if (!isValidScorePayload(score)) return null;
+    const nextScore = normalizeScoreRecord({
+      ...score,
+      ...overrides,
+      updated_at: new Date().toISOString(),
+    });
+
+    // Simpler Offline-Speicher: pro Score-Identität genau ein Eintrag.
+    // Wenn dasselbe Loch später erneut mit "nächstes Loch" bestätigt wird,
+    // überschreibt dieser neue sichtbare Stand den alten Pending-Stand.
+    addPendingScore(nextScore);
+    return nextScore;
+  }
+
+  function queueCurrentHoleScoresForSync() {
+    const roundId = String(displayedActiveRound?.round_id || "").trim();
+    const holeNumber = Number(activeHole || 0);
+    if (!roundId || !holeNumber) return false;
+
+    const findNewestLocalFirst = (playerId, wantControlScore) => {
+      const targetPlayerId = String(playerId || "").trim();
+      if (!targetPlayerId) return null;
+      const sources = [localScoreDraftsRef.current, pendingScoresRef.current, scoresRef.current, allScoresRef.current];
+      for (const source of sources) {
+        const match = (source || [])
+          .filter((score) =>
+            String(score.round_id || "") === roundId &&
+            String(score.player_id || "") === targetPlayerId &&
+            Number(score.hole_number) === holeNumber &&
+            isScorerControlScore(score) === wantControlScore
+          )
+          .sort((a, b) => getScoreTimestamp(b) - getScoreTimestamp(a))[0];
+        if (match) return normalizeScoreRecord(match);
+      }
+      return null;
+    };
+
+    const scoresToQueue = [];
+    const officialScore = findNewestLocalFirst(scoredPlayerId, false);
+    const controlScore = findNewestLocalFirst(myPlayerId, true);
+
+    if (officialScore && officialScore.strokes !== "" && officialScore.strokes != null && officialScore.putts_count !== "" && officialScore.putts_count != null) scoresToQueue.push(officialScore);
+    if (controlScore && controlScore.strokes !== "" && controlScore.strokes != null && controlScore.putts_count !== "" && controlScore.putts_count != null) scoresToQueue.push(controlScore);
+
+    scoresToQueue.forEach(addPendingScore);
+    return scoresToQueue.length > 0;
+  }
+
+  function removePendingScore(score) {
+    setPendingScores((current) => {
+      const targetKey = getScoreIdentityKey(score);
+      const targetUpdatedAt = String(score?.updated_at || "");
+      const nextPendingScores = current.filter((item) => {
+        const sameKey = getScoreIdentityKey(item) === targetKey;
+        const sameVersion = String(item?.updated_at || "") === targetUpdatedAt;
+        // Nur exakt den Score entfernen, der erfolgreich gespeichert wurde.
+        // Wenn der Nutzer während eines Hintergrund-Uploads zurückgeht und denselben Score ändert,
+        // bleibt die neuere lokale Version in pendingScores erhalten.
+        return !(sameKey && sameVersion);
+      });
+      pendingScoresRef.current = nextPendingScores;
+      writeLocalJson("lordOfTheHoles.pendingScores", nextPendingScores);
+      return nextPendingScores;
+    });
+  }
+
+  function isTemporarySheetLockError(err) {
+    const message = String(err?.message || err || "").toLowerCase();
+    return message.includes("exklusiv") || message.includes("lock") || message.includes("timeout") || message.includes("zeitüberschreitung") || message.includes("another operation") || message.includes("try again");
+  }
+
+  function waitForRetry(ms) {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
+  }
+
+  async function savePendingScore(score) {
+    if (!isValidScorePayload(score)) { removePendingScore(score); return true; }
+    const retryDelays = [0, 700, 1600];
+    let lastError = null;
+
+    for (let attempt = 0; attempt < retryDelays.length; attempt += 1) {
+      if (retryDelays[attempt] > 0) await waitForRetry(retryDelays[attempt]);
+      try {
+        await callSheetApi({ action: "upsertScore", score });
+        removePendingScore(score);
+        removeLocalScoreDraft(score);
+        setConnectionStatus("online");
+        setError("");
+        return true;
+      } catch (err) {
+        lastError = err;
+        if (!isTemporarySheetLockError(err)) break;
+      }
+    }
+
+    setConnectionStatus("offline");
+    setError(isTemporarySheetLockError(lastError)
+      ? "Score bleibt lokal gespeichert. Die Datenbank ist gerade durch einen anderen Vorgang gesperrt und wird später erneut synchronisiert."
+      : lastError?.message || "Score ist lokal gesichert und wird später synchronisiert.");
+    return false;
+  }
+
+  async function savePendingScoresBatch(scoresToSave = []) {
+    const validScores = (scoresToSave || []).filter(isValidScorePayload);
+    if (!validScores.length) return true;
+
+    try {
+      const result = await callSheetApi({ action: "upsertScores", scores: validScores });
+      if (!result || result.ok === false) {
+        throw new Error(result?.error || "Batch wurde von der Datenbank abgelehnt.");
+      }
+
+      setPendingScores((current) => {
+        const nextPendingScores = removeUploadedScoreVersions(current || [], validScores);
+        pendingScoresRef.current = nextPendingScores;
+        writeLocalJson("lordOfTheHoles.pendingScores", nextPendingScores);
+        return nextPendingScores;
+      });
+
+      setLocalScoreDrafts((current) => {
+        const nextDrafts = removeUploadedScoreVersions(current || [], validScores);
+        localScoreDraftsRef.current = nextDrafts;
+        writeLocalJson("lordOfTheHoles.localScoreDrafts", nextDrafts);
+        return nextDrafts;
+      });
+
+      setConnectionStatus("online");
+      setError("");
+      return true;
+    } catch (err) {
+      const message = err?.message || "Batch-Synchronisierung fehlgeschlagen.";
+      setConnectionStatus("offline");
+      setError(`Batch-Synchronisierung fehlgeschlagen für ${validScores.length} Scores: ${message}`);
+      return false;
+    }
+  }
+
+  async function flushPendingScores() {
+    const livePendingScores = [...pendingScoresRef.current].filter(isValidScorePayload);
+    if (livePendingScores.length !== pendingScoresRef.current.length) {
+      pendingScoresRef.current = livePendingScores;
+      setPendingScores(livePendingScores);
+      writeLocalJson("lordOfTheHoles.pendingScores", livePendingScores);
+    }
+    if (!livePendingScores.length) return true;
+
+    const batchResult = await savePendingScoresBatch(livePendingScores);
+    if (batchResult === true) return true;
+
+    // Kein Einzel-Fallback mehr: Das Apps Script unterstützt jetzt upsertScores.
+    // Die genaue Fehlermeldung wird bereits in savePendingScoresBatch gesetzt.
+    // Nicht hier mit einer generischen Meldung überschreiben, sonst sieht man den echten Apps-Script-Fehler nicht.
+    setConnectionStatus("offline");
+    return false;
+  }
+
+  function showScoreHint(message, timeoutMs = 1800) {
+    if (hintTimerRef.current) window.clearTimeout(hintTimerRef.current);
+    setScoreHintMessage(message);
+    hintTimerRef.current = window.setTimeout(() => {
+      setScoreHintMessage("");
+      hintTimerRef.current = null;
+    }, timeoutMs);
+  }
+
+  async function saveScore(patch) {
+    const nextPatch = { ...patch };
+    const nextStrokes = nextPatch.strokes !== undefined ? Number(nextPatch.strokes || 0) : currentEffectiveStrokes;
+    if (nextPatch.putts_count !== undefined && nextStrokes > 0 && Number(nextPatch.putts_count || 0) > Math.max(0, nextStrokes - 1)) {
+      showScoreHint("Putts dürfen maximal Schläge minus 1 sein.");
+      return;
+    }
+    if (nextPatch.strokes !== undefined && currentScore.putts_count !== "" && currentScore.putts_count != null && Number(currentScore.putts_count || 0) > Math.max(0, Number(nextPatch.strokes || 0) - 1)) {
+      nextPatch.putts_count = Math.max(0, Number(nextPatch.strokes || 0) - 1);
+      nextPatch.over_two_putts = Number(nextPatch.putts_count || 0) >= 3;
+    }
+    if (!canEnterScores) {
+      showScoreHint(isFlightDrawRound ? "Erst Handy-Besitzer wählen und gespeicherte Flight-Ziehung laden. Der zu zählende Spieler wird automatisch zugeordnet." : "Erst Handy-Besitzer und zu zählenden Spieler auswählen.");
+      return;
+    }
+    try { optimisticUpdate(nextPatch); }
+    catch (err) { setError(err.message || "Score kann noch nicht gespeichert werden."); return; }
+    // Wichtig: Der Offline-/Pending-Speicher wird NICHT bei jeder Eingabe beschrieben.
+    // Er wird erst beim Klick auf "nächstes Loch" oder "Runde abschließen" mit dem sichtbaren Lochstand befüllt.
+    setError("");
+  }
+
+  async function completeCurrentRound() {
+    if (!hasRequiredScoresForNext) {
+      const missingItems = [];
+      if (!officialScoreForActiveHole || officialScoreForActiveHole.strokes === "" || officialScoreForActiveHole.strokes == null) missingItems.push(`Score für ${getPlayerLabel(scoredPlayer) || "Spieler"}`);
+      if (!officialScoreForActiveHole || officialScoreForActiveHole.putts_count === "" || officialScoreForActiveHole.putts_count == null) missingItems.push(`Putts für ${getPlayerLabel(scoredPlayer) || "Spieler"}`);
+      if (!controlScoreForActiveHole || controlScoreForActiveHole.strokes === "" || controlScoreForActiveHole.strokes == null) missingItems.push("mein Score");
+      if (!controlScoreForActiveHole || controlScoreForActiveHole.putts_count === "" || controlScoreForActiveHole.putts_count == null) missingItems.push("meine Putts");
+      showScoreHint(`Erst ${missingItems.join(", ")} eintragen, dann Runde abschließen.`, 2400);
+      return;
+    }
+    setScoreHintMessage("");
+    queueCurrentHoleScoresForSync();
+    const syncCount = pendingScoresRef.current.filter(isValidScorePayload).length;
+    if (syncCount > 0) setScoreSyncCount(syncCount);
+    setSaving(true);
+    const allSaved = await flushPendingScores();
+    setSaving(false);
+    setScoreSyncCount(0);
+    if (allSaved) {
+      setConnectionStatus("online");
+      setError("");
+      setSetupSavedMessage(`${displayedActiveRound?.round_name || "Runde"} abgeschlossen. Alle offenen Scores wurden synchronisiert.`);
+    } else {
+      showScoreHint("Runde konnte noch nicht vollständig synchronisiert werden. Offene Scores bleiben lokal gespeichert.", 3200);
+    }
+  }
+
+  async function goToNextHole() {
+    if (activeHole === 18) return;
+    if (!hasRequiredScoresForNext) {
+      const missingItems = [];
+      if (!officialScoreForActiveHole || officialScoreForActiveHole.strokes === "" || officialScoreForActiveHole.strokes == null) missingItems.push(`Score für ${getPlayerLabel(scoredPlayer) || "Spieler"}`);
+      if (!officialScoreForActiveHole || officialScoreForActiveHole.putts_count === "" || officialScoreForActiveHole.putts_count == null) missingItems.push(`Putts für ${getPlayerLabel(scoredPlayer) || "Spieler"}`);
+      if (!controlScoreForActiveHole || controlScoreForActiveHole.strokes === "" || controlScoreForActiveHole.strokes == null) missingItems.push("mein Score");
+      if (!controlScoreForActiveHole || controlScoreForActiveHole.putts_count === "" || controlScoreForActiveHole.putts_count == null) missingItems.push("meine Putts");
+      showScoreHint(`Erst ${missingItems.join(", ")} eintragen, dann weiter.`, 2400);
+      return;
+    }
+    setScoreHintMessage("");
+    queueCurrentHoleScoresForSync();
+    const syncCount = pendingScoresRef.current.filter(isValidScorePayload).length;
+    setActiveHole((h) => Math.min(18, h + 1));
+    if (syncCount > 0) setScoreSyncCount(syncCount);
+    flushPendingScores().finally(() => setScoreSyncCount(0));
+  }
+
+  async function createRoundBackup() {
+    setBackupSavedMessage("");
+    try {
+      const result = await callSheetApi({ action: "createRoundBackup", round_id: displayedActiveRound?.round_id || "r1" });
+      setConnectionStatus("online");
+      setError("");
+      setBackupSavedMessage(result?.backup_sheet_name ? `Backup erstellt: ${result.backup_sheet_name}` : `${displayedActiveRound?.round_name || "Runde"} wurde gesichert.`);
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Backup konnte nicht erstellt werden.");
+    }
+  }
+
+  async function clearAllScores() {
+    setClearScoresSaving(true);
+    setError("");
+    try {
+      const result = await callSheetApi({ action: "clearScores" });
+      const emptyScores = [];
+      setScores(emptyScores);
+      setAllScores(emptyScores);
+      setPendingScores(emptyScores);
+      pendingScoresRef.current = emptyScores;
+      setLocalScoreDrafts(emptyScores);
+      localScoreDraftsRef.current = emptyScores;
+      clearLocalScoreStorage();
+      if (result?.scores_reset_at || result?.scoresResetAt) {
+        const resetAt = String(result.scores_reset_at || result.scoresResetAt);
+        setScoresResetAt(resetAt);
+        writeLocalJson("lordOfTheHoles.scoresResetAt", resetAt);
+      }
+      setActiveHole(1);
+      setConnectionStatus("online");
+      setClearScoresConfirmOpen(false);
+      setBackupSavedMessage(result?.backup_sheet_name ? `Backup erstellt: ${result.backup_sheet_name}` : "");
+      setSetupSavedMessage("Alle Scores wurden gelöscht. Backups bleiben erhalten.");
+      await loadData({ silent: true });
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Scores konnten nicht gelöscht werden.");
+    } finally {
+      setClearScoresSaving(false);
+    }
+  }
+
+  async function resetDeviceAssignmentsForAll() {
+    setSetupSavedMessage("");
+    try {
+      const result = await callSheetApi({ action: "resetDeviceAssignments" });
+      const resetAt = String(result?.device_assignments_reset_at || result?.deviceAssignmentsResetAt || new Date().toISOString());
+      setDeviceAssignmentsResetAt(resetAt);
+      setMyPlayerId("");
+      setScoredPlayerId("");
+      setScoredPlayerByRound({});
+      setScoreEntryMode("player");
+      setPendingScores([]);
+      pendingScoresRef.current = [];
+      writeLocalJson("lordOfTheHoles.myPlayerId", "");
+      writeLocalJson("lordOfTheHoles.scoredPlayerId", "");
+      writeLocalJson("lordOfTheHoles.scoredPlayerByRound", {});
+      writeLocalJson("lordOfTheHoles.pendingScores", []);
+      writeLocalJson("lordOfTheHoles.deviceAssignmentsResetAt", resetAt);
+      setConnectionStatus("online");
+      setError("");
+      setSetupSavedMessage("Spieler- und Zähler-Zuordnungen wurden zurückgesetzt.");
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Spieler-/Zähler-Zuordnungen konnten nicht zurückgesetzt werden.");
+    }
+  }
+
+  function applyLocalCacheClear(resetAt = "", message = "Lokaler Cache auf diesem Gerät wurde gelöscht.") {
+    clearLocalScoreStorage();
+    setScores([]);
+    setAllScores([]);
+    setPendingScores([]);
+    pendingScoresRef.current = [];
+    setLocalScoreDrafts([]);
+    localScoreDraftsRef.current = [];
+    try {
+      Object.keys(window.localStorage || {}).forEach((key) => {
+        if (String(key).startsWith("lordOfTheHoles.")) window.localStorage.removeItem(key);
+      });
+    } catch {}
+    setMyPlayerId("");
+    setScoredPlayerId("");
+    setScoredPlayerByRound({});
+    setPendingScores([]);
+    pendingScoresRef.current = [];
+    setLocalScoreDrafts([]);
+    localScoreDraftsRef.current = [];
+    setScores([]);
+    setAllScores([]);
+    clearLocalScoreStorage();
+    setWinnerPopupDismissedKey("");
+    setRoundHonorDismissedKeys([]);
+    setRoundSummaryDismissedKeys([]);
+    setScorecardRoundId("");
+    setRoundTableRoundId("");
+    setSelectedActiveRoundId(displayedActiveRound?.round_id || activeRound?.round_id || "r1");
+    setDeviceAssignmentsResetAt("");
+    setScoresResetAt("");
+    setScoreEntryMode("player");
+    setAppLocked(true);
+    setShowSplash(true);
+    setLockAdminBypass(false);
+    setActiveHole(1);
+    if (resetAt) {
+      setFullResetAt(resetAt);
+      writeLocalJson("lordOfTheHoles.fullResetAt", resetAt);
+    } else {
+      setFullResetAt("");
+    }
+    setSetupSavedMessage(message);
+  }
+
+  function clearLocalCache() {
+    applyLocalCacheClear("", "Lokaler Cache auf diesem Gerät wurde gelöscht.");
+  }
+
+  async function fullResetForAllDevices() {
+    setSetupSavedMessage("");
+    setError("");
+    try {
+      const result = await callSheetApi({ action: "clearResetMarkersAndFullReset" });
+      const resetAt = String(result?.full_reset_at || result?.fullResetAt || new Date().toISOString());
+      const emptyScores = [];
+      setScores(emptyScores);
+      setAllScores(emptyScores);
+      applyLocalCacheClear(resetAt, "Kompletter Reset wurde für alle Geräte ausgelöst. Flight-Ziehung wird neu bestimmt ...");
+
+      const freshDraw = buildFlightDraw(allPlayers, rounds);
+      const drawResult = await callSheetApi({ action: "saveFlightDraw", draw: freshDraw, test: false });
+      const savedDraw = drawResult?.flight_draw || drawResult?.flightDraw || freshDraw;
+      setFlightDraw(savedDraw);
+      writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, savedDraw);
+      setFlightCeremonyRunning(false);
+      setFlightCeremonyCompleted(false);
+      setFlightSummaryOpen(false);
+      setFlightCeremonyStepIndex(0);
+      setFlightCeremonySyncStartAt("");
+
+      setConnectionStatus("online");
+      setError("");
+      setSetupSavedMessage("Kompletter Reset wurde für alle Geräte ausgelöst. Die Flight-Ziehung wurde neu bestimmt und gespeichert.");
+      if (result?.backup_sheet_name) setBackupSavedMessage(`Backup erstellt: ${result.backup_sheet_name}`);
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Kompletter Reset oder neue Flight-Ziehung konnte nicht ausgelöst werden.");
+    }
+  }
+
+  async function saveFlightDrawFromAdmin() {
+    if (!isAdminUnlocked || flightDrawSaving) return;
+    setSetupSavedMessage("");
+    setError("");
+    setFlightDrawSaving(true);
+    try {
+      const draw = buildFlightDraw(allPlayers, rounds);
+      const saveResult = await callSheetApi({ action: "saveFlightDraw", draw, test: false });
+      const savedDraw = saveResult?.flight_draw || saveResult?.flightDraw || draw;
+      setFlightDraw(savedDraw);
+      writeLocalJson(FLIGHT_DRAW_STORAGE_KEY, savedDraw);
+      setConnectionStatus("online");
+      setSetupSavedMessage("Die Flight-Ziehung wurde neu bestimmt und gespeichert.");
+      await loadData({ silent: true });
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Flight-Ziehung konnte nicht gespeichert werden.");
+    } finally {
+      setFlightDrawSaving(false);
+    }
+  }
+
+  async function saveFullSetup() {
+    setBackupSavedMessage("");
+    setSetupSavedMessage("");
+    const nextAllPlayers = allPlayers.map((p) => {
+      const hcpIndexKey = `hcp_index_${p.id}`;
+      const hcpIndexInput = cleanHandicapInput(localHandicaps[hcpIndexKey] ?? p.handicap_index ?? p.dgv_hcp ?? p.hcp_index ?? "");
+      const handicapIndex = hcpIndexInput === "" || hcpIndexInput === "-" ? 0 : Number(hcpIndexInput);
+      const nextPlayer = { ...p, handicap_index: handicapIndex };
+      return { ...nextPlayer, course_hcp_goethe: getCourseHandicap(nextPlayer, "goethe", courses), course_hcp_feininger: getCourseHandicap(nextPlayer, "feininger", courses) };
+    });
+    if (!selectedActiveRoundId) { setError("Bitte zuerst eine Runde auswählen."); return; }
+    try {
+      await callSheetApi({ action: "saveSetup", round_id: selectedActiveRoundId, course_id: selectedCourseId || "", players: nextAllPlayers.map((p) => ({ id: p.id, character_name: p.character_name, display_name: p.display_name, alias_name: p.alias_name || fallbackAliases[p.id] || "", sort_order: p.sort_order, handicap_index: p.handicap_index, course_hcp_goethe: p.course_hcp_goethe, course_hcp_feininger: p.course_hcp_feininger })) });
+      setAllPlayers(nextAllPlayers.map(withFallbackAlias));
+      setConnectionStatus("online");
+      setError("");
+      setSetupSavedMessage("Setup wurde erfolgreich in der Datenbank gespeichert.");
+      setAdminEditing(false);
+      await loadData({ silent: true });
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Setup konnte nicht gespeichert werden.");
+    }
+  }
+
+  async function saveAdminRoundCourse(nextRoundId, nextCourseId) {
+    if (!isAdminUnlocked || !nextRoundId) return;
+    setSetupSavedMessage("");
+    setBackupSavedMessage("");
+    try {
+      await callSheetApi({ action: "saveSetup", round_id: nextRoundId, course_id: nextCourseId || "", players: allPlayers.map((p) => ({ id: p.id, character_name: p.character_name, display_name: p.display_name, alias_name: p.alias_name || fallbackAliases[p.id] || "", sort_order: p.sort_order, handicap_index: p.handicap_index, course_hcp_goethe: p.course_hcp_goethe, course_hcp_feininger: p.course_hcp_feininger })) });
+      setConnectionStatus("online");
+      setError("");
+      setSetupSavedMessage("Admin-Änderung wurde automatisch gespeichert.");
+      setAdminEditing(false);
+      await loadData({ silent: true });
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Admin-Änderung konnte nicht automatisch gespeichert werden.");
+    }
+  }
+
+  async function enterRoundFromSplash() {
+    setSplashEntering(true);
+
+    try {
+      if (introAudioRef.current) {
+        introAudioRef.current.currentTime = 0;
+        introAudioRef.current.play().catch(() => {});
+      }
+    } catch {}
+
+    setShowSplash(false);
+    setLockAdminBypass(false);
+    setSplashEntering(false);
+    loadData({ silent: true });
+  }
+
+  async function setGlobalAppLock(nextLocked) {
+    setSetupSavedMessage("");
+    try {
+      await callSheetApi({ action: "setAppLocked", app_locked: nextLocked });
+      setAppLocked(nextLocked);
+      setShowSplash(nextLocked);
+      setLockUnlockOpen(false);
+      setLockPasswordInput("");
+      setConnectionStatus("online");
+      setError("");
+      setSetupSavedMessage(nextLocked ? "App wurde für alle Geräte gesperrt." : "App wurde für alle Geräte freigegeben.");
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "App-Sperre konnte nicht global gespeichert werden.");
+    }
+  }
+
+  function enterLockedAppAsAdmin() {
+    if (lockPasswordInput !== ADMIN_PASSWORD) { setError("Passwort ist falsch."); return; }
+    const storedMyPlayerId = readLocalJson("lordOfTheHoles.myPlayerId", "");
+    const knownPlayers = [...(visiblePlayers || []), ...(allPlayers || [])];
+    const hasKnownDeviceOwner = Boolean((myPlayerId || storedMyPlayerId) && knownPlayers.some((player) => String(player.id) === String(myPlayerId || storedMyPlayerId)));
+    if (!hasKnownDeviceOwner) setForceMyPlayerPromptOpen(true);
+    setLockAdminBypass(true);
+    setIsAdminUnlocked(true);
+    setMainMenu("current");
+    setView("score");
+    setShowSplash(false);
+    setLockUnlockOpen(false);
+    setLockPasswordInput("");
+    setError("");
+  }
+
+  function saveLocalScoredPlayerForRound(roundId, scoredPlayerIdValue) {
+    if (!roundId || !scoredPlayerIdValue) return;
+    const next = { ...(scoredPlayerByRoundRef.current || {}), [roundId]: scoredPlayerIdValue };
+    scoredPlayerByRoundRef.current = next;
+    writeLocalJson("lordOfTheHoles.scoredPlayerByRound", next);
+    setScoredPlayerByRound(next);
+  }
+
+  function removeLocalScoredPlayerForRound(roundId) {
+    if (!roundId) return;
+    const next = { ...(scoredPlayerByRoundRef.current || {}) };
+    delete next[roundId];
+    scoredPlayerByRoundRef.current = next;
+    writeLocalJson("lordOfTheHoles.scoredPlayerByRound", next);
+    setScoredPlayerByRound(next);
+  }
+
+  function setMainMenuAndView(value) {
+    setMainMenu(value);
+    setMenuOpen(false);
+    if (value === "current") setView("score");
+    if (value === "roundTables") setView("leaderboard");
+    if (value === "tournament") setView("tournament");
+    if (value === "dailyTeams") setView("dailyTeams");
+    if (value === "prizes") setView("prizes");
+    if (value === "archive") setView("archive");
+    if (value === "fun") setView("fun");
+    if (value === "flights") setView("flights");
+    if (value === "rules") setView("rules");
+    if (value === "settings") setView("handicaps");
+    if (value === "admin") setView("admin");
+  }
+
+  function renderHeader() {
+    const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "flights" ? "Flights" : mainMenu === "rules" ? "Regeln" : mainMenu === "dailyTeams" ? "Tageswertungen" : mainMenu === "prizes" ? "Kasse & Ehre" : mainMenu === "admin" ? "Admin & HCPs" : mainMenu === "settings" ? "Einstellungen" : "Scoring";
+    return (
+      <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-1 pt-1">
+        <div className="relative flex h-8 items-center justify-center">
+          <div className="pointer-events-none absolute left-1/2 top-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 rounded-full border border-amber-500/35 bg-black/40 px-2.5 py-0.5 text-[10px] text-amber-100/80 shadow-[inset_0_1px_0_rgba(251,191,36,0.12),0_8px_18px_rgba(0,0,0,0.28)]">
+            <span className={scoreSyncCount > 0 ? "animate-pulse text-red-300" : connectionStatus === "online" ? "animate-pulse text-emerald-300" : "text-red-300"}>{scoreSyncCount > 0 ? "●" : connectionStatus === "online" ? "●" : "○"}</span>
+            <span className={scoreSyncCount > 0 ? "font-bold text-red-200" : ""}>{scoreSyncCount > 0 ? `${scoreSyncCount} Scores im Abgleich` : connectionStatus === "online" ? "Datenbank verbunden" : "Datenbank offline"}</span>
+          </div>
+          <button type="button" onClick={() => setMenuOpen((value) => !value)} className="ml-auto rounded-xl border border-amber-500/35 bg-[linear-gradient(180deg,rgba(48,35,22,0.82),rgba(12,10,9,0.82))] px-2.5 py-1 text-base leading-none text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.12),0_8px_18px_rgba(0,0,0,0.35)] backdrop-blur-sm transition active:scale-[0.96]" aria-label="Menü öffnen">☰</button>
+          {menuOpen ? (
+            <div className="absolute right-0 top-[34px] z-30 w-64 overflow-hidden rounded-2xl border border-amber-700/40 bg-stone-950/95 text-left shadow-2xl shadow-black/70 backdrop-blur">
+              {(() => {
+                const renderMenuButton = (value, label, featured = false) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setMainMenuAndView(value)}
+                    className={cls(
+                      "block w-full border-b border-amber-700/20 text-left last:border-b-0",
+                      featured ? "px-4 py-4 text-base font-black" : "px-4 py-2.5 text-sm",
+                      mainMenu === value
+                        ? featured
+                          ? "bg-[linear-gradient(180deg,rgba(217,119,6,0.98),rgba(146,64,14,0.96))] text-amber-50 shadow-[inset_0_1px_0_rgba(251,191,36,0.28)]"
+                          : "bg-amber-700/55 text-amber-50"
+                        : featured
+                          ? "bg-amber-500/10 text-amber-200"
+                          : "bg-transparent text-amber-100/85"
+                    )}
+                  >
+                    {featured ? (
+                      <span className="flex items-center justify-between gap-3">
+                        <span>
+                          <span className="block font-serif text-lg leading-tight">Scoring</span>
+                          <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-100/65">Score eingeben</span>
+                        </span>
+                        <span className="text-xl drop-shadow-[0_0_10px_rgba(251,191,36,0.35)]">➜</span>
+                      </span>
+                    ) : (
+                      <span className="pl-2">{label}</span>
+                    )}
+                  </button>
+                );
+                const renderMenuGroup = (groupKey, title, items) => {
+                  const isOpen = Boolean(openMenuGroups?.[groupKey]);
+                  return (
+                    <div key={groupKey} className="border-b border-amber-700/20 last:border-b-0">
+                      <button
+                        type="button"
+                        onClick={() => setOpenMenuGroups((current) => ({ ...(current || {}), [groupKey]: !isOpen }))}
+                        className="flex w-full items-center justify-between bg-black/18 px-4 py-2 text-left text-[11px] font-black uppercase tracking-[0.18em] text-amber-300/80"
+                      >
+                        <span>{title}</span>
+                        <span className="text-amber-100/60">{isOpen ? "−" : "+"}</span>
+                      </button>
+                      {isOpen ? <div>{items.map(([value, label]) => renderMenuButton(value, label))}</div> : null}
+                    </div>
+                  );
+                };
+                return (
+                  <>
+                    {renderMenuButton("current", "Scoring", true)}
+                    {renderMenuGroup("tournament", "Turnier", [["tournament", "Turnierstand"], ["dailyTeams", "Tageswertungen"], ["prizes", "Kasse & Ehre"], ["archive", "Scorekarten"]])}
+                    {renderMenuGroup("round", "Runde", [["roundTables", "Tabellen Runde"], ["fun", "Mittelerde"], ["flights", "Flights"]])}
+                    {renderMenuGroup("info", "Info", [["rules", "Regeln"]])}
+                    {renderMenuGroup("system", "System", [["settings", "Einstellungen"], ["admin", "Admin & HCPs"]])}
+                  </>
+                );
+              })()}
+            </div>
+          ) : null}
+        </div>
+      </motion.header>
+    );
+  }
+
+  function renderStatusMessages() {
+    const isDatabaseStatusOnly = /Datenbank|offline|nicht erreichbar|nicht geladen|lokal gesichert/i.test(String(error || ""));
+    if (!error || isDatabaseStatusOnly) return null;
+    return <Card className="mb-2 rounded-2xl border-amber-700/40 bg-amber-950/50"><CardContent className="p-3 text-sm text-amber-100">{error}</CardContent></Card>;
+  }
+
+  function renderScoreView() {
+    const scoringTintClass = isScorerEntryMode ? "[--score-accent:56_189_248]" : "[--score-accent:245_158_11]";
+    return (
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
+        <Card className="mb-2 rounded-2xl bg-transparent shadow-none">
+          <CardContent className="p-2">
+            <div className="mb-2 rounded-2xl border border-amber-500/30 bg-[linear-gradient(180deg,rgba(48,35,22,0.70),rgba(12,10,9,0.62))] px-3 py-2.5 shadow-[inset_0_1px_0_rgba(251,191,36,0.10),0_10px_28px_rgba(0,0,0,0.30)]">
+              <div className="grid grid-cols-[1fr_auto] items-center gap-2">
+                <div className="grid grid-cols-[auto_1fr] items-center gap-3">
+                  <div className="font-serif text-[1.7rem] font-black leading-none text-amber-200">{displayedActiveRound?.round_name || "Runde 1"}</div>
+                  <div className="text-right leading-snug">
+                    <div className="text-xs font-semibold text-amber-100/85">{getRoundChapterLabel(displayedActiveRound).replace(`${displayedActiveRound?.round_name || ""} · `, "")}</div>
+                    <div className="text-[11px] text-amber-100/65">{activeCourse?.course_name || "Kein Kurs ausgewählt"}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {myCurrentStats ? (
+              <div className="mb-2 w-full rounded-xl border border-amber-700/30 bg-black/25 p-1.5 text-left">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-amber-300/75">Mein Stand</div>
+                  <div className="font-serif text-xs text-amber-200">{getPlayerLabel(myCurrentStats)}</div>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5 text-center text-[11px]">
+                  <button type="button" onClick={() => setStandingsPopup("strokePlay")} className="rounded-xl border border-amber-500/20 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(0,0,0,0.18))] p-1.5 text-amber-50 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)] transition active:scale-[0.98]"><div className="text-amber-100">Tats. Strokes</div><b className="text-base text-amber-200">{myCurrentStats.played ? myCurrentStats.total : "–"}</b><div className="mt-0.5 text-[9px] text-amber-100/70">Platz {strokePlayLeaderboard.findIndex((player) => String(player.id) === String(myPlayerId)) >= 0 ? strokePlayLeaderboard.findIndex((player) => String(player.id) === String(myPlayerId)) + 1 : "–"}</div></button>
+                  <button type="button" onClick={() => setStandingsPopup("hcpAdjusted")} className="rounded-xl border border-amber-500/20 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(0,0,0,0.18))] p-1.5 text-amber-50 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)] transition active:scale-[0.98]"><div className="text-amber-100">HCP +/−</div><b className="text-base text-amber-200">{myCurrentStats.played ? formatToPar(myCurrentStats.hcpAdjustedToPar, true) : "–"}</b><div className="mt-0.5 text-[9px] text-amber-100/70">Platz {myHcpAdjustedStrokeRank || "–"}</div></button>
+                  <button type="button" onClick={() => setStandingsPopup("netStableford")} className="rounded-xl border border-amber-500/20 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(0,0,0,0.18))] p-1.5 text-amber-50 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)] transition active:scale-[0.98]"><div className="text-amber-100">Netto Stbl</div><b className="text-base text-amber-200">{myCurrentStats.netStableford}</b><div className="mt-0.5 text-[9px] text-amber-100/70">Platz {myNetStablefordRank || "–"}</div></button>
+                </div>
+              </div>
+            ) : <div className="mb-2 rounded-xl border border-amber-700/30 bg-black/25 p-1.5 text-[10px] text-amber-100/75">Wähle zuerst im Start-Popup deinen Spieler aus.</div>}
+            {myPlayerId && !scoredPlayerId ? (
+              isFlightDrawRound ? (
+                <div className="mb-2 rounded-2xl border border-amber-500/45 bg-stone-950/75 p-3 text-center shadow-xl shadow-black/30 backdrop-blur-sm">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300/75">Automatische Zähler-Zuordnung</div>
+                  <div className="mt-1 font-serif text-lg font-black text-amber-200">Noch keine Zuordnung aus der Flight-Ziehung.</div>
+                  <div className="mt-1 text-xs text-amber-100/65">Dieses Handy gehört {getPlayerLabel(myCurrentPlayer) || "dem gewählten Spieler"}. Der zu zählende Spieler wird automatisch aus der gespeicherten Flight-Ziehung gesetzt; eine manuelle Auswahl ist nur am Finaltag möglich.</div>
+                  {myFlightFromDraw ? <div className="mt-2 rounded-xl bg-amber-500/10 p-2 text-xs text-amber-100/70">Du bist in Flight {myFlightFromDraw.flight_number} eingeteilt.</div> : null}
+                </div>
+              ) : (
+                <div className="mb-2 rounded-2xl border border-amber-500/45 bg-stone-950/75 p-2 shadow-xl shadow-black/30 backdrop-blur-sm">
+                  <div className="mb-2 text-center"><div className="text-[10px] uppercase tracking-[0.2em] text-amber-300/75">Finaltag-Zählung</div><div className="font-serif text-lg font-black text-amber-200">Wen zählst du?</div><div className="mt-1 text-xs text-amber-100/65">Für Runde 4 gibt es keine Flight-Ziehung. Wähle den zu zählenden Spieler manuell aus.</div></div>
+                  <div className="grid grid-cols-2 gap-2">{scoreablePlayers.map((player) => <button key={player.id} type="button" onClick={() => { setScoredPlayerId(player.id); saveLocalScoredPlayerForRound(displayedActiveRound?.round_id || "", player.id); }} className="rounded-2xl bg-stone-800 px-2 py-3 font-serif text-sm font-bold text-amber-100 active:scale-[0.98]">{getPlayerLabel(player)}</button>)}</div>
+                </div>
+              )
+            ) : (
+              <div className={cls("rounded-3xl transition-colors", scoringTintClass, hasScoreMismatch && "rounded-3xl ring-1 ring-red-500/40")}>
+                {myCurrentPlayer ? (
+                  <div className="mb-2 grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setScoreEntryMode("player")} className={cls("rounded-2xl border px-2 py-3 text-sm font-bold transition-colors", !isScorerEntryMode ? "border-[rgb(var(--score-accent)/0.45)] bg-amber-600 text-amber-50" : "border-amber-700/25 bg-stone-800 text-amber-100", hasSelectedPlayerScoreMismatch && "ring-1 ring-red-400/70")}><span className="block truncate font-serif text-sm leading-none">{getPlayerLabel(scoredPlayer) || "Spieler"}{hasSelectedPlayerScoreMismatch ? " ⚠" : ""}</span></button>
+                    <button type="button" onClick={() => setScoreEntryMode("scorer")} className={cls("rounded-xl border px-2 py-1.5 text-xs font-bold transition-colors", isScorerEntryMode ? "border-[rgb(var(--score-accent)/0.45)] bg-sky-900/65 text-sky-50" : "border-amber-700/25 bg-stone-800 text-amber-100", hasOwnScoreMismatch && "ring-1 ring-red-400/70")}><span className="block truncate font-serif text-sm leading-none">Mein Score{hasOwnScoreMismatch ? " ⚠" : ""}</span></button>
+                  </div>
+                ) : null}
+                {visibleScoreMismatchMessages.length ? (
+                  <div className="mb-2 rounded-2xl border border-red-500/50 bg-red-950/45 p-2 text-xs text-red-100 shadow-[0_10px_24px_rgba(0,0,0,0.32)]">
+                    <div className="font-serif text-sm font-bold text-red-100">Palantír meldet Abweichung</div>
+                    <div className="mt-1 space-y-1 text-red-100/90">
+                      {visibleScoreMismatchMessages.map((message) => (
+                        <div key={message} className="rounded-xl bg-black/25 px-2 py-1">{message}</div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {currentFlightZeroNetPenalties.length ? (
+                  <div className="mb-2 rounded-2xl border border-sky-400/45 bg-sky-950/40 p-2 text-xs text-sky-100 shadow-[0_10px_24px_rgba(0,0,0,0.30)]">
+                    <div className="font-serif text-sm font-bold text-sky-100">Der Rat des Flights raunt</div>
+                    <div className="mt-1 text-sky-100/80">Ein Gefährte hat an diesem Loch 0 Netto-Punkte errungen. Das Regelwerk verlangt Tribut:</div>
+                    <div className="mt-1 space-y-1">
+                      {currentFlightZeroNetPenalties.map((item) => (
+                        <div key={`${item.playerId}-${item.action}`} className="rounded-xl bg-black/25 px-2 py-1 font-semibold">{item.text}</div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                <div className="mb-1.5 grid grid-cols-[auto_1fr] items-center gap-2 rounded-2xl border border-[rgb(var(--score-accent)/0.30)] bg-black/25 px-3 py-2 text-[10px] text-amber-100/70"><div className="font-serif text-xl font-black leading-none text-amber-200">Loch {activeHole}</div><div className="flex items-center justify-end gap-2.5 text-right text-[11px]"><span>Par <b className="text-amber-200">{activeHoleData.par}</b></span><span>HCP <b className="text-amber-200">{activeHoleData.hcp}</b></span><span>{activeHoleData.meters} m</span><span>Vorgabe <b className="text-amber-200 tracking-[0.18em]">{formatShotMarks(entryPlayerShotsOnActiveHole)}</b></span></div></div>
+                <div className="mb-3"><ScoreStepper value={normalizeBoolean(currentScore.picked_up) ? 0 : currentScore.strokes ?? ""} par={activeHoleData?.par || 4} pickedUpStrokes={pickedUpStrokes} disabled={!canEnterScores} onChange={(scoreValue) => Number(scoreValue) === 0 || Number(scoreValue) >= Number(pickedUpStrokes || 0) ? saveScore({ strokes: pickedUpStrokes, picked_up: true }) : saveScore({ strokes: scoreValue, picked_up: false })} /></div>
+                <div className="mb-3"><PuttStepper value={currentScore.putts_count} disabled={!canEnterScores || currentEffectiveStrokes <= 1} max={maxPuttsForCurrentScore} onChange={(putts) => saveScore({ putts_count: putts, over_two_putts: Number(putts) >= 3 })} /></div>
+                <div className="mb-3 rounded-2xl border border-[rgb(var(--score-accent)/0.30)] bg-black/25 p-2"><div className="flex items-center justify-between gap-2"><div><div className="text-xs font-semibold text-amber-100">Lady</div><div className="text-[10px] text-amber-100/65">Markiert eine Lady.</div></div><input type="checkbox" disabled={!canEnterScores} checked={normalizeBoolean(currentScore.lady)} onChange={(e) => saveScore({ lady: e.target.checked })} className="h-6 w-6 accent-amber-500 disabled:opacity-40" /></div></div>
+                {roundScoreEntryClosed ? <div className={cls("mb-2 rounded-xl border p-2 text-center text-xs font-semibold", adminScoreEntryUnlockedForRound ? "border-amber-400/45 bg-amber-950/45 text-amber-100" : "border-emerald-500/40 bg-emerald-950/45 text-emerald-100")}>
+                  <div>{adminScoreEntryUnlockedForRound ? "Admin-Übersteuerung aktiv: Score-Eingaben sind für diese Runde wieder geöffnet." : "Diese Runde ist vollständig eingetragen und ohne Palantír-Abweichung. Score-Eingaben sind gesperrt."}</div>
+                  {isAdminUnlocked ? <button type="button" onClick={() => setAdminScoreEntryUnlocks((current) => ({ ...(current || {}), [String(displayedActiveRound?.round_id || "")]: !adminScoreEntryUnlockedForRound }))} className="mt-2 rounded-xl border border-amber-400/45 bg-black/25 px-3 py-1.5 text-xs font-bold text-amber-100">{adminScoreEntryUnlockedForRound ? "Score-Sperre wieder aktivieren" : "Score-Sperre adminseitig aufheben"}</button> : null}
+                </div> : null}
+                {scoreHintMessage ? <div className="mb-2 rounded-xl border border-amber-500/40 bg-amber-950/50 p-1.5 text-center text-xs font-semibold text-amber-100">{scoreHintMessage}</div> : null}
+                <div className="grid grid-cols-2 gap-2"><Button disabled={activeHole === 1} onClick={() => setActiveHole((h) => Math.max(1, h - 1))} className="rounded-2xl bg-stone-800 py-3 text-base font-bold text-amber-100">Zurück</Button>{activeHole === 18 ? <Button disabled={!canEnterScores || saving} onClick={completeCurrentRound} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-emerald-700" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>{saving ? "Synchronisiere ..." : "Runde abschließen"}</Button> : <Button disabled={!canEnterScores || saving} onClick={goToNextHole} className={cls("rounded-2xl py-3 text-base font-bold text-amber-50 disabled:opacity-50", hasRequiredScoresForNext ? "bg-amber-600" : "bg-amber-700/60 ring-1 ring-amber-500/30")}>{`Loch ${Math.min(18, Number(activeHole || 1) + 1)}`}</Button>}</div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.section>
+    );
+  }
+
+  function renderLeaderboardView() {
+    const availableRounds = rounds.length ? rounds : fallbackRounds;
+    const tableRound = availableRounds.find((round) => String(round.round_id) === String(roundTableRoundId)) || displayedActiveRound || availableRounds[0] || fallbackRounds[0];
+    const tableCourseId = tableRound?.course_id || displayCourseId || "goethe";
+    const tableCourse = (courses.length ? courses : fallbackCourses).find((course) => String(course.course_id) === String(tableCourseId));
+    const tableHoles = (allHoles.length ? allHoles : fallbackHoles).filter((hole) => String(hole.course_id) === String(tableCourseId)).sort((a, b) => Number(a.hole_number) - Number(b.hole_number));
+    const tablePlayers = getPlayersForCourse(getRoundPlayers(tableRound?.round_id, allPlayers, roundPlayers), tableCourseId, courses);
+    const tableScores = officialAllScores.filter((score) => String(score.round_id || "") === String(tableRound?.round_id || ""));
+    const tableStats = buildPlayerStats(tablePlayers, tableHoles, tableScores);
+    const dgvRoundStats = buildDgvRoundStats(tablePlayers, tableRound, tableHoles, tableScores, courses);
+    return (
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
+        <div className="landscape:mx-auto landscape:max-w-none landscape:pb-6">
+          <Card className="mb-2 rounded-2xl border border-amber-500/30 bg-[linear-gradient(180deg,rgba(48,35,22,0.86),rgba(18,13,9,0.82))] shadow-[inset_0_1px_0_rgba(251,191,36,0.10),0_18px_46px_rgba(0,0,0,0.38)] backdrop-blur-sm">
+            <CardContent className="p-3 text-sm text-amber-100"><div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Tabellen Runde</div><div className="mt-1 font-serif text-lg text-amber-200">{tableRound?.round_name || "Runde"}</div><div className="text-amber-100/65">{tableCourse?.course_name || "Kurs"}</div><div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">{availableRounds.map((round) => <button key={round.round_id} type="button" onClick={() => setRoundTableRoundId(round.round_id)} className={cls("rounded-xl border px-2 py-2 text-xs font-bold", String(tableRound?.round_id) === String(round.round_id) ? "border-amber-400/60 bg-amber-600 text-amber-50" : "border-amber-700/35 bg-black/25 text-amber-100")}>{round.round_name || round.round_id}</button>)}</div></CardContent>
+          </Card>
+          <Card className="mb-2 rounded-2xl border border-amber-500/30 bg-[linear-gradient(180deg,rgba(48,35,22,0.86),rgba(18,13,9,0.82))] shadow-[inset_0_1px_0_rgba(251,191,36,0.10),0_18px_46px_rgba(0,0,0,0.38)] backdrop-blur-sm">
+            <CardContent className="p-3"><div className="mb-2"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Leaderboard</p></div><LeaderboardTable title="Strokes HCP adjusted" players={sortHcpAdjustedStrokePlay(tableStats)} columns={[{ label: "+/−", render: (p) => formatToPar(p.hcpAdjustedToPar, p.played), emphasize: true }, { label: "Netto", render: (p) => p.played ? p.hcpAdjustedTotal : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} />
+              <RoundProgressChart title="Strokes HCP adjusted" players={tablePlayers} holes={tableHoles} scores={tableScores} metric="strokesHcpAdjusted" /><LeaderboardTable title="Strokes" players={sortStrokePlay(tableStats)} columns={[{ label: "+/−", render: (p) => formatToPar(p.toPar, p.played), emphasize: true }, { label: "Schläge", render: (p) => p.played ? p.total : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} />
+              <LeaderboardTable title="DGV-Schlagzahl / HCP-Differential" players={dgvRoundStats} columns={[{ label: "Schläge", render: (p) => p.strokes ?? "–" }, { label: "CR/Slope", render: (p) => `${Number(p.courseRating || 0).toFixed(1)} / ${p.slope || "–"}` }, { label: "Diff.", render: (p) => p.differential == null ? "nach 18" : Number(p.differential).toFixed(1), emphasize: true }, { label: "Löcher", render: (p) => `${p.played}/${p.expected || 18}` }]} />
+              <RoundProgressChart title="Strokes" players={tablePlayers} holes={tableHoles} scores={tableScores} metric="strokes" /><LeaderboardTable title="Netto Stableford" players={sortStableford(tableStats, "netStableford")} columns={[{ label: "Punkte", render: (p) => p.netStableford, emphasize: true }, { label: "Löcher", render: (p) => `${p.played}/18` }]} />
+              <RoundProgressChart title="Netto Stableford" players={tablePlayers} holes={tableHoles} scores={tableScores} metric="netStableford" /><LeaderboardTable title="Brutto Punkte" players={sortStableford(tableStats, "grossStableford")} columns={[{ label: "Punkte", render: (p) => p.grossStableford, emphasize: true }, { label: "Schläge", render: (p) => p.played ? p.total : "–" }, { label: "Löcher", render: (p) => `${p.played}/18` }]} />
+              <RoundProgressChart title="Brutto Punkte" players={tablePlayers} holes={tableHoles} scores={tableScores} metric="grossStableford" /><LeaderboardTable title="Putt-Kasse" players={[...tableStats].sort((a, b) => Number(b.puttPenaltyEuro || 0) - Number(a.puttPenaltyEuro || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0))} columns={[{ label: "3 Putts", render: (p) => `${p.threePutts} × 2 €` }, { label: "4+ Putts", render: (p) => `${p.fourPlusPutts} × 4 €` }, { label: "Gesamt", render: (p) => `${p.puttPenaltyEuro || 0} €`, emphasize: true }]} />
+              <RoundProgressChart title="Putt-Kasse" players={tablePlayers} holes={tableHoles} scores={tableScores} metric="puttPenalty" /></CardContent>
+          </Card>
+        </div>
+      </motion.section>
+    );
+  }
+
+  function renderFlightsView() {
+    const playerMap = new Map((allPlayers?.length ? allPlayers : fallbackPlayers).map((player) => [String(player.id), withFallbackAlias(player)]));
+    const drawRounds = (flightDraw?.rounds || []).filter((roundPlan) => String(roundPlan.round_id || "") !== "r4");
+
+    return (
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
+        <Card className="mb-2 rounded-2xl border border-amber-500/30 bg-[linear-gradient(180deg,rgba(48,35,22,0.86),rgba(18,13,9,0.82))] shadow-xl backdrop-blur-sm">
+          <CardContent className="p-3">
+            <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Flights</p>
+            <h2 className="font-serif text-lg text-amber-200">Flight-Ziehung & Zähler</h2>
+            <p className="mt-1 text-sm text-amber-100/65">Übersicht der ausgelosten Flights für Runde 1–3. Runde 4 wird manuell nach Tabellenstand gesetzt.</p>
+
+            {!drawRounds.length ? (
+              <div className="mt-3 rounded-2xl border border-amber-700/35 bg-black/25 p-3 text-sm text-amber-100/75">
+                Noch keine Flight-Ziehung geladen. Sobald die Pergamente gespeichert sind, erscheint hier die vollständige Übersicht.
+              </div>
+            ) : (
+              <div className="mt-3 space-y-3">
+                {drawRounds.map((roundPlan) => (
+                  <div key={roundPlan.round_id} className="rounded-2xl border border-amber-700/35 bg-black/25 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="font-serif text-lg font-black text-amber-200">{roundPlan.round_name || roundPlan.round_id}</div>
+                        {roundPlan.note ? <div className="mt-0.5 text-xs text-amber-100/60">{roundPlan.note}</div> : null}
+                      </div>
+                      <div className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-amber-100/70">
+                        {roundPlan.flights?.length || 0} Flights
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid gap-2">
+                      {(roundPlan.flights || []).map((flight) => (
+                        <div key={`${roundPlan.round_id}-${flight.flight_number}`} className="rounded-2xl border border-amber-700/30 bg-stone-950/55 p-2">
+                          <div className="mb-2 flex items-center justify-between gap-2">
+                            <div className="font-serif text-base font-black text-amber-200">Flight {flight.flight_number}</div>
+                            <div className="text-xs text-amber-100/55">{(flight.players || []).length} Gefährten</div>
+                          </div>
+
+                          <div className="grid gap-1.5">
+                            {(flight.players || []).map((playerId) => {
+                              const player = withFallbackAlias(playerMap.get(String(playerId)) || { id: playerId });
+                              return (
+                                <div key={playerId} className="rounded-xl bg-amber-500/10 px-3 py-2">
+                                  <div className="font-serif text-lg font-black text-amber-100">{player.alias_name || player.character_name || playerId}</div>
+                                  <div className="text-[10px] uppercase tracking-[0.16em] text-amber-100/50">{player.character_name || player.display_name || playerId}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          <div className="mt-2 rounded-xl border border-sky-400/25 bg-sky-950/25 p-2">
+                            <div className="mb-1 text-[10px] uppercase tracking-[0.18em] text-sky-200/70">Zähl-Zuordnung</div>
+                            <div className="grid gap-1.5">
+                              {(flight.scorers || []).map((assignment) => {
+                                const scorer = withFallbackAlias(playerMap.get(String(assignment.scorer_player_id)) || { id: assignment.scorer_player_id });
+                                const scoredPlayerId = assignment.player_id || assignment.scored_player_id || assignment.scoredPlayerId;
+                                const scored = withFallbackAlias(playerMap.get(String(scoredPlayerId)) || { id: scoredPlayerId });
+                                return (
+                                  <div key={`${assignment.scorer_player_id || assignment.scorerPlayerId}-${assignment.player_id || assignment.scored_player_id || assignment.scoredPlayerId}`} className="rounded-lg bg-black/25 px-2 py-1.5 text-xs text-sky-50/90">
+                                    <b className="text-sky-100">{getPlayerLabel(scorer)}</b> zählt <b className="text-amber-100">{getPlayerLabel(scored)}</b>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </motion.section>
+    );
+  }
+
+  function renderSettingsView() {
+    return (
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
+        <Card className="mb-2 rounded-2xl border border-amber-500/30 bg-[linear-gradient(180deg,rgba(48,35,22,0.86),rgba(18,13,9,0.82))] shadow-xl backdrop-blur-sm">
+          <CardContent className="p-3">
+            <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Einstellungen</p>
+            <h2 className="font-serif text-lg text-amber-200">Mein Handy</h2>
+            <p className="mt-1 text-sm text-amber-100/65">Diese Einstellung wird nur lokal auf diesem Handy gespeichert.</p>
+            <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
+              <label className="mb-1 block text-sm text-amber-100/80">Handy-Eigentümer / Zähler auf diesem Gerät</label>
+              <select value={myPlayerId} disabled={pendingScores.length > 0} onChange={(e) => { const nextMyPlayerId = e.target.value; setMyPlayerId(nextMyPlayerId); setScoreEntryMode("player"); if (displayedActiveRound?.round_id && nextMyPlayerId && String(scoredPlayerId) === String(nextMyPlayerId)) { setScoredPlayerId(""); removeLocalScoredPlayerForRound(displayedActiveRound.round_id); } }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:cursor-not-allowed disabled:opacity-50">
+                <option value="">Spieler auswählen</option>
+                {allPlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}
+              </select>
+              {pendingScores.length > 0 ? (
+                <p className="mt-1 rounded-xl border border-red-500/35 bg-red-950/35 p-2 text-xs font-semibold text-red-100">Handy-Eigentümer kann erst gewechselt werden, wenn alle offenen Scores synchronisiert wurden.</p>
+              ) : (
+                <p className="mt-1 text-xs text-amber-100/60">Hier kannst du korrigieren, wem dieses Handy gehört. Der zu zählende Spieler kommt automatisch aus der Flight-/Datenbank-Zuordnung.</p>
+              )}
+            </div>
+            {!isFlightDrawRound ? (
+              <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
+                <label className="mb-1 block text-sm text-amber-100/80">Zu zählender Spieler am Finaltag</label>
+                <select value={scoredPlayerId} disabled={pendingScores.length > 0} onChange={(e) => { const nextPlayerId = e.target.value; setScoredPlayerId(nextPlayerId); if (displayedActiveRound?.round_id) { if (nextPlayerId) saveLocalScoredPlayerForRound(displayedActiveRound.round_id, nextPlayerId); else removeLocalScoredPlayerForRound(displayedActiveRound.round_id); } }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:cursor-not-allowed disabled:opacity-50">
+                  <option value="">Spieler auswählen</option>
+                  {scoreablePlayers.map((player) => <option key={player.id} value={player.id}>{getPlayerLabel(player)}</option>)}
+                </select>
+                {pendingScores.length > 0 ? (
+                  <p className="mt-1 rounded-xl border border-red-500/35 bg-red-950/35 p-2 text-xs font-semibold text-red-100">Zu zählender Spieler kann erst gewechselt werden, wenn alle offenen Scores synchronisiert wurden.</p>
+                ) : (
+                  <p className="mt-1 text-xs text-amber-100/60">Nur am Finaltag manuell. Runde 1–3 kommen automatisch aus der gespeicherten Flight-Ziehung.</p>
+                )}
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      </motion.section>
+    );
+  }
+
+  function renderAdminView() {
+    return (
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
+        <Card className="mb-2 rounded-2xl border border-amber-500/30 bg-[linear-gradient(180deg,rgba(48,35,22,0.86),rgba(18,13,9,0.82))] shadow-[inset_0_1px_0_rgba(251,191,36,0.10),0_18px_46px_rgba(0,0,0,0.38)] backdrop-blur-sm">
+          <CardContent className="p-3">
+            <div className="mb-2"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Admin</p><h2 className="font-serif text-lg text-amber-200">Turnierverwaltung</h2></div>
+            {!isAdminUnlocked ? <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Admin-Passwort</label><input type="password" value={adminPinInput} onChange={(e) => setAdminPinInput(e.target.value)} placeholder="Passwort eingeben" className="mb-3 w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" /><Button onClick={() => { if (adminPinInput === ADMIN_PASSWORD) { setIsAdminUnlocked(true); setError(""); } else { setError("Admin-Passwort ist falsch."); } }} className="w-full rounded-2xl bg-amber-600 py-2 text-amber-50">Admin entsperren</Button></div> : <div className="mb-2 rounded-2xl border border-emerald-700/30 bg-emerald-950/30 p-3 text-sm text-emerald-100">Admin entsperrt. Änderungen können gespeichert werden.</div>}
+            {isAdminUnlocked ? <>
+            <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Aktive Runde</label><select value={selectedActiveRoundId} onChange={(e) => { const nextRoundId = e.target.value; const nextRound = (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(nextRoundId)); const nextCourseId = nextRound?.course_id || selectedCourseId || ""; setAdminEditing(true); setSelectedActiveRoundId(nextRoundId); setSelectedCourseId(nextCourseId); setScoredPlayerId(""); lastLoadedRoundRef.current = ""; setScoreEntryMode("player"); saveAdminRoundCourse(nextRoundId, nextCourseId); }} disabled={!isAdminUnlocked} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:opacity-60"><option value="">Runde auswählen</option>{(rounds.length ? rounds : fallbackRounds).map((round) => <option key={round.round_id} value={round.round_id}>{round.round_name}</option>)}</select></div>
+            <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Kurs für aktive Runde</label><select value={selectedCourseId} onChange={(e) => { const nextCourseId = e.target.value; setAdminEditing(true); setSelectedCourseId(nextCourseId); saveAdminRoundCourse(selectedActiveRoundId, nextCourseId); }} disabled={!isAdminUnlocked} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:opacity-60"><option value="">Kurs auswählen</option>{(courses.length ? courses : fallbackCourses).map((course) => <option key={course.course_id} value={course.course_id}>{course.course_name}</option>)}</select></div>
+            </> : null}
+            <div className="space-y-2">{allPlayers.map((p) => { const hcpIndexKey = `hcp_index_${p.id}`; const hcpIndexValue = localHandicaps[hcpIndexKey] ?? String(p.handicap_index ?? p.dgv_hcp ?? p.hcp_index ?? ""); const previewPlayer = { ...p, handicap_index: hcpIndexValue === "" || hcpIndexValue === "-" ? 0 : Number(String(hcpIndexValue).replace(",", ".")) }; const goetheSpv = getCourseHandicap(previewPlayer, "goethe", courses); const feiningerSpv = getCourseHandicap(previewPlayer, "feininger", courses); return <div key={p.id} className="rounded-xl border border-amber-700/30 bg-black/25 p-2"><div className="mb-2 font-semibold text-amber-100">{getPlayerLabel(p)}</div><input inputMode="decimal" disabled={!isAdminUnlocked} value={hcpIndexValue} onChange={(e) => { setAdminEditing(true); setLocalHandicaps((current) => ({ ...current, [hcpIndexKey]: cleanHandicapInput(e.target.value) })); }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-center text-amber-50 disabled:opacity-60" /><div className="mt-2 grid grid-cols-2 gap-2 text-center text-xs text-amber-100/75"><div className="rounded-xl bg-amber-50/5 p-2"><div>Goethe SpV</div><b className="text-lg text-amber-200">{goetheSpv}</b></div><div className="rounded-xl bg-amber-50/5 p-2"><div>Feininger SpV</div><b className="text-lg text-amber-200">{feiningerSpv}</b></div></div></div>; })}</div>
+            {isAdminUnlocked ? <>
+            <Button disabled={!isAdminUnlocked} onClick={saveFullSetup} className="mt-2 w-full rounded-2xl bg-amber-600 py-2 text-amber-50 disabled:opacity-50">HCP-Werte speichern</Button>
+            <Button disabled={!isAdminUnlocked} onClick={createRoundBackup} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-700/80 py-2 text-emerald-50 disabled:opacity-50">Backup für aktive Runde erstellen</Button>
+            {appLocked ? <Button disabled={!isAdminUnlocked} onClick={() => { setGlobalAppLock(false); setLockAdminBypass(false); }} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-800/70 py-2 text-emerald-50 disabled:opacity-50">App für alle freigeben</Button> : <Button disabled={!isAdminUnlocked} onClick={() => { setMenuOpen(false); setLockAdminBypass(false); setGlobalAppLock(true); }} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">App für alle sperren</Button>}
+            <Button disabled={!isAdminUnlocked || clearScoresSaving || connectionStatus !== "online"} onClick={() => setClearScoresConfirmOpen(true)} className="mt-2 w-full rounded-2xl border border-red-500/50 bg-red-950/60 py-2 text-red-100 disabled:opacity-50">Scores löschen</Button>
+            <Button disabled={!isAdminUnlocked || flightDrawSaving || connectionStatus !== "online"} onClick={saveFlightDrawFromAdmin} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-amber-800/70 py-2 text-amber-50 disabled:opacity-50">{flightDrawSaving ? "Flights werden bestimmt ..." : "Flights neu bestimmen"}</Button>
+            <Button disabled={!isAdminUnlocked || connectionStatus !== "online"} onClick={resetDeviceAssignmentsForAll} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">Spieler-/Zähler-Zuordnungen zurücksetzen</Button>
+            <Button disabled={!isAdminUnlocked} onClick={clearLocalCache} className="mt-2 w-full rounded-2xl border border-sky-500/40 bg-sky-950/60 py-2 text-sky-100 disabled:opacity-50">Lokalen Cache dieses Geräts löschen</Button>
+            <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
+              <div className="text-sm font-bold text-amber-200">Score-Sperre</div>
+              <div className="mt-1 text-[11px] text-amber-100/55">Öffnet die aktuelle Runde lokal auf diesem Gerät, falls du nachträglich Scores korrigieren musst.</div>
+              <Button disabled={!isAdminUnlocked} onClick={() => setAdminScoreEntryUnlocks((current) => {
+                const roundId = String(displayedActiveRound?.round_id || selectedActiveRoundId || "");
+                return { ...(current || {}), [roundId]: !Boolean(current?.[roundId]) };
+              })} className={cls("mt-2 w-full rounded-2xl border py-2 text-sm font-bold disabled:opacity-50", adminScoreEntryUnlocks?.[String(displayedActiveRound?.round_id || selectedActiveRoundId || "")] ? "border-amber-400/55 bg-amber-700/45 text-amber-50" : "border-amber-500/40 bg-stone-950/70 text-amber-100")}>{adminScoreEntryUnlocks?.[String(displayedActiveRound?.round_id || selectedActiveRoundId || "")] ? "Score-Sperre wieder aktivieren" : "Score-Sperre für aktuelle Runde aufheben"}</Button>
+            </div>
+            <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
+              <div className="mb-2 text-sm font-bold text-amber-200">Team-Zeremonie testen</div>
+              <div className="grid grid-cols-2 gap-2">
+                <Button disabled={!isAdminUnlocked} onClick={() => startTeamCeremonyTest("r1")} className="rounded-2xl border border-amber-500/40 bg-amber-950/60 py-2 text-xs font-bold text-amber-100 disabled:opacity-50">R1</Button>
+                <Button disabled={!isAdminUnlocked} onClick={() => startTeamCeremonyTest("r2")} className="rounded-2xl border border-amber-500/40 bg-amber-950/60 py-2 text-xs font-bold text-amber-100 disabled:opacity-50">R2</Button>
+                <Button disabled={!isAdminUnlocked} onClick={() => startTeamCeremonyTest("r3")} className="rounded-2xl border border-amber-500/40 bg-amber-950/60 py-2 text-xs font-bold text-amber-100 disabled:opacity-50">R3 echt</Button>
+                <Button disabled={!isAdminUnlocked} onClick={startDummyRound3TeamCeremonyTest} className="rounded-2xl border border-sky-500/40 bg-sky-950/60 py-2 text-xs font-bold text-sky-100 disabled:opacity-50">R3 Dummy</Button>
+              </div>
+              <div className="mt-1 text-[11px] text-amber-100/45">R3 Dummy testet spoilerfrei mit Platzhaltern. Echte Teams, Scores und Marker bleiben verborgen.</div>
+            </div>
+            <Button disabled={!isAdminUnlocked || connectionStatus !== "online" || teamDrawSaving} onClick={async () => { setTeamCeremonyDismissedKeys([]); writeLocalJson("lordOfTheHoles.teamCeremonyDismissedKeys", []); await fullResetForAllDevices(); await generateAndSaveTeamDrawToSheet(); }} className="mt-2 w-full rounded-2xl border border-red-400/60 bg-red-950/80 py-2 text-red-100 disabled:opacity-50">Runde beginnen</Button>
+            </> : null}
+          </CardContent>
+        </Card>
+      </motion.section>
+    );
+  }
+
+  function renderTournamentView() {
+    return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3"><div className="landscape:mx-auto landscape:max-w-none landscape:pb-6"><TournamentStandings players={allPlayers} rounds={rounds} holes={allHoles} scores={officialAllScores} courses={courses} activeRoundId={displayedActiveRound?.round_id} /></div></motion.section>;
+  }
+
+  function getStrokesCellClass(score, hole) {
+    if (!score || score.strokes === "" || score.strokes == null) return "bg-stone-900/70 text-amber-100/45 ring-1 ring-stone-600/35";
+    if (normalizeBoolean(score.picked_up)) return "bg-red-700 text-white ring-2 ring-red-200/70 shadow-[0_0_14px_rgba(248,113,113,0.22)]";
+    const diff = Number(score.strokes || 0) - Number(hole?.par || 0);
+    if (diff <= -1) return "bg-emerald-500 text-emerald-950 ring-2 ring-emerald-100/70 shadow-[0_0_14px_rgba(16,185,129,0.22)]";
+    if (diff === 0) return "bg-sky-500 text-sky-950 ring-2 ring-sky-100/70 shadow-[0_0_14px_rgba(14,165,233,0.20)]";
+    if (diff === 1) return "bg-yellow-400 text-yellow-950 ring-2 ring-yellow-100/75 shadow-[0_0_14px_rgba(250,204,21,0.20)]";
+    return "bg-red-700 text-white ring-2 ring-red-200/70 shadow-[0_0_14px_rgba(248,113,113,0.22)]";
+  }
+
+  function renderArchiveView() {
+    const availableRounds = rounds.length ? rounds : fallbackRounds;
+    const archiveRound = availableRounds.find((round) => String(round.round_id) === String(scorecardRoundId)) || displayedActiveRound || availableRounds[0] || fallbackRounds[0];
+    const archiveCourseId = archiveRound?.course_id || displayCourseId || "goethe";
+    const archiveCourse = (courses.length ? courses : fallbackCourses).find((course) => String(course.course_id) === String(archiveCourseId));
+    const scorecardHoles = (allHoles.length ? allHoles : fallbackHoles).filter((hole) => String(hole.course_id) === String(archiveCourseId)).sort((a, b) => Number(a.hole_number) - Number(b.hole_number));
+    const scorecardPlayers = getPlayersForCourse(getRoundPlayers(archiveRound?.round_id, allPlayers, roundPlayers), archiveCourseId, courses);
+    const scorecardScores = officialAllScores.filter((score) => String(score.round_id || "") === String(archiveRound?.round_id || ""));
+
+    return (
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3">
+        <div className="landscape:mx-auto landscape:max-w-none landscape:pb-6">
+          <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm">
+            <CardContent className="p-3">
+              <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Scorekarten</p>
+              <div className="mt-0.5 text-sm font-semibold text-amber-300/85">Chroniken der Runde</div>
+              <h2 className="font-serif text-lg text-amber-200">{archiveRound?.round_name || "Aktive Runde"}</h2>
+              <p className="mt-1 text-sm text-amber-100/70">{archiveCourse?.course_name || "Kurs"} · klassische Scorekarte je Spieler</p>
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {availableRounds.map((round) => (
+                  <button key={round.round_id} type="button" onClick={() => setScorecardRoundId(round.round_id)} className={cls("rounded-xl border px-2 py-2 text-xs font-bold", String(archiveRound?.round_id) === String(round.round_id) ? "border-amber-400/60 bg-amber-600 text-amber-50" : "border-amber-700/35 bg-black/25 text-amber-100")}>{round.round_name || round.round_id}</button>
+                ))}
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-1.5 text-[10px] text-amber-100/70 sm:grid-cols-4">
+                <div className="rounded-lg bg-emerald-500 px-2 py-1 font-bold text-emerald-950">Birdie oder besser</div>
+                <div className="rounded-lg bg-sky-500 px-2 py-1 font-bold text-sky-950">Par</div>
+                <div className="rounded-lg bg-yellow-400 px-2 py-1 font-bold text-yellow-950">Bogey</div>
+                <div className="rounded-lg bg-red-700 px-2 py-1 font-bold text-white">Doppelbogey+ / X</div>
+              </div>
+            </CardContent>
+          </Card>
+          {scorecardPlayers.map((player) => {
+            const playerScores = scorecardHoles.map((hole) => {
+              const score = scorecardScores.find((item) => String(item.player_id || "") === String(player.id) && Number(item.hole_number) === Number(hole.hole_number));
+              const shots = getShotsOnHole(player.course_hcp, hole.hcp);
+              const grossStableford = score ? getScoreStablefordPoints(score, hole.par, 0) : 0;
+              const netStableford = score ? getScoreStablefordPoints(score, hole.par, shots) : 0;
+              const hcpAdjustedStrokes = score && score.strokes !== "" && score.strokes != null ? Number(score.strokes || 0) - shots : null;
+              const hcpAdjustedToPar = hcpAdjustedStrokes != null ? hcpAdjustedStrokes - Number(hole.par || 0) : null;
+              return { hole, score, shots, grossStableford, netStableford, hcpAdjustedStrokes, hcpAdjustedToPar };
+            });
+            const outSummary = getScorecardSegmentSummary(player, scorecardHoles, scorecardScores, 1, 9);
+            const inSummary = getScorecardSegmentSummary(player, scorecardHoles, scorecardScores, 10, 18);
+            const totalSummary = getScorecardSegmentSummary(player, scorecardHoles, scorecardScores, 1, 18);
+            const playedRows = playerScores.filter((row) => row.score && row.score.strokes !== "" && row.score.strokes != null);
+            const totalStrokes = playedRows.reduce((sum, row) => sum + Number(row.score?.strokes || 0), 0);
+            const totalGrossStableford = playedRows.reduce((sum, row) => sum + Number(row.grossStableford || 0), 0);
+            const totalNetStableford = playedRows.reduce((sum, row) => sum + Number(row.netStableford || 0), 0);
+            const totalHcpAdjustedStrokes = playedRows.reduce((sum, row) => sum + Number(row.hcpAdjustedStrokes || 0), 0);
+            const totalParPlayed = playedRows.reduce((sum, row) => sum + Number(row.hole?.par || 0), 0);
+            const totalHcpAdjustedToPar = playedRows.length ? totalHcpAdjustedStrokes - totalParPlayed : null;
+            return (
+              <Card key={player.id} className="mb-3 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm">
+                <CardContent className="p-3">
+                  <div className="mb-3 flex items-start justify-between gap-2"><div><div className="font-serif text-lg font-bold text-amber-200">{getPlayerLabel(player)}</div><div className="text-xs text-amber-100/65">SpV {Number(player.course_hcp || 0)} · {playedRows.length}/18 Löcher</div></div><div className="rounded-2xl border border-amber-700/30 bg-black/25 px-3 py-2 text-right text-xs text-amber-100/80"><div>Strokes HCP adjusted</div><b className="font-serif text-lg text-amber-300">{playedRows.length ? totalHcpAdjustedStrokes : "–"}</b></div></div>
+                  <div className="overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <table className="w-full min-w-[760px] border-collapse text-xs text-amber-50 landscape:min-w-0 landscape:text-[11px]">
+                      <thead><tr className="text-left uppercase tracking-wider text-amber-100/80"><th className="px-2 py-1.5">Loch</th>{renderScorecardCellsWithSummaries(scorecardHoles, (hole) => <th key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hole.hole_number}</th>, () => <th key="out-header" className="px-2 py-1.5 text-center bg-amber-500/10 text-amber-200">OUT</th>, () => <th key="in-header" className="px-2 py-1.5 text-center bg-amber-500/10 text-amber-200">IN</th>, () => <th key="total-header" className="px-2 py-1.5 text-center bg-amber-500/15 text-amber-200">TOTAL</th>)}</tr></thead>
+                      <tbody>
+                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Par</td>{renderScorecardCellsWithSummaries(scorecardHoles, (hole) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hole.par}</td>, () => <td key="par-out" className="px-2 py-1.5 text-center font-bold text-amber-200 bg-amber-500/10">{outSummary.par}</td>, () => <td key="par-in" className="px-2 py-1.5 text-center font-bold text-amber-200 bg-amber-500/10">{inSummary.par}</td>, () => <td key="par-total" className="px-2 py-1.5 text-center font-bold text-amber-200 bg-amber-500/15">{totalSummary.par}</td>)}</tr>
+                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Vorgabe</td>{renderScorecardCellsWithSummaries(playerScores, ({ hole, shots }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center font-bold tracking-[0.18em] text-amber-300">{Number(shots || 0) > 0 ? "|".repeat(Number(shots || 0)) : ""}</td>, () => <td key="shots-out" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/10">{outSummary.hcpShots || ""}</td>, () => <td key="shots-in" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/10">{inSummary.hcpShots || ""}</td>, () => <td key="shots-total" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/15">{totalSummary.hcpShots || ""}</td>)}</tr>
+                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Strokes</td>{renderScorecardCellsWithSummaries(playerScores, ({ hole, score }) => <td key={hole.hole_number} className="px-1 py-1.5 text-center"><span className={cls("inline-flex min-w-[26px] justify-center rounded-lg px-1.5 py-0.5 font-bold", getStrokesCellClass(score, hole))}>{score ? normalizeBoolean(score.picked_up) ? "X" : score.strokes || "–" : "–"}</span></td>, () => <td key="strokes-out" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/10">{outSummary.strokes ?? "–"}</td>, () => <td key="strokes-in" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/10">{inSummary.strokes ?? "–"}</td>, () => <td key="strokes-total" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/15">{totalSummary.strokes ?? "–"}</td>)}</tr>
+                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Strokes HCP adjusted</td>{renderScorecardCellsWithSummaries(playerScores, ({ hole, hcpAdjustedStrokes }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hcpAdjustedStrokes ?? "–"}</td>, () => <td key="hcp-out" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/10">{outSummary.hcpAdjusted ?? "–"}</td>, () => <td key="hcp-in" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/10">{inSummary.hcpAdjusted ?? "–"}</td>, () => <td key="hcp-total" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/15">{totalSummary.hcpAdjusted ?? "–"}</td>)}</tr>
+                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">+/− HCP adjusted</td>{renderScorecardCellsWithSummaries(playerScores, ({ hole, hcpAdjustedToPar }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{hcpAdjustedToPar == null ? "–" : formatToPar(hcpAdjustedToPar, true)}</td>, () => <td key="hcptopar-out" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/10">{outSummary.hcpAdjustedToPar == null ? "–" : formatToPar(outSummary.hcpAdjustedToPar, true)}</td>, () => <td key="hcptopar-in" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/10">{inSummary.hcpAdjustedToPar == null ? "–" : formatToPar(inSummary.hcpAdjustedToPar, true)}</td>, () => <td key="hcptopar-total" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/15">{totalSummary.hcpAdjustedToPar == null ? "–" : formatToPar(totalSummary.hcpAdjustedToPar, true)}</td>)}</tr>
+                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Netto Stblf.</td>{renderScorecardCellsWithSummaries(playerScores, ({ hole, score, netStableford }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{score ? netStableford : "–"}</td>, () => <td key="net-out" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/10">{outSummary.played ? outSummary.netStableford : "–"}</td>, () => <td key="net-in" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/10">{inSummary.played ? inSummary.netStableford : "–"}</td>, () => <td key="net-total" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/15">{totalSummary.played ? totalSummary.netStableford : "–"}</td>)}</tr>
+                        <tr className="border-t border-amber-700/20"><td className="px-2 py-1.5 font-semibold text-amber-100">Brutto</td>{renderScorecardCellsWithSummaries(playerScores, ({ hole, score, grossStableford }) => <td key={hole.hole_number} className="px-1.5 py-1.5 text-center">{score ? grossStableford : "–"}</td>, () => <td key="gross-out" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/10">{outSummary.played ? outSummary.grossStableford : "–"}</td>, () => <td key="gross-in" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/10">{inSummary.played ? inSummary.grossStableford : "–"}</td>, () => <td key="gross-total" className="px-2 py-1.5 text-center font-bold text-amber-300 bg-amber-500/15">{totalSummary.played ? totalSummary.grossStableford : "–"}</td>)}</tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </motion.section>
+    );
+  }
+
+  function renderFunView() {
+    return <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="landscape:fixed landscape:inset-0 landscape:z-40 landscape:overflow-auto landscape:bg-stone-950 landscape:p-3"><div className="landscape:mx-auto landscape:max-w-none landscape:pb-6"><MiddleEarthTables players={playersWithCurrentHandicaps} holes={holes} scores={officialScores} mismatches={roundMismatches} rounds={rounds} allPlayers={allPlayers} allHoles={allHoles} allScores={officialAllScores} courses={courses} roundPlayers={roundPlayers} activeRoundId={displayedActiveRound?.round_id || ""} /></div></motion.section>;
+  }
+
+  function RulesSection({ title, subtitle = "", children }) {
+    return (
+      <div className="mb-2 overflow-hidden rounded-2xl border border-amber-700/35 bg-black/25 shadow-[inset_0_1px_0_rgba(251,191,36,0.08)]">
+        <div className="border-b border-amber-700/25 bg-amber-500/10 px-3 py-2">
+          <div className="font-serif text-lg font-black text-amber-200">{title}</div>
+          {subtitle ? <div className="mt-0.5 text-xs text-amber-100/60">{subtitle}</div> : null}
+        </div>
+        <div className="min-w-0 space-y-2 overflow-hidden p-3 text-sm leading-relaxed text-amber-100/82 [&_*]:break-words">{children}</div>
+      </div>
+    );
+  }
+
+  function RulesPill({ children }) {
+    return <span className="inline-flex rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.12em] text-amber-200">{children}</span>;
+  }
+
+  function getDailyTeamValue(round, teamPlayers, roundHoles, roundScores, mode) {
+    if (!round || !teamPlayers.length || !roundHoles.length) return { value: 0, detail: "–" };
+
+    if (mode === "bestBallMatchplay") {
+      let won = 0;
+      let shared = 0;
+      const opponentTeamValues = [];
+      return { value: 0, detail: "Match Play wird unten direkt je Team verglichen." };
+    }
+
+    const holeValues = roundHoles.map((hole) => {
+      const playerPoints = teamPlayers.map((player) => {
+        const playerForRound = getPlayerForCourse(player, round.course_id || "goethe", courses);
+        const score = roundScores.find((item) => String(item.player_id) === String(player.id) && Number(item.hole_number) === Number(hole.hole_number));
+        const shots = getShotsOnHole(playerForRound?.course_hcp, hole.hcp);
+        return getScoreStablefordPoints(score, hole.par, shots);
+      });
+      return mode === "bestBallNetto" ? Math.max(0, ...playerPoints) : playerPoints.reduce((sum, points) => sum + points, 0);
+    });
+
+    const value = holeValues.reduce((sum, points) => sum + points, 0);
+    return { value, detail: `${value} Netto-Punkte` };
+  }
+
+  function normalizeTeamDrawRow(row) {
+    return {
+      draw_key: String(row?.draw_key || "").trim(),
+      round_id: String(row?.round_id || "").trim(),
+      round_name: String(row?.round_name || "").trim(),
+      team_number: String(row?.team_number || row?.teamNumber || "").trim(),
+      player_id: String(row?.player_id || row?.playerId || "").trim(),
+      player_name: String(row?.player_name || row?.playerName || "").trim(),
+      player_alias: String(row?.player_alias || row?.playerAlias || "").trim(),
+      sort_order: Number(row?.sort_order || row?.sortOrder || 0),
+      created_at: String(row?.created_at || row?.createdAt || "").trim(),
+      updated_at: String(row?.updated_at || row?.updatedAt || "").trim(),
+      is_test: normalizeBoolean(row?.is_test || row?.isTest),
+    };
+  }
+
+  function buildDailyTeamSelectionsFromRows(rows = [], onlyUnlocked = false) {
+    const next = {};
+    const allowedRoundIds = onlyUnlocked ? unlockedTeamDrawRoundIds : ["r1", "r2", "r3"];
+    (rows || []).map(normalizeTeamDrawRow).filter((row) => allowedRoundIds.includes(row.round_id) && row.round_id && row.team_number && row.player_id).sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0)).forEach((row) => {
+      const roundId = row.round_id;
+      const teamId = String(row.team_number || "").replace(/^team/i, "").trim().toUpperCase();
+      if (!["A", "B", "C"].includes(teamId)) return;
+      if (!next[roundId]) next[roundId] = { teams: { A: ["", ""], B: ["", ""], C: ["", ""] } };
+      const emptyIndex = next[roundId].teams[teamId].findIndex((value) => !value);
+      if (emptyIndex >= 0) next[roundId].teams[teamId][emptyIndex] = row.player_id;
+    });
+    return next;
+  }
+
+  function buildGeneratedTeamDrawRows() {
+    const createdAt = new Date().toISOString();
+    const drawKey = `teamdraw_${createdAt.replace(/[-:.TZ]/g, "").slice(0, 14)}`;
+    const usedPairs = new Set();
+    const rows = [];
+    const makePairKey = (a, b) => [String(a || ""), String(b || "")].sort().join("|");
+    const teamLabels = ["A", "B", "C"];
+
+    ["r1", "r2", "r3"].forEach((roundId, roundIndex) => {
+      const round = (rounds.length ? rounds : fallbackRounds).find((item) => String(item.round_id) === String(roundId));
+      const roundPlayersList = getRoundPlayers(roundId, allPlayers, roundPlayers);
+      const playerIds = roundPlayersList.map((player) => String(player.id)).filter(Boolean);
+      let bestTeams = null;
+      let bestScore = Infinity;
+
+      for (let attempt = 0; attempt < 900; attempt += 1) {
+        const random = seededRandom(`${drawKey}-${roundId}-${attempt}`);
+        const shuffled = shuffleWithRandom(playerIds, random);
+        const expanded = roundId === "r1" && shuffled.length === 5 ? [...shuffled, shuffled[Math.floor(random() * shuffled.length)]] : shuffled.slice(0, 6);
+        const teams = [expanded.slice(0, 2), expanded.slice(2, 4), expanded.slice(4, 6)].filter((team) => team.length === 2);
+        let score = 0;
+        teams.forEach((team) => {
+          const key = makePairKey(team[0], team[1]);
+          if (team[0] === team[1]) score += 10000;
+          if (usedPairs.has(key)) score += 200;
+        });
+        if (score < bestScore) {
+          bestScore = score;
+          bestTeams = teams;
+          if (score === 0) break;
+        }
+      }
+
+      (bestTeams || []).forEach((team, teamIndex) => {
+        const pair = makePairKey(team[0], team[1]);
+        if (pair) usedPairs.add(pair);
+        team.forEach((playerId, slotIndex) => {
+          const player = allPlayers.find((item) => String(item.id) === String(playerId)) || {};
+          rows.push({
+            draw_key: drawKey,
+            round_id: roundId,
+            round_name: round?.round_name || getRoundChapterLabel(round),
+            team_number: teamLabels[teamIndex] || String(teamIndex + 1),
+            player_id: playerId,
+            player_name: player.character_name || player.display_name || playerId,
+            player_alias: player.alias_name || "",
+            sort_order: Number(roundIndex + 1) * 1000 + Number(teamIndex + 1) * 100 + Number(slotIndex + 1),
+            created_at: createdAt,
+            updated_at: createdAt,
+            is_test: false,
+          });
+        });
+      });
+    });
+
+    return rows;
+  }
+
+  function buildTeamDrawRowsFromSelections() {
+    const createdAt = new Date().toISOString();
+    const drawKey = `teamdraw_${createdAt.replace(/[-:.TZ]/g, "").slice(0, 14)}`;
+    const rows = [];
+    ["r1", "r2", "r3"].forEach((roundId, roundIndex) => {
+      const round = (rounds.length ? rounds : fallbackRounds).find((item) => String(item.round_id) === String(roundId));
+      const slots = getDailyTeamSlots(roundId);
+      ["A", "B", "C"].forEach((teamId, teamIndex) => {
+        (slots?.[teamId] || []).forEach((playerId, slotIndex) => {
+          const player = allPlayers.find((item) => String(item.id) === String(playerId));
+          if (!playerId || !player) return;
+          rows.push({
+            draw_key: drawKey,
+            round_id: roundId,
+            round_name: round?.round_name || getRoundChapterLabel(round),
+            team_number: teamId,
+            player_id: player.id,
+            player_name: player.character_name || player.display_name || player.id,
+            player_alias: player.alias_name || "",
+            sort_order: Number(roundIndex + 1) * 1000 + Number(teamIndex + 1) * 100 + Number(slotIndex + 1),
+            created_at: createdAt,
+            updated_at: createdAt,
+            is_test: false,
+          });
+        });
+      });
+    });
+    return rows;
+  }
+
+  async function saveTeamDrawToSheet() {
+    setTeamDrawSaving(true);
+    setError("");
+    try {
+      const rows = buildTeamDrawRowsFromSelections();
+      const result = await callSheetApi({ action: "saveTeamDraw", rows });
+      const nextRows = result?.team_draw_rows || result?.teamDrawRows || rows;
+      setTeamDrawRows(nextRows);
+      setSetupSavedMessage("Team-Ziehung wurde in der Datenbank gespeichert.");
+      setConnectionStatus("online");
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Team-Ziehung konnte nicht gespeichert werden.");
+    } finally {
+      setTeamDrawSaving(false);
+    }
+  }
+
+  function startTeamCeremonyTest(roundId) {
+    const key = `team_ceremony_${roundId}`;
+    setTeamCeremonyTestMode(false);
+    setTeamCeremonyDismissedKeys((current) => (current || []).filter((item) => item !== key));
+    setTeamCeremonyRoundId(roundId);
+    setTeamCeremonyStepIndex(0);
+    setTeamCeremonySyncStartAt(getNextSyncedCeremonyStart(roundId, buildTeamCeremonyTimeline(roundId), true));
+    setShowSplash(false);
+    setTeamCeremonyRunning(true);
+  }
+
+  function startDummyRound3TeamCeremonyTest() {
+    const timeline = buildDummyRound3TeamCeremonyTimeline();
+    setTeamCeremonyTestMode(true);
+    setTeamCeremonyRoundId("r3");
+    setTeamCeremonyStepIndex(0);
+    setTeamCeremonySyncStartAt(getNextSyncedCeremonyStart("r3", timeline, true));
+    setShowSplash(false);
+    setTeamCeremonyRunning(true);
+  }
+
+  async function generateAndSaveTeamDrawToSheet() {
+    setTeamDrawSaving(true);
+    setError("");
+    try {
+      const rows = buildGeneratedTeamDrawRows();
+      const result = await callSheetApi({ action: "saveTeamDraw", rows });
+      const nextRows = result?.team_draw_rows || result?.teamDrawRows || rows;
+      setTeamDrawRows(nextRows);
+      setDailyTeamSelections(buildDailyTeamSelectionsFromRows(nextRows, true));
+      setSetupSavedMessage("Team-Ziehung wurde neu ausgelost und gespeichert.");
+      setConnectionStatus("online");
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Team-Ziehung konnte nicht ausgelost werden.");
+    } finally {
+      setTeamDrawSaving(false);
+    }
+  }
+
+  async function clearTeamDrawInSheet() {
+    setTeamDrawSaving(true);
+    setError("");
+    try {
+      await callSheetApi({ action: "clearTeamDraw" });
+      setTeamDrawRows([]);
+      setDailyTeamSelections({});
+      setSetupSavedMessage("Team-Ziehung wurde gelöscht.");
+      setConnectionStatus("online");
+    } catch (err) {
+      setConnectionStatus("offline");
+      setError(err.message || "Team-Ziehung konnte nicht gelöscht werden.");
+    } finally {
+      setTeamDrawSaving(false);
+    }
+  }
+
+  function getTeamDrawTargetLabel(roundId) {
+    const labels = {
+      r1: "22.05.2026 · 21:00 Uhr",
+      r2: "23.05.2026 · 19:30 Uhr",
+      r3: "24.05.2026 · 21:00 Uhr",
+    };
+    return labels[roundId] || "noch nicht festgelegt";
+  }
+
+  function getTeamDrawCountdownLabel(roundId) {
+    if (!atomicTimeActive) return "";
+    const target = TEAM_DRAW_TARGETS[roundId];
+    if (!target) return "";
+    const diffMs = target.getTime() - syncedNow.getTime();
+    if (diffMs <= 0) return "bereit zur Zeremonie";
+    const totalSeconds = Math.floor(diffMs / 1000);
+    const days = Math.floor(totalSeconds / 86400);
+    const hours = Math.floor((totalSeconds % 86400) / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    if (days > 0) return `${days} T ${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+
+  function getTimeSourceLabel() {
+    if (atomicTimeActive) return lastServerSync?.source === "itime.live-vercel" ? "Atomzeit aktiv · über Vercel" : "Atomzeit aktiv";
+    if (atomicTimeStatus === "syncing") return "Atomzeit wird synchronisiert ...";
+    if (atomicTimeStatus === "fallback") return "Atomzeit nicht erreichbar — Countdown pausiert.";
+    if (lastServerSync?.source === "apps-script-available") return "Apps-Script-Zeit verfügbar, aber Countdown wartet auf Atomzeit.";
+    return "Countdown wartet auf bestätigte Atomzeit.";
+  }
+
+  function getTimeSourceClassName() {
+    if (atomicTimeActive) return "text-emerald-200/75";
+    return "text-red-200/85";
+  }
+
+  function getTeamDrawRowsForRound(roundId) {
+    return (teamDrawRows || []).map(normalizeTeamDrawRow).filter((row) => String(row.round_id) === String(roundId)).sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
+  }
+
+  function buildDummyRound3TeamCeremonyTimeline() {
+    const dummyRows = [
+      { team_number: "A", player_id: "dummy-a1", player_name: "Wanderer aus Bree", player_alias: "Waldläufer" },
+      { team_number: "A", player_id: "dummy-a2", player_name: "Hüter des Westens", player_alias: "Hüter" },
+      { team_number: "B", player_id: "dummy-b1", player_name: "Reiter Rohans", player_alias: "Reiter" },
+      { team_number: "B", player_id: "dummy-b2", player_name: "Zwerg aus Erebor", player_alias: "Zwerg" },
+      { team_number: "C", player_id: "dummy-c1", player_name: "Bote Gondors", player_alias: "Bote" },
+      { team_number: "C", player_id: "dummy-c2", player_name: "Elb aus Lórien", player_alias: "Elb" },
+    ];
+    const teamMap = { A: dummyRows.slice(0, 2), B: dummyRows.slice(2, 4), C: dummyRows.slice(4, 6) };
+    const teamsByLetter = ["A", "B", "C"].map((teamId) => ({ teamId, players: teamMap[teamId], value: 0, detail: "Dummy-Wertung", ceremonyRank: 0 }));
+    const playerCeremonyLabel = (row) => row?.player_alias ? `${row.player_alias} (${row.player_name || row.player_id})` : (row?.player_name || row?.player_id || "");
+    const teamPlayersText = (team) => (team.players || []).map(playerCeremonyLabel).filter(Boolean).join(" und ") || `Team ${team.teamId}`;
+
+    const steps = [
+      { type: "text", testMode: true, title: "TESTMODUS · Keine echten Teams", text: "Dies ist nur eine Probe der Runde-3-Zeremonie. Namen, Teams und Ergebnisse sind Platzhalter — die echte Auslosung bleibt verborgen.", waitLabel: "Das Testpergament wird entrollt ..." },
+      { type: "text", testMode: true, title: "Die Mannschaften werden offenbart", text: "Zuerst werden nur die Bündnisse gezogen. Die Wertung bleibt noch im Schatten, bis alle Namen gefallen sind.", waitLabel: "Die Dummy-Bündnisse werden entrollt ..." },
+      { type: "teamBoard", testMode: true, title: "Drei leere Banner", teams: teamsByLetter, revealCounts: { A: 0, B: 0, C: 0 }, revealLine: "Drei Banner werden erhoben. Noch ist kein Name sichtbar. Der Palantír sammelt Atem.", waitLabel: "Die ersten Namen werden gerufen ..." },
+      { type: "teamBoard", testMode: true, title: "Die ersten Namen fallen", teams: teamsByLetter, revealCounts: { A: 1, B: 0, C: 0 }, revealLine: "Vor den Toren Mordors erscheint der erste Gefährte im roten Licht.", waitLabel: "Team A erhält den ersten Gefährten ..." },
+      { type: "teamBoard", testMode: true, title: "Die ersten Namen fallen", teams: teamsByLetter, revealCounts: { A: 1, B: 1, C: 0 }, revealLine: "Das Pergament wandert weiter. Auch Team B wird berufen.", waitLabel: "Team B erhält den ersten Gefährten ..." },
+      { type: "teamBoard", testMode: true, title: "Die ersten Namen fallen", teams: teamsByLetter, revealCounts: { A: 1, B: 1, C: 1 }, revealLine: "Das dritte Fenster glimmt. Team C bekommt seinen ersten Namen.", waitLabel: "Team C erhält den ersten Gefährten ..." },
+      { type: "text", testMode: true, title: "Die halben Bündnisse stehen", text: "Drei Namen sind gefallen. Drei Schatten fehlen noch. Der Rat tuschelt, der Palantír glimmt, und irgendwo rechnet jemand bereits heimlich Netto-Punkte nach.", waitLabel: "Die zweiten Siegel werden vorbereitet ..." },
+      { type: "teamBoard", testMode: true, title: "Die Bündnisse schließen sich", teams: teamsByLetter, revealCounts: { A: 2, B: 1, C: 1 }, revealLine: "Der zweite Name fällt. Team A wird vollständig.", waitLabel: "Team A wird vollständig ..." },
+      { type: "teamBoard", testMode: true, title: "Die Bündnisse schließen sich", teams: teamsByLetter, revealCounts: { A: 2, B: 2, C: 1 }, revealLine: "Ein weiterer Name fällt. Team B ist nun vollständig.", waitLabel: "Team B wird vollständig ..." },
+      { type: "teamBoard", testMode: true, title: "Die Bündnisse schließen sich", teams: teamsByLetter, revealCounts: { A: 2, B: 2, C: 2 }, revealLine: "Das letzte Siegel bricht. Auch Team C steht nun vollständig im Licht.", waitLabel: "Alle Bündnisse sind offenbart ..." },
+      { type: "intro", testMode: true, title: "Die Tore Mordors öffnen sich", text: "Nun wird Loch für Loch enthüllt. Nach jedem Loch verschiebt sich die Rangordnung — und der Palantír kennt kein Mitleid." },
+    ];
+
+    const running = { A: 0, B: 0, C: 0 };
+    const dummyHolePlan = [
+      { winner: ["B"], values: { A: [2, 1], B: [3, 2], C: [1, 1] } },
+      { winner: ["A"], values: { A: [4, 2], B: [2, 1], C: [3, 1] } },
+      { winner: ["C"], values: { A: [1, 1], B: [2, 2], C: [3, 2] } },
+      { winner: ["A", "B"], values: { A: [3, 2], B: [3, 1], C: [2, 1] } },
+      { winner: ["B"], values: { A: [2, 0], B: [4, 2], C: [1, 1] } },
+      { winner: ["C"], values: { A: [2, 1], B: [2, 2], C: [4, 3] } },
+      { winner: ["A"], values: { A: [3, 2], B: [1, 1], C: [2, 1] } },
+      { winner: ["B"], values: { A: [2, 2], B: [3, 2], C: [2, 0] } },
+      { winner: ["C"], values: { A: [1, 1], B: [2, 1], C: [3, 3] } },
+      { winner: ["A"], values: { A: [4, 2], B: [3, 1], C: [2, 1] } },
+      { winner: ["B"], values: { A: [2, 1], B: [4, 2], C: [3, 1] } },
+      { winner: ["C"], values: { A: [1, 1], B: [2, 2], C: [4, 2] } },
+      { winner: ["A"], values: { A: [3, 2], B: [2, 1], C: [1, 1] } },
+      { winner: ["B", "C"], values: { A: [2, 1], B: [3, 2], C: [3, 2] } },
+      { winner: ["A"], values: { A: [4, 1], B: [2, 2], C: [3, 1] } },
+      { winner: ["C"], values: { A: [2, 2], B: [1, 1], C: [3, 2] } },
+      { winner: ["B"], values: { A: [2, 1], B: [4, 2], C: [3, 2] } },
+      { winner: ["C"], values: { A: [2, 1], B: [3, 1], C: [4, 2] } },
+    ];
+
+    dummyHolePlan.forEach((holePlan, index) => {
+      const holeNumber = index + 1;
+      const winners = holePlan.winner || [];
+      winners.forEach((teamId) => { running[teamId] = Number(running[teamId] || 0) + (1 / winners.length); });
+      const teams = teamsByLetter.map((team) => {
+        const values = holePlan.values?.[team.teamId] || [0, 0];
+        const best = Math.max(...values);
+        const players = (team.players || []).map((row, playerIndex) => ({
+          player: { id: row.player_id, alias_name: row.player_alias, character_name: row.player_name, display_name: row.player_name },
+          score: { strokes: values[playerIndex] === 0 ? 9 : 6 - values[playerIndex], putts_count: playerIndex + 1, picked_up: false },
+          points: values[playerIndex] || 0,
+        }));
+        return { teamId: team.teamId, players, value: best, matchplayPoints: winners.includes(team.teamId) ? Number((1 / winners.length).toFixed(2)) : 0 };
+      });
+      const standings = Object.entries(running).map(([teamId, points]) => ({ teamId, points })).sort((a, b) => Number(b.points || 0) - Number(a.points || 0) || String(a.teamId).localeCompare(String(b.teamId)));
+      const winnerText = winners.length > 1 ? `geteilt von Team ${winners.join(" und Team ")}` : `an Team ${winners[0]}`;
+      steps.push({ type: "holeReveal", testMode: true, title: `Loch ${holeNumber} · Der Schatten wandert`, text: `Loch ${holeNumber} geht ${winnerText}.`, holeNumber, winnerTeamId: winners[0] || "", winnerTeamIds: winners, standings, teams });
+    });
+
+    const rankedTeams = Object.entries(running).map(([teamId, points]) => ({ teamId, points, value: points, detail: `${points} Lochpunkte`, players: teamMap[teamId] || [] })).sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
+    rankedTeams.forEach((team, index) => {
+      team.ceremonyRank = getCompetitionRank(rankedTeams, index, (item) => Number(item.value || 0));
+      team.ceremonyRankLabel = formatCompetitionRank(rankedTeams, index, (item) => Number(item.value || 0));
+    });
+    rankedTeams.slice().sort((a, b) => Number(b.ceremonyRank || 0) - Number(a.ceremonyRank || 0)).forEach((team) => {
+      steps.push({ type: "teamResult", testMode: true, title: `${team.ceremonyRankLabel}. Platz · TEST`, text: `Auf Platz ${team.ceremonyRankLabel} landen ${teamPlayersText(team)} mit ${team.detail}. Keine echten Spieler, keine echte Tageswertung.`, teamId: team.teamId, rank: team.ceremonyRank, detail: team.detail });
+    });
+    steps.push({ type: "text", testMode: true, title: "Test beendet", text: "Die echte Runde-3-Zeremonie bleibt versiegelt. Keine Teams wurden verraten, kein Marker wurde gesetzt." });
+    return steps;
+  }
+
+  function buildRealRound3HoleRevealSteps(roundId) {
+    if (String(roundId) !== "r3") return [];
+    const holeDetails = buildDailyTeamHoleDetails(roundId, true);
+    if (!holeDetails.length) return [];
+    const running = { A: 0, B: 0, C: 0 };
+    const steps = [{ type: "intro", title: "Die Tore Mordors öffnen sich", text: "Nun wird Loch für Loch enthüllt. Nach jedem Loch verschiebt sich die Rangordnung — und der Palantír kennt kein Mitleid." }];
+
+    holeDetails.forEach((row) => {
+      (row.teams || []).forEach((team) => {
+        running[team.teamId] = Number(running[team.teamId] || 0) + Number(team.matchplayPoints || 0);
+      });
+      const winners = (row.teams || []).filter((team) => Number(team.matchplayPoints || 0) > 0).map((team) => team.teamId);
+      const winnerText = winners.length > 1 ? `geteilt von Team ${winners.join(" und Team ")}` : winners.length ? `an Team ${winners[0]}` : "an niemanden";
+      const teamReasonText = (row.teams || []).map((team) => {
+        const playerBits = (team.players || []).map((playerRow) => {
+          const scoreValue = playerRow.score ? (normalizeBoolean(playerRow.score.picked_up) ? "X" : playerRow.score.strokes) : "–";
+          const putts = playerRow.score?.putts_count !== "" && playerRow.score?.putts_count != null ? `, ${playerRow.score.putts_count} Putts` : "";
+          return `${playerRow.player?.alias_name || playerRow.player?.character_name || playerRow.player?.display_name || playerRow.player?.id}: ${scoreValue}${putts} · ${playerRow.points} Netto`;
+        }).join(" · ");
+        return `Team ${team.teamId}: ${playerBits} → Best Ball ${team.value}`;
+      }).join("\\n");
+      const standings = Object.entries(running)
+        .map(([teamId, points]) => ({ teamId, points }))
+        .sort((a, b) => Number(b.points || 0) - Number(a.points || 0) || String(a.teamId).localeCompare(String(b.teamId)));
+      steps.push({
+        type: "holeReveal",
+        title: `Loch ${row.hole.hole_number} · Der Schatten wandert`,
+        text: `Loch ${row.hole.hole_number} geht ${winnerText}.`,
+        reasonText: teamReasonText,
+        holeNumber: row.hole.hole_number,
+        winnerTeamId: winners[0] || "",
+        winnerTeamIds: winners,
+        standings,
+        teams: row.teams,
+      });
+    });
+
+    return steps;
+  }
+
+  function buildTeamCeremonyTimeline(roundId) {
+    const rows = getTeamDrawRowsForRound(roundId);
+    if (!roundId || !rows.length) return [];
+    const round = (rounds.length ? rounds : fallbackRounds).find((item) => String(item.round_id) === String(roundId));
+    const title = roundId === "r1" ? "Die Bündnisse des ersten Tages" : roundId === "r2" ? "Die Bündnisse aus den Minen" : "Die Bündnisse vor Mordor";
+    const teamMap = { A: [], B: [], C: [] };
+    rows.forEach((row) => {
+      const teamId = String(row.team_number || "").toUpperCase();
+      if (!teamMap[teamId]) teamMap[teamId] = [];
+      teamMap[teamId].push(row);
+    });
+
+    const standings = buildDailyTeamStandings(roundId, true);
+    const standingMap = new Map((standings.teams || []).map((team, index) => [String(team.teamId), { ...team, ceremonyRank: index + 1 }]));
+    const teamLabel = (teamId) => `Team ${teamId}`;
+    const teamsByLetter = ["A", "B", "C"].map((teamId, index) => {
+      const standing = standingMap.get(teamId) || { teamId, label: teamLabel(teamId), value: 0, detail: "noch ohne Wertung", ceremonyRank: index + 1 };
+      return { ...standing, teamId, players: teamMap[teamId] || [] };
+    });
+    const rankedTeams = teamsByLetter.slice().sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
+
+    rankedTeams.forEach((team, index) => {
+      team.ceremonyRank = getCompetitionRank(rankedTeams, index, (item) => Number(item.value || 0));
+      team.ceremonyRankLabel = formatCompetitionRank(rankedTeams, index, (item) => Number(item.value || 0));
+    });
+    const resultRevealTeams = rankedTeams.slice().sort((a, b) => Number(b.ceremonyRank || 0) - Number(a.ceremonyRank || 0));
+    const playerCeremonyLabel = (row) => row?.player_alias ? `${row.player_alias} (${row.player_name || row.player_id})` : (row?.player_name || row?.player_id || "");
+    const teamPlayersText = (team) => (team.players || []).map(playerCeremonyLabel).filter(Boolean).join(" und ") || `Team ${team.teamId}`;
+
+    const roundCeremonyTexts = {
+      r1: {
+        mode: "Der erste Tag ist geschlagen. Heute zählt die rohe Macht der Netto-Punkte: Zwei Gefährten, ein gemeinsames Konto der Hoffnung — und genug Raum für frühe Schuldzuweisungen.",
+        rankTexts: {
+          1: "Ein Auftakt wie ein Hornstoß aus Minas Tirith. Dieses Bündnis führt den ersten Tag an und darf so tun, als sei alles genau geplant gewesen.",
+          2: "Solider Beginn, keine Heldensage, aber auch kein Ork-Lager. Dieses Bündnis steht in Lauerstellung.",
+          3: "Der erste Marsch war hart. Dieses Bündnis trägt die Laterne am Ende der Karawane — immerhin sieht man dort die Ausreden zuerst.",
+        },
+      },
+      r2: {
+        mode: "Runde zwei führt durch die Minen. Heute zählt pro Loch nur der bessere Ball: Der schwächere Score wird wortlos in die Tiefe Morias gestoßen.",
+        rankTexts: {
+          1: "Aus den Minen steigt dieses Bündnis mit erhobenem Haupt. Der bessere Ball hat gesprochen, und er sprach erstaunlich freundlich.",
+          2: "Dieses Bündnis hat Moria überlebt, ohne komplett vom Balrog der Mittelmäßigkeit verschlungen zu werden.",
+          3: "Hier hallt noch ein Echo aus den Tiefen: Nicht jedes Best-Ball war wirklich best. Aber Mut ist auch eine Währung.",
+        },
+      },
+      r3: {
+        mode: "Vor den Toren Mordors wird Loch für Loch gerichtet. Wer das bessere Netto-Ergebnis bringt, nimmt das Loch — bei Gleichstand wird geteilt, wie letztes Brot in Bruchtal.",
+        rankTexts: {
+          1: "Dieses Bündnis steht vor Mordor und schaut nicht weg. Loch um Loch wurde genommen, als hätte jemand heimlich Mut gefrühstückt.",
+          2: "Noch nicht der Schicksalsberg, aber nah genug, um Rauch zu riechen. Dieses Bündnis bleibt gefährlich.",
+          3: "Die Tore Mordors waren schwer. Dieses Bündnis hat gekämpft — und der Palantír wird die Details gnädig verschweigen.",
+        },
+      },
+    };
+    const modeText = roundCeremonyTexts[roundId]?.mode || "Die Tageswertung wird offenbart.";
+    const rankTexts = roundCeremonyTexts[roundId]?.rankTexts || {
+      1: "Dieses Bündnis führt die Tageswertung an.",
+      2: "Dieses Bündnis hält die Mitte.",
+      3: "Dieses Bündnis trägt die Last des Tages.",
+    };
+
+    const revealLines = roundId === "r1"
+      ? [
+        "Das erste Siegel bricht. Ein Name tritt aus dem Pergament — noch glaubt jeder, es könne gut ausgehen.",
+        "Das zweite Siegel glimmt. Der Partner wird offenbart, und mit ihm die erste echte Belastungsprobe der Freundschaft.",
+      ]
+      : roundId === "r2"
+        ? [
+          "Aus der Dunkelheit Morias tritt der erste Name hervor.",
+          "Ein zweiter Name hallt durch die Tiefe. Das Bündnis ist geschmiedet — ob aus Mithril oder Panik, wird sich zeigen.",
+        ]
+        : [
+          "Vor den Toren Mordors erscheint der erste Gefährte im roten Licht.",
+          "Der zweite Name fällt. Nun ist klar, wer gemeinsam Richtung Schicksalsberg marschiert.",
+        ];
+
+    const teamHasAny = (team, aliases) => {
+      const normalizedAliases = aliases.map((item) => String(item || "").toLowerCase().trim());
+      return (team.players || []).some((row) => {
+        const haystack = [row.player_id, row.player_name, row.player_alias].map((item) => String(item || "").toLowerCase().trim());
+        return haystack.some((value) => normalizedAliases.includes(value));
+      });
+    };
+
+    const getSpecialTeamComboText = (team) => {
+      const hasGimme = teamHasAny(team, ["mucky", "gimme"]);
+      const hasForedo = teamHasAny(team, ["kio", "foredo"]);
+      const hasBogeymir = teamHasAny(team, ["andreas", "bogeymir"]);
+      const rank = Number(team.ceremonyRank || 0);
+      if (hasGimme && hasForedo) {
+        if (rank === 1) return `Foredo und Gimme führen auf Rang ${rank}. Foredo freut sich natürlich über den Sieg — bleibt aber innerlich erstaunlich sicher, dass Gimme dafür nicht hauptverantwortlich war.`;
+        if (rank === 2) return `Foredo und Gimme auf Rang ${rank}. Foredo nennt es solide und hofft, dass damit alles gesagt ist. Gimme hat vermutlich noch drei Ergänzungen.`;
+        return `Foredo und Gimme auf Rang ${rank}. Foredo schaut in die Ferne. Nicht nach Mordor — nur irgendwohin, wo er Gimme nicht sehen muss.`;
+      }
+      if (hasGimme && hasBogeymir) {
+        if (rank === 1) return `Bogeymir und Gimme führen auf Rang ${rank}. Gimme hält es für verdient. Bogeymir auch. Irritiert sind beide nur darüber, dass der jeweils andere offenbar tatsächlich geholfen hat.`;
+        if (rank === 2) return `Bogeymir und Gimme auf Rang ${rank}. Gimme nennt es solide. Bogeymir nennt es vermeidbar. Beide meinen wahrscheinlich denselben Spieler — nur nicht sich selbst.`;
+        return `Bogeymir und Gimme auf Rang ${rank}. Zum ersten Mal sind sie sich völlig einig: Genau das hatte jeder dem anderen zugetraut.`;
+      }
+      return "";
+    };
+
+    const hasLoanPlayer = roundId === "r1" && teamsByLetter.some((team) => (team.players || []).some((row, index) => getDailyTeamPlayerMeta(roundId, team.teamId, row.player_id, index, true).isLoanPlayer));
+    const steps = [
+      { type: "text", title, text: `${getRoundChapterLabel(round)} ist geschlagen. Der Abend senkt sich über Mittelerde, und der Rat öffnet das versiegelte Pergament der Tageswertung.`, waitLabel: "Das Pergament wird entrollt ..." },
+      { type: "text", title: "Die Mannschaften werden offenbart", text: `${modeText} Zuerst werden nur die Bündnisse gezogen. Die Wertung bleibt noch im Schatten, bis alle Namen gefallen sind.`, waitLabel: "Die Bündnisse werden entrollt ..." },
+      ...(hasLoanPlayer ? [{ type: "text", title: "Sonderregel des ersten Tages", text: "Da Gangolf noch über die Straßen Mittelerdes jagte, erhält ein Team einen Leihspieler. Dessen Punkte zählen für dieses Team mit — seine eigene Wertung bleibt aber bei seinem Stammteam.", waitLabel: "Die Sonderregel wird ins Pergament gekratzt ..." }] : []),
+    ];
+
+    steps.push({
+      type: "teamBoard",
+      title: "Drei leere Banner",
+      teams: teamsByLetter,
+      revealCounts: { A: 0, B: 0, C: 0 },
+      revealLine: "Drei Banner werden erhoben. Noch ist kein Name sichtbar. Der Palantír sammelt Atem.",
+      waitLabel: "Die ersten Namen werden gerufen ...",
+    });
+    steps.push({
+      type: "teamBoard",
+      title: "Die ersten Namen fallen",
+      teams: teamsByLetter,
+      revealCounts: { A: 1, B: 0, C: 0 },
+      revealLine: revealLines[0] || "Das erste Siegel bricht. Ein Name tritt aus dem Pergament.",
+      waitLabel: "Team A erhält den ersten Gefährten ...",
+    });
+    steps.push({
+      type: "teamBoard",
+      title: "Die ersten Namen fallen",
+      teams: teamsByLetter,
+      revealCounts: { A: 1, B: 1, C: 0 },
+      revealLine: "Das Pergament wandert weiter. Auch Team B wird berufen.",
+      waitLabel: "Team B erhält den ersten Gefährten ...",
+    });
+    steps.push({
+      type: "teamBoard",
+      title: "Die ersten Namen fallen",
+      teams: teamsByLetter,
+      revealCounts: { A: 1, B: 1, C: 1 },
+      revealLine: "Das dritte Fenster glimmt. Team C bekommt seinen ersten Namen.",
+      waitLabel: "Team C erhält den ersten Gefährten ...",
+    });
+
+    steps.push({
+      type: "text",
+      title: "Die halben Bündnisse stehen",
+      text: "Drei Namen sind gefallen. Drei Schatten fehlen noch. Der Rat tuschelt, der Palantír glimmt, und irgendwo rechnet jemand bereits heimlich Netto-Punkte nach.",
+      waitLabel: "Die zweiten Siegel werden vorbereitet ...",
+    });
+
+    steps.push({
+      type: "teamBoard",
+      title: "Die Bündnisse schließen sich",
+      teams: teamsByLetter,
+      revealCounts: { A: 2, B: 1, C: 1 },
+      revealLine: revealLines[1] || "Das zweite Siegel glimmt. Der Partner wird offenbart.",
+      waitLabel: "Team A wird vollständig ...",
+    });
+    steps.push({
+      type: "teamBoard",
+      title: "Die Bündnisse schließen sich",
+      teams: teamsByLetter,
+      revealCounts: { A: 2, B: 2, C: 1 },
+      revealLine: "Ein weiterer Name fällt. Team B ist nun vollständig.",
+      waitLabel: "Team B wird vollständig ...",
+    });
+    steps.push({
+      type: "teamBoard",
+      title: "Die Bündnisse schließen sich",
+      teams: teamsByLetter,
+      revealCounts: { A: 2, B: 2, C: 2 },
+      revealLine: "Das letzte Siegel bricht. Auch Team C steht nun vollständig im Licht.",
+      waitLabel: "Alle Bündnisse sind offenbart ...",
+    });
+
+    if (String(roundId) === "r3") {
+      steps.push(...buildRealRound3HoleRevealSteps(roundId));
+    } else {
+      steps.push({
+        type: "text",
+        title: "Alle Bündnisse sind offenbart",
+        text: "Die Namen sind gefallen. Nun richtet der Palantír die Teams nach ihrer Tageswertung — und plötzlich wird aus einer Ziehung ein Urteil.",
+        waitLabel: "Die Rangfolge wird enthüllt ...",
+      });
+    }
+
+    resultRevealTeams.forEach((team) => {
+      const rank = Number(team.ceremonyRank || 0);
+      const rankLabel = team.ceremonyRankLabel || String(rank);
+      steps.push({
+        type: "teamResult",
+        title: `${rankLabel}. Platz`,
+        text: `Auf Platz ${rankLabel} landen ${teamPlayersText(team)} mit ${team.detail}. ${rankTexts[rank] || "Das Schicksal hat gesprochen."}`,
+        teamId: team.teamId,
+        rank,
+        detail: team.detail,
+        waitLabel: "Die Chronisten notieren ...",
+      });
+      const specialText = getSpecialTeamComboText(team);
+      if (specialText) {
+        steps.push({
+          type: "teamResult",
+          title: `Sondervermerk · ${teamPlayersText(team)}`,
+          text: specialText,
+          teamId: team.teamId,
+          rank: team.ceremonyRank,
+          detail: team.detail,
+          waitLabel: "Der Rat sortiert seine Gefühle ...",
+        });
+      }
+    });
+
+    steps.push({ type: "text", title: "Die Teams sind gesprochen", text: "Die Bündnisse stehen. Die Rangfolge ist bekannt. Wer nun klagt, möge dies mit Netto-Punkten widerlegen — oder wenigstens mit einer sehr guten Geschichte.", waitLabel: "Die Chronik wird versiegelt ..." });
+    return steps;
+  }
+
+  function renderTeamCeremonyView() {
+    const timeline = teamCeremonyTimeline;
+    const step = timeline[Math.min(teamCeremonyStepIndex, Math.max(0, timeline.length - 1))];
+    if (!step) return null;
+    const playerLabel = (row) => {
+      const alias = row?.player_alias || row?.alias_name || "";
+      const name = row?.player_name || row?.character_name || row?.display_name || row?.player_id || row?.id || "";
+      return alias ? `${alias} (${name})` : name;
+    };
+    const playerMetaLabel = (row, teamId, index) => {
+      const meta = getDailyTeamPlayerMeta(teamCeremonyRoundId, teamId, row.player_id, index, true);
+      return meta.isLoanPlayer ? `Leihspieler in Team C · zählt hier mit, Stammteam ${meta.homeTeamId}` : "";
+    };
+    return (
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="min-h-[70vh]">
+        <Card className="relative overflow-hidden rounded-3xl border-amber-500/45 bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.28),transparent_44%),linear-gradient(180deg,rgba(32,23,15,0.96),rgba(12,10,9,0.96))] shadow-2xl">
+          <CardContent className="p-4 text-center">
+            <div className="mx-auto mb-3 h-1.5 w-24 rounded-full bg-amber-400/70 shadow-[0_0_18px_rgba(251,191,36,0.35)]" />
+            <p className="text-[10px] uppercase tracking-[0.28em] text-amber-300/75">{teamCeremonyTestMode || step.testMode ? "TESTMODUS · Keine echten Teams" : "Team-Zeremonie"}</p>
+            <h2 className="mt-1 font-serif text-2xl font-black text-amber-200">{step.title}</h2>
+            {step.type === "teamBoard" ? (
+              <motion.div key={`team-board-${teamCeremonyStepIndex}`} initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="mt-5 rounded-3xl border border-amber-500/35 bg-black/28 p-3">
+                <p className="mb-3 text-sm italic text-amber-100/70">{step.revealLine}</p>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 landscape:grid-cols-3">
+                  {(step.teams || []).map((team) => {
+                    const revealCount = Number(step.revealCounts?.[team.teamId] ?? team.revealCount ?? 0);
+                    const shownPlayers = (team.players || []).slice(0, revealCount);
+                    return (
+                      <div key={team.teamId} className="rounded-2xl border border-amber-700/35 bg-stone-950/65 p-2 text-center">
+                        <div className="mb-2 font-serif text-4xl font-black text-amber-300 drop-shadow-[0_0_14px_rgba(251,191,36,0.2)]">{team.teamId}</div>
+                        <div className="space-y-1.5">
+                          {[0, 1].map((slotIndex) => {
+                            const row = shownPlayers[slotIndex];
+                            return row ? (
+                              <motion.div key={`${team.teamId}-${row.player_id}-${slotIndex}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-amber-700/30 bg-black/35 px-2 py-2 font-serif text-base font-bold text-amber-100">
+                                <div>{playerLabel(row)}</div>
+                                {playerMetaLabel(row, team.teamId, slotIndex) ? <div className="mt-1 font-sans text-[10px] font-bold uppercase tracking-[0.12em] text-amber-300/70">{playerMetaLabel(row, team.teamId, slotIndex)}</div> : null}
+                              </motion.div>
+                            ) : (
+                              <div key={`${team.teamId}-empty-${slotIndex}`} className="rounded-xl border border-dashed border-amber-700/25 bg-black/20 px-2 py-2 text-sm text-amber-100/35">versiegelt</div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            ) : step.type === "team" ? (
+              <motion.div key={`${step.teamId}-${teamCeremonyStepIndex}`} initial={{ opacity: 0, scale: 0.94 }} animate={{ opacity: 1, scale: 1 }} className="mt-5 rounded-3xl border border-amber-500/35 bg-black/28 p-4">
+                {step.rank ? <div className="mb-1 text-xs uppercase tracking-[0.2em] text-amber-100/50">Rang {step.rank} · {step.detail}</div> : null}
+                <div className="mb-3 font-serif text-5xl font-black text-amber-300 drop-shadow-[0_0_18px_rgba(251,191,36,0.22)]">{step.teamId}</div>
+                <p className="mb-3 text-sm italic text-amber-100/65">{step.revealLine}</p>
+                <div className="space-y-2">
+                  {(step.players || []).map((row, index) => (
+                    <motion.div key={`${row.player_id}-${index}`} initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: index * 0.25 }} className="rounded-2xl border border-amber-700/35 bg-stone-950/65 px-3 py-2 font-serif text-xl font-bold text-amber-100">
+                      <div>{playerLabel(row)}</div>
+                      {playerMetaLabel(row, step.teamId, index) ? <div className="mt-1 font-sans text-[11px] font-bold uppercase tracking-[0.16em] text-amber-300/70">{playerMetaLabel(row, step.teamId, index)}</div> : null}
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            ) : step.type === "holeReveal" ? (
+              <motion.div key={`hole-${teamCeremonyStepIndex}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="mx-auto mt-5 max-w-md rounded-3xl border border-sky-500/35 bg-black/28 p-4">
+                <div className="mb-2 text-xs uppercase tracking-[0.22em] text-sky-200/70">Loch {step.holeNumber} · Mordors Schlachtbericht</div>
+                <p className="text-base leading-relaxed text-amber-100/85">{step.text}</p>
+                <div className="mt-3 grid grid-cols-1 gap-2">
+                  {['A', 'B', 'C'].map((teamId) => {
+                    const standing = (step.standings || []).find((item) => item.teamId === teamId) || { teamId, points: 0 };
+                    const rankIndex = (step.standings || []).findIndex((item) => item.teamId === teamId);
+                    const isWinner = (step.winnerTeamIds || [step.winnerTeamId]).map(String).includes(String(teamId));
+                    const teamDetail = (step.teams || []).find((team) => String(team.teamId) === String(teamId));
+                    const teamPlayers = teamDetail?.players || [];
+                    return (
+                      <div key={teamId} className={cls("rounded-2xl border p-2 text-left", isWinner ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-100" : "border-amber-700/35 bg-stone-950/60 text-amber-100")}> 
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="text-[10px] uppercase tracking-[0.16em] opacity-70">{rankIndex >= 0 ? `Rang ${rankIndex + 1}` : "Rang –"}</div>
+                            <div className="font-serif text-xl font-black">Team {teamId}</div>
+                            <div className="text-[11px] text-amber-100/65">{teamPlayers.map((row) => row.player?.alias_name || row.player?.character_name || row.player?.display_name || row.player?.id).filter(Boolean).join(' · ') || 'noch versiegelt'}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-serif text-2xl font-black text-amber-300">{Number(standing.points || 0)}</div>
+                            <div className="text-[10px] uppercase tracking-[0.12em] opacity-70">Lochpunkte</div>
+                          </div>
+                        </div>
+                        <div className="mt-2 grid gap-1 text-[11px] text-amber-100/78">
+                          {teamPlayers.map((playerRow) => {
+                            const scoreValue = playerRow.score ? (normalizeBoolean(playerRow.score.picked_up) ? 'X' : playerRow.score.strokes) : '–';
+                            const putts = playerRow.score?.putts_count !== '' && playerRow.score?.putts_count != null ? ` · ${playerRow.score.putts_count} Putts` : '';
+                            const name = playerRow.player?.alias_name || playerRow.player?.character_name || playerRow.player?.display_name || playerRow.player?.id;
+                            return <div key={playerRow.player?.id || name} className="rounded-xl bg-black/22 px-2 py-1"><b className="text-amber-100">{name}</b>: Score {scoreValue}{putts} · Netto {playerRow.points} P</div>;
+                          })}
+                          <div className={cls("rounded-xl px-2 py-1 font-bold", isWinner ? "bg-emerald-400/15 text-emerald-100" : "bg-black/18 text-amber-100/65")}>Best Ball: {teamDetail?.value ?? 0}{teamDetail?.matchplayPoints ? ` · +${teamDetail.matchplayPoints} Lochpunkt` : ""}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-3 rounded-2xl border border-amber-700/35 bg-stone-950/60 p-3 text-left">
+                  <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-amber-300/70">Aktueller Stand nach Loch {step.holeNumber}</div>
+                  <div className="space-y-1">
+                    {(step.standings || []).map((team, index) => (
+                      <div key={team.teamId} className="flex items-center justify-between rounded-xl bg-black/25 px-3 py-1.5 text-sm text-amber-100">
+                        <span className="font-bold">{index + 1}. Team {team.teamId}</span>
+                        <span className="font-serif text-lg font-black text-amber-300">{Number(team.points || 0)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            ) : step.type === "teamIntro" || step.type === "teamResult" ? (
+              <motion.div key={teamCeremonyStepIndex} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="mx-auto mt-5 max-w-md rounded-3xl border border-amber-500/30 bg-black/24 p-4">
+                <div className="mb-2 text-xs uppercase tracking-[0.22em] text-amber-300/65">{step.teamId ? `Team ${step.teamId}` : "Tageswertung"}</div>
+                <p className="text-lg leading-relaxed text-amber-100/85">{step.text}</p>
+                {step.detail ? <div className="mt-3 rounded-2xl border border-amber-700/35 bg-stone-950/60 px-3 py-2 font-serif text-xl font-black text-amber-300">{step.detail}</div> : null}
+              </motion.div>
+            ) : (
+              <motion.p key={teamCeremonyStepIndex} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="mx-auto mt-5 max-w-md text-lg leading-relaxed text-amber-100/85">
+                {step.text}
+              </motion.p>
+            )}
+            <div className="mt-5 text-xs uppercase tracking-[0.18em] text-amber-100/45">{step.waitLabel || "Die Chronik schreibt ..."}</div>
+            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-black/35">
+              <div className="h-full rounded-full bg-amber-400/80" style={{ width: `${Math.round(((teamCeremonyStepIndex + 1) / Math.max(1, timeline.length)) * 100)}%` }} />
+            </div>
+          </CardContent>
+        </Card>
+      </motion.section>
+    );
+  }
+
+  function getDailyTeamPlayerMeta(roundId, teamId, playerId, slotIndex = 0, includeHidden = false) {
+    if (String(roundId) !== "r1" || !playerId) return { isLoanPlayer: false, homeTeamId: teamId, label: "" };
+    const slots = getDailyTeamSlots(roundId, includeHidden);
+    const appearances = [];
+    ["A", "B", "C"].forEach((currentTeamId) => {
+      (slots?.[currentTeamId] || []).forEach((currentPlayerId, currentSlotIndex) => {
+        if (String(currentPlayerId || "") === String(playerId)) {
+          appearances.push({ teamId: currentTeamId, slotIndex: currentSlotIndex });
+        }
+      });
+    });
+    if (appearances.length <= 1) return { isLoanPlayer: false, homeTeamId: teamId, label: "" };
+    const loanAppearance = appearances[appearances.length - 1];
+    const homeAppearance = appearances[0];
+    const isLoanPlayer = teamId === loanAppearance.teamId && slotIndex === loanAppearance.slotIndex;
+    return {
+      isLoanPlayer,
+      homeTeamId: homeAppearance.teamId,
+      label: isLoanPlayer ? `Leihspieler aus Team ${homeAppearance.teamId}` : "Stammteam",
+    };
+  }
+
+  function getDailyTeamSlots(roundId, includeHidden = false) {
+    if (!includeHidden && !isTeamDrawRoundVisible(roundId)) return { A: ["", ""], B: ["", ""], C: ["", ""] };
+    const selectionsFromRows = buildDailyTeamSelectionsFromRows(teamDrawRows || [], false);
+    const rowSelection = selectionsFromRows?.[roundId]?.teams;
+    if (rowSelection) return rowSelection;
+    return { A: ["", ""], B: ["", ""], C: ["", ""] };
+  }
+
+  function buildDailyTeamHoleDetails(roundId, includeHidden = false) {
+    const round = (rounds.length ? rounds : fallbackRounds).find((item) => String(item.round_id) === String(roundId));
+    if (!round) return [];
+    const mode = String(roundId) === "r2" ? "bestBallNetto" : String(roundId) === "r3" ? "bestBallMatchplay" : "nettoTeam";
+    const roundHoles = getRoundHoles(round, allHoles);
+    const roundScores = officialAllScores.filter((score) => String(score.round_id) === String(roundId));
+    const roundPlayerList = getRoundPlayers(roundId, allPlayers, roundPlayers);
+    const playerMap = new Map(roundPlayerList.map((player) => [String(player.id), player]));
+    const teamSlots = getDailyTeamSlots(roundId, includeHidden);
+    const teams = ["A", "B", "C"].map((teamId) => {
+      const players = (teamSlots?.[teamId] || ["", ""]).slice(0, 2).map((playerId) => playerMap.get(String(playerId))).filter(Boolean);
+      return { teamId, players };
+    });
+
+    return roundHoles.map((hole) => {
+      const teamValues = teams.map((team) => {
+        const playerRows = team.players.map((player) => {
+          const playerForRound = getPlayerForCourse(player, round.course_id || "goethe", courses);
+          const score = roundScores.find((item) => String(item.player_id) === String(player.id) && Number(item.hole_number) === Number(hole.hole_number));
+          const shots = getShotsOnHole(playerForRound?.course_hcp, hole.hcp);
+          const points = getScoreStablefordPoints(score, hole.par, shots);
+          return { player: playerForRound, score, shots, points };
+        });
+        const bestPoints = playerRows.length ? Math.max(0, ...playerRows.map((row) => Number(row.points || 0))) : 0;
+        const totalPoints = playerRows.reduce((sum, row) => sum + Number(row.points || 0), 0);
+        return {
+          teamId: team.teamId,
+          players: playerRows,
+          bestPoints,
+          totalPoints,
+          value: mode === "bestBallNetto" || mode === "bestBallMatchplay" ? bestPoints : totalPoints,
+          label: mode === "bestBallNetto" || mode === "bestBallMatchplay" ? `${bestPoints} Best Ball` : `${totalPoints} Netto`,
+        };
+      });
+      const bestValue = Math.max(0, ...teamValues.map((team) => Number(team.value || 0)));
+      const winners = teamValues.filter((team) => Number(team.value || 0) === bestValue && bestValue > 0);
+      return {
+        hole,
+        mode,
+        teams: teamValues.map((team) => ({
+          ...team,
+          isHoleWinner: winners.some((winner) => winner.teamId === team.teamId),
+          matchplayPoints: mode === "bestBallMatchplay" && winners.length && team.value === bestValue ? Number((1 / winners.length).toFixed(2)) : 0,
+        })),
+      };
+    });
+  }
+
+  function buildDailyTeamStandings(roundId, includeHidden = false) {
+    const round = (rounds.length ? rounds : fallbackRounds).find((item) => String(item.round_id) === String(roundId));
+    if (!round) return { round: null, teams: [], mode: "nettoTeam", title: "" };
+    const mode = String(roundId) === "r2" ? "bestBallNetto" : String(roundId) === "r3" ? "bestBallMatchplay" : "nettoTeam";
+    const title = String(roundId) === "r2" ? "Tag 2 · Best Ball Netto" : String(roundId) === "r3" ? "Tag 3 · Best Ball Match Play" : "Tag 1 · Netto-Team";
+    const roundHoles = getRoundHoles(round, allHoles);
+    const roundScores = officialAllScores.filter((score) => String(score.round_id) === String(roundId));
+    const roundPlayerList = getRoundPlayers(roundId, allPlayers, roundPlayers);
+    const playerMap = new Map(roundPlayerList.map((player) => [String(player.id), player]));
+    const teamSlots = getDailyTeamSlots(roundId, includeHidden);
+    const teamIds = ["A", "B", "C"];
+    const teams = teamIds.map((teamId) => {
+      const playerIds = (teamSlots?.[teamId] || ["", ""]).slice(0, 2);
+      const teamPlayers = playerIds.map((playerId) => playerMap.get(String(playerId))).filter(Boolean);
+      return { teamId, label: `Team ${teamId}`, playerIds, players: teamPlayers, isComplete: teamPlayers.length === 2 };
+    });
+
+    if (mode === "bestBallMatchplay") {
+      const enrichedTeams = teams.map((team) => ({ ...team, holesWon: 0, holesShared: 0, points: 0, value: 0, detail: "0 Löcher" }));
+      roundHoles.forEach((hole) => {
+        const values = enrichedTeams.map((team) => {
+          const best = Math.max(0, ...team.players.map((player) => {
+            const playerForRound = getPlayerForCourse(player, round.course_id || "goethe", courses);
+            const score = roundScores.find((item) => String(item.player_id) === String(player.id) && Number(item.hole_number) === Number(hole.hole_number));
+            const shots = getShotsOnHole(playerForRound?.course_hcp, hole.hcp);
+            return getScoreStablefordPoints(score, hole.par, shots);
+          }));
+          return { team, best };
+        });
+        const bestValue = Math.max(0, ...values.map((item) => item.best));
+        const winners = values.filter((item) => item.best === bestValue && bestValue > 0);
+        if (winners.length === 1) {
+          winners[0].team.holesWon += 1;
+          winners[0].team.points += 1;
+        } else if (winners.length > 1) {
+          winners.forEach((item) => {
+            item.team.holesShared += 1;
+            item.team.points += 1 / winners.length;
+          });
+        }
+      });
+      enrichedTeams.forEach((team) => {
+        team.value = team.points;
+        team.detail = `${Number(team.points.toFixed(2)).toLocaleString("de-DE")} Löcher`;
+      });
+      return { round, mode, title, teams: enrichedTeams.sort((a, b) => Number(b.value || 0) - Number(a.value || 0)) };
+    }
+
+    const enrichedTeams = teams.map((team) => {
+      const result = getDailyTeamValue(round, team.players, roundHoles, roundScores, mode);
+      return { ...team, value: result.value, detail: result.detail };
+    }).sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
+    return { round, mode, title, teams: enrichedTeams };
+  }
+
+  function updateDailyTeamSlot(roundId, teamId, slotIndex, playerId) {
+    return;
+  }
+
+  function isDailyTeamPlayerAlreadySelected(roundId, playerId, currentTeamId, currentSlotIndex) {
+    if (!playerId) return false;
+    const teams = getDailyTeamSlots(roundId);
+    const sameTeamOtherSlot = (teams?.[currentTeamId] || []).some((selectedPlayerId, slotIndex) => String(selectedPlayerId || "") === String(playerId) && slotIndex !== currentSlotIndex);
+    if (sameTeamOtherSlot) return true;
+    if (String(roundId) === "r1") return false;
+    return ["A", "B", "C"].some((teamId) => (teams?.[teamId] || []).some((selectedPlayerId, slotIndex) => String(selectedPlayerId || "") === String(playerId) && !(teamId === currentTeamId && slotIndex === currentSlotIndex)));
+  }
+
+  function renderDailyTeamsView() {
+    const roundIds = ["r1", "r2", "r3"];
+    return (
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
+        <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm landscape:relative landscape:left-1/2 landscape:w-[calc(100vw-0.75rem)] landscape:max-w-none landscape:-translate-x-1/2 landscape:rounded-xl">
+          <CardContent className="p-2 landscape:p-1.5">
+            <div className="mb-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 landscape:mb-1.5 landscape:rounded-xl landscape:p-2">
+              <p className="text-xs uppercase tracking-[0.22em] text-amber-300/75">Tageswertungen</p>
+              <h2 className="font-serif text-xl font-black text-amber-200">TeamDraw & Tageswertung</h2>
+              {teamDrawRows?.length ? <div className="mt-2 text-xs text-amber-100/55">Geladen aus TeamDraw: {teamDrawRows.length} Einträge. Neuer TeamDraw nur über Admin & HCPs · Runde beginnen.</div> : null}
+            </div>
+            <div className="space-y-3 landscape:space-y-2">
+              {roundIds.map((roundId) => {
+                const standings = buildDailyTeamStandings(roundId);
+                const roundPlayersForSelection = getRoundPlayers(roundId, allPlayers, roundPlayers);
+                const teamSlots = getDailyTeamSlots(roundId);
+                const teamDrawVisible = isTeamDrawRoundVisible(roundId);
+                const teamHoleDetails = buildDailyTeamHoleDetails(roundId);
+                const detailsOpen = Boolean(openTeamHoleDetails?.[roundId]);
+                return (
+                  <div key={roundId} className="overflow-hidden rounded-2xl border border-amber-700/35 bg-black/24 landscape:rounded-xl">
+                    <div className="border-b border-amber-700/25 bg-amber-500/10 px-3 py-2 landscape:px-2 landscape:py-1.5">
+                      <div className="font-serif text-lg font-black text-amber-200 landscape:text-base">{standings.title}</div>
+                      <div className="text-xs text-amber-100/60">{getRoundChapterLabel(standings.round)}</div>
+                    </div>
+                    <div className="space-y-3 p-3 landscape:space-y-2 landscape:p-2">
+                      {!teamDrawVisible ? <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100/75">
+                        <div className="font-bold text-amber-200">Team-Ziehung noch versiegelt</div>
+                        <div className="mt-1">Die Zeremonie für diese Runde startet am {getTeamDrawTargetLabel(roundId)}. Danach erscheinen hier die Teams und die Tageswertung.</div>
+                        {atomicTimeActive ? <div className="mt-2 rounded-xl border border-amber-500/25 bg-black/25 px-3 py-2 font-serif text-lg font-black text-amber-300">{getTeamDrawCountdownLabel(roundId)}</div> : null}
+                        {!atomicTimeActive ? <div className={cls("mt-1 text-[11px] font-semibold", getTimeSourceClassName())}>{getTimeSourceLabel()}</div> : null}
+                      </div> : null}
+                      {teamDrawVisible ? <>
+                      <div className="grid gap-2 landscape:grid-cols-3 landscape:gap-1.5">
+                        {["A", "B", "C"].map((teamId) => (
+                          <div key={teamId} className="rounded-xl border border-amber-700/25 bg-stone-950/45 p-2 landscape:p-1.5">
+                            <div className="mb-1.5 font-serif text-base font-bold text-amber-200 landscape:mb-1 landscape:text-sm">Team {teamId}</div>
+                            <div className="grid grid-cols-2 gap-2 landscape:gap-1">
+                              {[0, 1].map((slotIndex) => (
+                                <select key={slotIndex} value={teamSlots?.[teamId]?.[slotIndex] || ""} disabled className="min-w-0 rounded-xl border border-amber-700/40 bg-stone-950 px-2 py-2 text-sm text-amber-50 opacity-80 landscape:px-1.5 landscape:py-1.5 landscape:text-[11px]">
+                                  <option value="">Spieler {slotIndex + 1}</option>
+                                  {roundPlayersForSelection.map((player) => {
+                                    const disabled = isDailyTeamPlayerAlreadySelected(roundId, player.id, teamId, slotIndex);
+                                    return <option key={player.id} value={player.id} disabled={disabled}>{player.character_name || player.display_name || player.id}{disabled ? " · bereits gewählt" : ""}</option>;
+                                  })}
+                                </select>
+                              ))}
+                            </div>
+                            {roundId !== "r1" ? <div className="mt-1 text-[11px] text-amber-100/45">Runde 2/3: jeder Spieler nur einmal.</div> : <div className="mt-1 text-[11px] text-amber-100/45">Runde 1: Ein Leihspieler darf ein zweites Team auffüllen; nie zweimal im selben Team.</div>}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="w-full overflow-x-auto rounded-xl border border-amber-700/25 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                        <table className="w-full table-fixed border-collapse text-xs text-amber-50 landscape:text-[11px]">
+                          <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100/75"><th className="hidden w-[8%] px-2 py-1.5 landscape:table-cell">#</th><th className="w-[23%] px-2 py-1.5 landscape:w-[18%]">Team</th><th className="w-[43%] px-2 py-1.5 landscape:w-[49%]">Spieler</th><th className="w-[34%] px-2 py-1.5 text-right landscape:w-[25%]">Wertung</th></tr></thead>
+                          <tbody>
+                            {standings.teams.map((team, index) => (
+                              <tr key={team.teamId} className="border-t border-amber-700/20">
+                                <td className="hidden px-2 py-1.5 text-amber-200/70 landscape:table-cell">{formatCompetitionRank(standings.teams, index, (item) => Number(item.value || 0))}</td>
+                                <td className="px-2 py-1.5 font-bold text-amber-200">{team.label}</td>
+                                <td className="px-2 py-1.5 text-amber-100/80 landscape:break-words">{team.players.map((player, playerIndex) => { const meta = getDailyTeamPlayerMeta(roundId, team.teamId, player.id, playerIndex); const name = player.character_name || player.display_name || player.id; return meta.isLoanPlayer ? `${name} (Leihspieler aus Team ${meta.homeTeamId})` : name; }).join(" · ") || "–"}{!team.isComplete ? <span className="ml-1 text-[10px] text-red-200/75">offen</span> : null}</td>
+                                <td className="px-2 py-1.5 text-right font-serif text-base font-black text-amber-300 landscape:text-lg">{team.detail}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {['r2', 'r3'].includes(String(roundId)) ? (
+                        <div className="rounded-xl border border-amber-700/25 bg-stone-950/45 p-2">
+                          <button type="button" onClick={() => setOpenTeamHoleDetails((current) => ({ ...(current || {}), [roundId]: !Boolean(current?.[roundId]) }))} className="flex w-full items-center justify-between gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-left text-sm font-bold text-amber-100">
+                            <span>Lochwertung der Teams anzeigen</span>
+                            <span className="text-amber-300">{detailsOpen ? '−' : '+'}</span>
+                          </button>
+                          {detailsOpen ? (
+                            <div className="mt-2 overflow-x-auto rounded-xl border border-amber-700/25 bg-black/25 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                              <table className="w-full min-w-[720px] border-collapse text-xs text-amber-50 landscape:min-w-0 landscape:text-[11px]">
+                                <thead>
+                                  <tr className="text-left uppercase tracking-wider text-amber-100/70">
+                                    <th className="px-2 py-1.5">Loch</th>
+                                    {['A', 'B', 'C'].map((teamId) => <th key={teamId} className="px-2 py-1.5 text-center">Team {teamId}</th>)}
+                                    <th className="px-2 py-1.5 text-right">Gewinner</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {teamHoleDetails.map((row) => {
+                                    const winningTeams = row.teams.filter((team) => team.isHoleWinner).map((team) => `Team ${team.teamId}`).join(' · ') || '–';
+                                    return (
+                                      <tr key={row.hole.hole_number} className="border-t border-amber-700/20 align-top">
+                                        <td className="px-2 py-2 font-bold text-amber-200">{row.hole.hole_number}</td>
+                                        {row.teams.map((team) => (
+                                          <td key={team.teamId} className={cls('px-2 py-2 text-center', team.isHoleWinner && 'bg-emerald-500/10 text-emerald-200')}>
+                                            <div className="font-serif text-base font-black">{row.mode === 'bestBallMatchplay' ? `${team.matchplayPoints || 0}` : team.value}</div>
+                                            <div className="text-[10px] text-amber-100/55">{row.mode === 'bestBallMatchplay' ? `${team.value} Best Ball` : team.label}</div>
+                                            <div className="mt-1 space-y-0.5 text-[10px] text-amber-100/70">
+                                              {team.players.map((playerRow) => <div key={playerRow.player?.id || Math.random()}>{playerRow.player?.alias_name || playerRow.player?.character_name || playerRow.player?.display_name}: {playerRow.points} P</div>)}
+                                            </div>
+                                          </td>
+                                        ))}
+                                        <td className="px-2 py-2 text-right font-bold text-amber-200">{winningTeams}</td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+                      </> : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.section>
+    );
+  }
+
+  function parseEuroValue(value) {
+    const parsed = Number(String(value ?? "").replace(",", "."));
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
+  function formatEuroValue(value) {
+    const number = Number(value || 0);
+    const prefix = number > 0 ? "+" : number < 0 ? "−" : "";
+    return `${prefix}${Math.abs(number).toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 })} €`;
+  }
+
+  function addPrizeLedgerEntry(ledger, playerId, amount, label, type = "money", category = "other") {
+    if (!playerId || (!amount && type === "money")) return;
+    const key = String(playerId);
+    const inferredCategory = category !== "other"
+      ? category
+      : String(label || "").includes("Snake") ? "snake"
+        : String(label || "").includes("Tag ") || String(label || "").includes("Tages") ? "daily"
+          : String(label || "").includes("Pokal") || String(label || "").includes("Ring") || String(label || "").includes("Brutto") ? "honor"
+            : "final";
+    if (!ledger[key]) ledger[key] = { playerId: key, player: allPlayers.find((player) => String(player.id) === key) || { id: key, character_name: key }, money: 0, categories: { daily: 0, snake: 0, final: 0, honor: [], other: 0 }, notes: [] };
+    if (type === "money") {
+      const nextAmount = Number(amount || 0);
+      ledger[key].money += nextAmount;
+      ledger[key].categories[inferredCategory] = Number(ledger[key].categories[inferredCategory] || 0) + nextAmount;
+    } else if (inferredCategory === "honor") {
+      ledger[key].categories.honor.push(label);
+    }
+    ledger[key].notes.push(label);
+  }
+
+  function getPrizeCategories(row) {
+    return {
+      daily: Number(row?.categories?.daily || 0),
+      snake: Number(row?.categories?.snake || 0),
+      final: Number(row?.categories?.final || 0),
+      honor: Array.isArray(row?.categories?.honor) ? row.categories.honor : [],
+      other: Number(row?.categories?.other || 0),
+    };
+  }
+
+  function buildPrizeLedger() {
+    const ledger = {};
+    allPlayers.forEach((player) => {
+      ledger[String(player.id)] = { playerId: String(player.id), player: withFallbackAlias(player), money: 0, categories: { daily: 0, snake: 0, final: 0, honor: [], other: 0 }, notes: [] };
+    });
+
+    ["r1", "r2", "r3"].forEach((roundId) => {
+      const standings = buildDailyTeamStandings(roundId);
+      const completeTeams = (standings.teams || []).filter((team) => team.players.length > 0);
+      if (completeTeams.length < 2) return;
+
+      const winner = completeTeams[0];
+      const second = completeTeams[1];
+      const loser = completeTeams[completeTeams.length - 1];
+      const bestValue = Number(winner?.value || 0);
+      const worstValue = Number(loser?.value || 0);
+      const allTeamsTied = completeTeams.length > 1 && bestValue === worstValue;
+      if (allTeamsTied) return;
+      const winnerTeams = completeTeams.filter((team) => Number(team.value || 0) === bestValue);
+      const loserTeams = completeTeams.filter((team) => Number(team.value || 0) === worstValue);
+      const teamWithLoan = (team) => String(roundId) === "r1" && (team.players || []).some((player, index) => getDailyTeamPlayerMeta(roundId, team.teamId, player.id, index).isLoanPlayer);
+      const realTeamPlayers = (team) => (team.players || []).filter((player, index) => !getDailyTeamPlayerMeta(roundId, team.teamId, player.id, index).isLoanPlayer);
+      const addDaily = (player, amount, label) => addPrizeLedgerEntry(ledger, player.id, amount, `${standings.title}: ${label} ${formatEuroValue(amount)}`, "money", "daily");
+
+      if (String(roundId) === "r1" && teamWithLoan(winner)) {
+        realTeamPlayers(loser).forEach((player) => addDaily(player, -50, "letzter Platz"));
+        realTeamPlayers(winner).forEach((player) => addDaily(player, 50, "Sieg mit Leihspieler-Team"));
+        if (second) realTeamPlayers(second).forEach((player) => addDaily(player, 25, "zweiter Platz bei Leihspieler-Sieg"));
+        return;
+      }
+
+      if (String(roundId) === "r1" && teamWithLoan(loser)) {
+        realTeamPlayers(loser).forEach((player) => addDaily(player, -50, "letzter Platz mit Leihspieler-Team"));
+        realTeamPlayers(winner).forEach((player) => addDaily(player, 25, "Sieg gegen Leihspieler-Team"));
+        return;
+      }
+
+      const winnerPlayers = winnerTeams.flatMap((team) => team.players || []);
+      const loserPlayers = loserTeams.flatMap((team) => team.players || []);
+      const winnerShare = winnerPlayers.length ? 100 / winnerPlayers.length : 0;
+      const loserShare = loserPlayers.length ? -100 / loserPlayers.length : 0;
+
+      winnerPlayers.forEach((player) => addDaily(player, winnerShare, winnerTeams.length > 1 ? "geteilter Sieg" : "Siegermannschaft"));
+      loserPlayers.forEach((player) => addDaily(player, loserShare, loserTeams.length > 1 ? "geteilter letzter Platz" : "letzter Platz"));
+    });
+
+    const snakeStats = buildFunPlayerStats(getPlayersForCourse(allPlayers, displayCourseId, courses), allHoles, officialAllScores);
+    const snakePot = snakeStats.reduce((sum, player) => sum + Number(player.puttPenaltyEuro || 0), 0);
+    snakeStats.forEach((player) => {
+      if (Number(player.puttPenaltyEuro || 0) > 0) addPrizeLedgerEntry(ledger, player.id, -Number(player.puttPenaltyEuro || 0), `Snake-Kasse: ${formatEuroValue(-Number(player.puttPenaltyEuro || 0))}`, "money", "snake");
+    });
+
+    const finalStandings = buildFinalNetStandings(allPlayers, rounds, allHoles, officialAllScores, courses);
+    const finalRound = getFinalRound(rounds);
+    const finalHoles = getRoundHoles(finalRound, allHoles);
+    const finalPlayers = getRoundPlayers(finalRound?.round_id, allPlayers, roundPlayers);
+    const finalResultsComplete = Boolean(finalRound?.round_id && finalHoles.length && finalPlayers.length && finalPlayers.every((player) => finalHoles.every((hole) => officialAllScores.some((score) => String(score.round_id) === String(finalRound.round_id) && String(score.player_id) === String(player.id) && Number(score.hole_number) === Number(hole.hole_number) && score.strokes !== "" && score.strokes != null && score.putts_count !== "" && score.putts_count != null))));
+    const topGreenfee = parseEuroValue(prizeSettings.topGreenfee);
+    const finalGreenfee = topGreenfee;
+    const winner = finalStandings.find((player) => Number(player.finalRank) === 1) || finalStandings[0];
+    const second = finalStandings.find((player) => Number(player.finalRank) === 2);
+    if (finalResultsComplete && winner?.id) {
+      if (topGreenfee) addPrizeLedgerEntry(ledger, winner.id, topGreenfee, `Gesamtsieger: teuerste Greenfee ${formatEuroValue(topGreenfee)}`, "money", "final");
+      if (snakePot) addPrizeLedgerEntry(ledger, winner.id, snakePot, `Snake-Pott an den Turniersieger ${formatEuroValue(snakePot)}`, "money", "snake");
+      addPrizeLedgerEntry(ledger, winner.id, 0, "Pokal des Lord of the Holes", "note", "honor");
+    }
+    if (finalResultsComplete && second?.id && finalGreenfee) addPrizeLedgerEntry(ledger, second.id, finalGreenfee * 0.5, `Platz 2: 50 % teuerste Greenfee ${formatEuroValue(finalGreenfee * 0.5)}`, "money", "final");
+
+    const placementPenalties = { 4: -0.35, 5: -0.5, 6: -0.65 };
+    if (finalResultsComplete) Object.entries(placementPenalties).forEach(([rank, factor]) => {
+      const player = finalStandings.find((item) => Number(item.finalRank) === Number(rank));
+      if (player?.id && finalGreenfee) addPrizeLedgerEntry(ledger, player.id, finalGreenfee * factor, `Platz ${rank}: Strafzahlung ${formatEuroValue(finalGreenfee * factor)}`, "money", "final");
+    });
+
+    const scoredRoundIds = (rounds.length ? rounds : fallbackRounds).map((round) => String(round.round_id || "")).filter(Boolean);
+    const expectedGrossHoles = scoredRoundIds.reduce((sum, roundId) => {
+      const round = (rounds.length ? rounds : fallbackRounds).find((item) => String(item.round_id) === String(roundId));
+      return sum + getRoundHoles(round, allHoles).length;
+    }, 0);
+    const grossRows = allPlayers.map((player) => {
+      const playerScores = officialAllScores.filter((score) => String(score.player_id) === String(player.id) && scoredRoundIds.includes(String(score.round_id)) && score.strokes !== "" && score.strokes != null);
+      const gross = playerScores.reduce((sum, score) => sum + Number(score.strokes || 0), 0);
+      return { ...withFallbackAlias(player), gross, played: playerScores.length, expected: expectedGrossHoles, isCompleteGross: expectedGrossHoles > 0 && playerScores.length >= expectedGrossHoles };
+    }).filter((player) => player.isCompleteGross).sort((a, b) => Number(a.gross || 0) - Number(b.gross || 0));
+    const grossWinner = grossRows[0];
+    if (grossWinner?.id) addPrizeLedgerEntry(ledger, grossWinner.id, 0, "Bruttosieger: Championship-Ring", "note", "honor");
+
+    return {
+      rows: Object.values(ledger).sort((a, b) => Number(b.money || 0) - Number(a.money || 0) || Number(a.player.sort_order || 0) - Number(b.player.sort_order || 0)),
+      snakePot,
+      finalStandings,
+      grossWinner,
+    };
+  }
+
+  function renderPrizesView() {
+    const prizeLedger = buildPrizeLedger();
+    return (
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
+        <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm landscape:relative landscape:left-1/2 landscape:w-[calc(100vw-0.75rem)] landscape:max-w-none landscape:-translate-x-1/2 landscape:rounded-xl">
+          <CardContent className="p-2 landscape:p-1.5">
+            <div className="mb-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 landscape:mb-1.5 landscape:rounded-xl landscape:p-2">
+              <p className="text-xs uppercase tracking-[0.22em] text-amber-300/75">Punkt 6 · Ehre, Strafen, Preise</p>
+              <h2 className="font-serif text-xl font-black text-amber-200">Kasse & Ehre</h2>
+              <p className="mt-1 text-sm text-amber-100/70">Gesamtübersicht aus Tageswertungen, Snake-Kasse, Finalpreisen und Ehrenpreisen.</p>
+            </div>
+
+            <div className="mb-3 grid grid-cols-1 gap-2">
+              <label className="rounded-2xl border border-amber-700/30 bg-black/25 p-2 text-sm text-amber-100/75">Teuerste Greenfee / Preisbasis (€)
+                <input value={prizeSettings.topGreenfee || ""} onChange={(event) => setPrizeSettings((current) => ({ ...(current || {}), topGreenfee: event.target.value }))} inputMode="decimal" placeholder="z. B. 150" className="mt-1 w-full rounded-xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" />
+                <span className="mt-1 block text-[11px] text-amber-100/50">Dieser Betrag wird für Platz 1, Platz 2 und die Strafzahlungen Platz 4–6 verwendet.</span>
+              </label>
+            </div>
+
+            <div className="mb-3 grid grid-cols-2 gap-2 text-sm">
+              <div className="rounded-2xl border border-amber-700/30 bg-black/25 p-3"><div className="text-xs uppercase tracking-wide text-amber-100/50">Snake-Pott</div><div className="font-serif text-2xl font-black text-amber-300">{formatEuroValue(prizeLedger.snakePot)}</div></div>
+              <div className="rounded-2xl border border-amber-700/30 bg-black/25 p-3"><div className="text-xs uppercase tracking-wide text-amber-100/50">Bruttosieger</div><div className="font-serif text-lg font-black text-amber-300">{prizeLedger.grossWinner ? getPlayerLabel(prizeLedger.grossWinner) : "–"}</div></div>
+            </div>
+
+            <div className="w-full overflow-x-auto rounded-2xl border border-amber-700/30 bg-black/20 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden landscape:rounded-xl">
+              <table className="w-full table-fixed border-collapse text-xs text-amber-50 landscape:text-[11px]">
+                <thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100/75"><th className="w-[58%] bg-[#1b130c] px-2 py-1.5 landscape:w-[21%]">Spieler</th><th className="hidden w-[13%] px-2 py-1.5 text-right landscape:table-cell">Tage 1–3</th><th className="hidden w-[12%] px-2 py-1.5 text-right landscape:table-cell">Snake</th><th className="hidden w-[12%] px-2 py-1.5 text-right landscape:table-cell">Finale</th><th className="hidden w-[27%] px-2 py-1.5 landscape:table-cell">Ehre</th><th className="w-[42%] px-2 py-1.5 text-right landscape:w-[15%]">Saldo</th></tr></thead>
+                <tbody>
+                  {prizeLedger.rows.map((row) => (
+                    <tr key={row.playerId} className="border-t border-amber-700/20 align-top">
+                      <td className="bg-[#1b130c] px-2 py-2 font-semibold text-amber-100"><div className="truncate">{getPlayerLabel(row.player)}</div><div className="mt-0.5 text-[10px] font-normal text-amber-100/45 landscape:hidden">Tage/Snake/Finale im Querformat</div></td>
+                      <td className="hidden px-2 py-2 text-right text-amber-100/85 landscape:table-cell">{formatEuroValue(getPrizeCategories(row).daily)}</td>
+                      <td className="hidden px-2 py-2 text-right text-amber-100/85 landscape:table-cell">{formatEuroValue(getPrizeCategories(row).snake)}</td>
+                      <td className="hidden px-2 py-2 text-right text-amber-100/85 landscape:table-cell">{formatEuroValue(getPrizeCategories(row).final)}</td>
+                      <td className="hidden px-2 py-2 text-xs text-amber-100/70 landscape:table-cell landscape:whitespace-normal">{getPrizeCategories(row).honor.length ? getPrizeCategories(row).honor.join(" · ") : "–"}</td>
+                      <td className={cls("px-2 py-2 text-right font-serif text-base font-black landscape:text-lg", row.money > 0 ? "text-emerald-300" : row.money < 0 ? "text-red-200" : "text-amber-200")}>{formatEuroValue(row.money)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-2 rounded-xl border border-amber-500/25 bg-amber-500/10 p-2 text-xs text-amber-100/65">Hinweis: Tagespreise werden auf die Teamspieler verteilt. Die teuerste Greenfee ist die gemeinsame Preisbasis für Platz 1, Platz 2 und die Strafzahlungen Platz 4–6. Nicht-monetäre Ehren wie Pokal und Championship-Ring erscheinen in den Details.</p>
+          </CardContent>
+        </Card>
+      </motion.section>
+    );
+  }
+
+  function renderRulesView() {
+    return (
+      <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
+        <Card className="mb-2 rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm">
+          <CardContent className="p-2">
+            <div className="mb-3 rounded-2xl border border-amber-500/30 bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.18),transparent_50%),rgba(0,0,0,0.24)] p-3 text-center">
+              <div className="text-[10px] uppercase tracking-[0.28em] text-amber-300/75">Charta der Gefährten</div>
+              <h2 className="mt-1 font-serif text-2xl font-black text-amber-200">Lord of the Holes Regeln</h2>
+              <p className="mt-1 text-sm text-amber-100/70">Offizielles Pergament für Fairness, Ruhm, Schmach und sehr teure Dreiputts.</p>
+            </div>
+
+            <RulesSection title="1. Handicap & Fairness" subtitle="Die Vorgaben sind gesetzt — die Ausreden nicht.">
+              <p>Für das Turnier gelten die festgelegten DGV-Handicaps. Ausländische Teilnehmer müssen rechtzeitig belastbare Runden bzw. RPR-Runden nachweisen; falls keine RPR-Runden möglich sind, legt die Turnierleitung anhand eingereichter Runden ein faires HCP fest. Die Spielleitung darf Vorgaben prüfen und anpassen, wenn es der Fairness dient. Während des Turniers bleiben die Handicaps unverändert.</p>
+            </RulesSection>
+
+            <RulesSection title="2. Turniermodus" subtitle="Vier Tage. Drei Kapitel. Ein Schicksalsberg.">
+              <div className="space-y-2">
+                <div><RulesPill>Runden 1–3</RulesPill><p className="mt-1">Die ersten drei Tagesrunden bilden die Qualifikation. Die Mannschaften werden nach den Tagesrunden ausgelost. Keine Mannschaft darf sich wiederholen; das Schicksal darf launisch sein, aber nicht faul.</p></div>
+                <div><RulesPill>Cut</RulesPill><p className="mt-1">Nach der Qualifikation ziehen die besten drei Gefährten gemessen am Zählspiel minus Vorgabe in den Kampf um die Plätze 1–3. Die übrigen Spieler treten in der Platzierungsgruppe um die Plätze 4–6 an.</p></div>
+                <div><RulesPill>Finaltag</RulesPill><p className="mt-1">Am Finaltag zählt das Netto-Zählspiel: Bruttoschläge minus Spielvorgabe. Niedriger ist besser. Bei Gleichstand um Cut, Gesamtsieg, Tagesentscheidung oder Butler-Rollen entscheidet ein Putt-Wettbewerb.</p></div>
+              </div>
+            </RulesSection>
+
+            <RulesSection title="3. Tageswertungen" subtitle="Ruhm gibt es täglich. Rechnungen auch.">
+              <ul className="list-disc space-y-1 pl-5">
+                <li><b>Tag 1 · Netto-Team:</b> Die Nettopunkte beider Teampartner werden addiert.</li>
+                <li><b>Tag 2 · Best Ball Netto:</b> Pro Loch zählt das beste Nettoergebnis des Teams.</li>
+                <li><b>Tag 3 · Best Ball Match Play:</b> Pro Loch gewinnt das bessere Nettoergebnis; geteilte Löcher werden geteilt.</li>
+                <li><b>Tag 4 · Einzel-Netto:</b> Finale und Platzierungsspiele werden im Zählspiel minus Vorgabe entschieden.</li>
+              </ul>
+            </RulesSection>
+
+            <RulesSection title="4. Side Bets" subtitle="Kleine Spiele, große Narben.">
+              <div className="space-y-2">
+                <div className="rounded-xl border border-amber-700/25 bg-black/20 p-2"><b className="text-amber-200">Shelobs Putt-Kammer / Snake</b><p className="mt-1">3 Putts: 2 €. 4 Putts: 4 €. 5 oder mehr Putts: 10 €. Der Snake-Pott geht an den Turniersieger.</p></div>
+                <div className="rounded-xl border border-amber-700/25 bg-black/20 p-2"><b className="text-amber-200">Weiße Fahne</b><p className="mt-1">Bei einem gestrichenen Loch mit 0 Nettopunkten muss ein Kurzer getrunken werden. Die Achim-Rule bleibt als Sonderritual bestehen: Kniebeuge-Hock-Strecksprung mit Händen am Boden.</p></div>
+                <div className="rounded-xl border border-amber-700/25 bg-black/20 p-2"><b className="text-amber-200">Nearest to the Pin</b><p className="mt-1">Die NttP-Löcher werden bis zum ersten Abschlag festgelegt. Der Ball muss auf dem Grün liegen. Beim gewählten NttP erhält der Gewinner 5 € von seinen Flight-Partnern. Das Signature-Hole bringt zusätzlich 1 Schlag Abzug für den Finaltag.</p></div>
+                <div className="rounded-xl border border-amber-700/25 bg-black/20 p-2"><b className="text-amber-200">Longest Drive</b><p className="mt-1">Das Longest-Drive-Loch wird bis zum ersten Abschlag festgelegt. Nur Fairway zählt. Wer den längsten gültigen Drive schlägt, erhält 5 € von jedem Flight-Partner.</p></div>
+              </div>
+            </RulesSection>
+
+            <RulesSection title="5. Herren von Gondor & Schildträger" subtitle="Butlerdienst ist Ehrendienst. Angeblich.">
+              <p>Die schlechtesten Spieler der Tagesrunde dienen den Bestplatzierten als Schildträger. Platz 1 darf seinen Butler wählen. Der Dienst beginnt nach Ende der Runde und endet vor dem ersten Abschlag des nächsten Tages. Bekommt ein Butler frei, heißt das nicht automatisch, dass auch der andere Schildträger seine Ketten ablegen darf.</p>
+              <ul className="list-disc space-y-1 pl-5">
+                <li>Schläger putzen und spielfertig machen.</li>
+                <li>Rangebälle organisieren und Bag bereitstellen.</li>
+                <li>Frühstückstisch, Getränke und Wohlbefinden des Herren sichern.</li>
+                <li>Verweigerung, unsaubere Schläger oder sonstige Pflichtverletzungen können durch die Gründerväter mit 75 € sanktioniert werden; im schlimmsten Fall droht Ausschluss vom Turnier.</li>
+              </ul>
+            </RulesSection>
+
+            <RulesSection title="6. Preise, Strafen & Ehre" subtitle="Am Ende gewinnt einer. Zahlen tun mehrere.">
+              <ul className="list-disc space-y-1 pl-5">
+                <li><b>Team-Tageswertung:</b> Siegermannschaft +100 €, Platz 3 −100 €, Platz 2 neutral. Bei Gleichstand werden Preise bzw. Schulden geteilt.</li>
+                <li><b>Sonderregel Runde 1 · Leihspieler:</b> Der Leihspieler wird finanziell nicht doppelt gewertet. Verliert das Leihspieler-Team, zahlt nur der Einzelspieler 50 €; das Siegerteam erhält je 25 €. Gewinnt das Leihspieler-Team, zahlen die Spieler des letzten Teams je 50 €; der Einzelspieler des Siegerteams erhält 50 €, die Spieler auf Platz 2 erhalten je 25 €.</li>
+                <li><b>Gesamtsieger:</b> teuerste Greenfee, Pokal und Snake-Pott.</li>
+                <li><b>Platz 2:</b> 50 % der teuersten Greenfee.</li>
+                <li><b>Plätze 4–6:</b> Strafzahlungen auf Basis der teuersten Greenfee: Platz 4 = −35 %, Platz 5 = −50 %, Platz 6 = −65 %.</li>
+                <li><b>Bruttosieger:</b> Championship-Ring für den besten Bruttospieler des Turniers.</li>
+              </ul>
+            </RulesSection>
+
+            <RulesSection title="7. Heilige Ordnung" subtitle="Keine Gimmies. Keine Ausreden. Kein Ring ohne Regeln.">
+              <ul className="list-disc space-y-1 pl-5">
+                <li>Es werden keine Putts oder Schläge geschenkt.</li>
+                <li>Gespielt wird nach DGV-Regelwerk und Golfetikette. Da die Runden offiziell bzw. RPR-relevant sind, sind Regelverstöße keine Folklore, sondern werden geahndet.</li>
+                <li>Lautes Fluchen oder Beleidigen: 10 €.</li>
+                <li>Schlägerwurf: 30 €.</li>
+                <li>Schläger brechen oder Gegenstände beschädigen: 50 €.</li>
+                <li>Die Gründerväter dürfen über weitere Verfehlungen richten.</li>
+              </ul>
+              <p className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-2 text-xs text-amber-100/75">Da es sich um ein offizielles Turnier handelt, wird das Regelwerk nicht als Dekoration verstanden. Wer sündigt, wird geahndet — notfalls vom Palantír.</p>
+            </RulesSection>
+          </CardContent>
+        </Card>
+      </motion.section>
+    );
+  }
+
+  function renderActiveView() {
+    if (teamCeremonyRunning) return renderTeamCeremonyView();
+    if (loading) return <Card className="rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl backdrop-blur-sm"><CardContent className="flex items-center gap-2 p-3 text-amber-100">⟳ Lade Datenbank ...</CardContent></Card>;
+    if (view === "admin") return renderAdminView();
+    if (view === "handicaps") return renderSettingsView();
+    if (view === "leaderboard") return renderLeaderboardView();
+    if (view === "tournament") return renderTournamentView();
+    if (view === "archive") return renderArchiveView();
+    if (view === "fun") return renderFunView();
+    if (view === "dailyTeams") return renderDailyTeamsView();
+    if (view === "prizes") return renderPrizesView();
+    if (view === "flights") return renderFlightsView();
+    if (view === "rules") return renderRulesView();
+    return renderScoreView();
+  }
+
+  function renderPopupStandingsTable() {
+    if (!standingsPopup) return null;
+    const isNetStableford = standingsPopup === "netStableford";
+    const isStrokePlay = standingsPopup === "strokePlay";
+    const title = isStrokePlay ? "Klassisches Zählspiel" : isNetStableford ? "Netto Stableford" : "Strokes HCP adjusted";
+    const tablePlayers = isStrokePlay ? strokePlayLeaderboard : isNetStableford ? netStablefordLeaderboard : hcpAdjustedStrokeLeaderboard;
+    const getPopupRankValue = (player) => isStrokePlay
+      ? (player.played ? player.toPar : "")
+      : isNetStableford
+        ? (player.played ? player.netStableford : "")
+        : (player.played ? player.hcpAdjustedToPar : "");
+    return <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 px-3 backdrop-blur-sm"><div className="max-h-[82vh] w-full max-w-md overflow-hidden rounded-3xl border border-amber-500/45 bg-stone-950 text-amber-50 shadow-2xl shadow-black/80"><div className="flex items-start justify-between gap-2 border-b border-amber-700/35 bg-amber-500/10 p-3"><div><div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Tabelle</div><div className="font-serif text-lg text-amber-200">{title}</div></div><button type="button" onClick={() => setStandingsPopup(null)} className="rounded-xl border border-amber-500/40 bg-black/25 px-3 py-1 text-lg font-bold leading-none text-amber-100">×</button></div><div className="max-h-[68vh] overflow-auto p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><table className="w-full border-collapse text-sm text-amber-50"><thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100/80"><th className="px-2 py-2">#</th><th className="px-2 py-2">Spieler</th><th className="px-2 py-2 text-right">{isNetStableford ? "Punkte" : "+/−"}</th><th className="px-2 py-2 text-right">Löcher</th></tr></thead><tbody>{tablePlayers.map((player, index) => <tr key={player.id} className={cls("border-t border-amber-700/20", myPlayerId && String(player.id) === String(myPlayerId) && "bg-amber-500/15")}><td className="px-2 py-2 text-amber-200/80">{formatCompetitionRank(tablePlayers, index, getPopupRankValue)}</td><td className="px-2 py-2 font-semibold text-amber-100">{getPlayerLabel(player)}</td><td className="px-2 py-2 text-right font-serif text-lg font-bold text-amber-300">{isStrokePlay ? formatToPar(player.toPar, player.played) : isNetStableford ? player.netStableford : formatToPar(player.hcpAdjustedToPar, player.played)}</td><td className="px-2 py-2 text-right text-amber-100/80">{player.played}/18</td></tr>)}</tbody></table></div></div></div>;
+  }
+
+  function buildFlightCeremonyTimeline(draw = flightDraw) {
+    const drawRounds = (draw?.rounds || []).filter((roundPlan) => ["r1", "r2", "r3"].includes(String(roundPlan.round_id || "")));
+    const hasPlayerInFlight = (flight, playerAliases = []) => {
+      const normalizedAliases = playerAliases.map((item) => String(item || "").toLowerCase().trim());
+      return (flight.players || []).some((playerId) => normalizedAliases.includes(String(playerId || "").toLowerCase().trim()));
+    };
+    const roundHasPairInFlight = (roundPlan, firstAliases, secondAliases) => (roundPlan?.flights || []).some((flight) => hasPlayerInFlight(flight, firstAliases) && hasPlayerInFlight(flight, secondAliases));
+    const introTexts = {
+      r1: [
+        "Der Rat von Bruchtal wurde einberufen. Elben schweigen, Zwerge murmeln, und irgendwo diskutieren Bogeymir und Gimme bereits über eine Auslegung, die niemand gefragt hat. Die Flights werden geschmiedet.",
+        "Elrond hebt die Hand. Das erste Pergament wird in den Kreis getragen.",
+        "Gangolf fehlt. Offiziell wegen Anreise. Inoffiziell, weil selbst Schattenfell bei 300 km/h auf der Autobahn kurz nach Tempolimit fragt. Der erste Flight wird ohne ihn entsandt.",
+        "Möge das erste Kapitel die Gemeinschaft nicht schon am Tee 1 entzweien.",
+      ],
+      r2: [
+        "Das erste Pergament ist gesprochen. Manche Blicke sagen: Das war bestimmt kein Zufall.",
+        "Nun tritt Gangolf aus dem Schatten hinzu. Die Gemeinschaft ist vollständig.",
+        "Das zweite Pergament wird geöffnet — und irgendwo lacht ein Ork über die Startzeiten.",
+        "Runde 2 führt durch die Minen von Moria. Wer hier zittert, sollte wenigstens gerade putten.",
+      ],
+      r3: [
+        "Zwei Kapitel sind besiegelt. Noch atmet die Gemeinschaft, wenn auch hörbar schwerer.",
+        "Das dritte Pergament liegt bereit. Vor den Toren Mordors zählt jede Allianz doppelt.",
+        "Die letzten Flights vor dem Schicksalsberg werden offenbart.",
+        "Mögen die Drives lang, die Ausreden kurz und die Zähler gnädig sein.",
+      ],
+    };
+    const steps = [];
+    let bogeymirGimmeShown = false;
+    let foredoGimmeShown = false;
+
+    drawRounds.forEach((roundPlan, roundIndex) => {
+      const chapter = roundIndex + 1;
+      (introTexts[String(roundPlan.round_id)] || []).forEach((text) => {
+        steps.push({ type: "text", title: "Flightziehung - Das Öffnen der Pergamente", text, waitLabel: "Die Gemeinschaft wartet ...", chapter });
+      });
+
+      const totalPlayers = (roundPlan.flights || []).reduce((sum, flight) => sum + (flight.players || []).length, 0);
+      for (let revealCount = 0; revealCount <= totalPlayers; revealCount += 1) {
+        steps.push({ type: "reveal", roundPlan, revealCount, chapter });
+      }
+
+      if (!bogeymirGimmeShown && roundHasPairInFlight(roundPlan, ["andreas", "bogeymir"], ["mucky", "gimme"])) {
+        bogeymirGimmeShown = true;
+        steps.push({
+          type: "text",
+          title: "Ein gefährliches Bündnis",
+          text: "Das Schicksal hat Bogeymir und Gimme in denselben Flight geworfen. Die Elben senken den Blick. Die Zwerge bestellen Nachschub. Der Marschall notiert: ‚Konfliktpotenzial: episch.‘",
+          waitLabel: "Der Rat hält kurz den Atem an ...",
+          chapter,
+        });
+      }
+
+      if (!foredoGimmeShown && roundHasPairInFlight(roundPlan, ["kio", "foredo"], ["mucky", "gimme"])) {
+        foredoGimmeShown = true;
+        steps.push({
+          type: "text",
+          title: "Die Last des Foredo",
+          text: "Foredo spürt eine alte Last auf seinen Schultern. Es ist nicht der Eine Ring. Es ist Gimme im selben Flight.",
+          waitLabel: "Foredo sammelt innere Kraft ...",
+          chapter,
+        });
+      }
+    });
+    [
+      "Die Ziehung ist vollendet.",
+      "Bogeymir und Gimme prüfen bereits vorsorglich die Rechtslage eines Ereignisses, das noch gar nicht stattgefunden hat.",
+      "Der Rest der Gemeinschaft tut, was Helden tun: lächeln, nicken und innerlich den Ballvorrat zählen.",
+    ].forEach((text) => steps.push({ type: "outro", title: "Der Rat hat gesprochen", text, waitLabel: "Die Chronik wird geschlossen ...", chapter: 3 }));
+    return steps;
+  }
+
+  function startFlightCeremony(drawOverride = null) {
+    const nextDraw = drawOverride || flightDraw || readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null);
+    if (!nextDraw?.rounds?.length) {
+      setFlightCeremonyRunning(false);
+      setError("Keine gespeicherte Flight-Ziehung gefunden. Bitte zuerst im Admin-Bereich „Flights neu bestimmen“ ausführen und die App 1–2 Minuten vorher öffnen.");
+      return false;
+    }
+    setFlightDraw(nextDraw);
+    setError("");
+    setFlightSummaryOpen(false);
+    setFlightCeremonyCompleted(false);
+    setFlightCeremonyStepIndex(0);
+    setFlightCeremonySyncStartAt(getNextSyncedFlightCeremonyStart(buildFlightCeremonyTimeline(nextDraw), true));
+    setLockUnlockOpen(false);
+    setFlightCeremonyRunning(true);
+    return true;
+  }
+
+  function startFlightCeremonyAsAdmin() {
+    if (lockPasswordInput !== ADMIN_PASSWORD) {
+      setError("Passwort ist falsch.");
+      return;
+    }
+    setIsAdminUnlocked(true);
+    const started = startFlightCeremony(flightDraw || readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null));
+    if (started) {
+      setLockPasswordInput("");
+    }
+  }
+
+  function renderCountdownGrid(countdown, compact = false) {
+    if (!atomicTimeActive) return null;
+    return (
+      <div className={cls("grid grid-cols-4 gap-1.5 rounded-2xl border border-amber-500/25 bg-black/35 p-2 text-center", compact && "p-1.5")}> 
+        {[ ["Tage", countdown.days], ["Std", String(countdown.hours).padStart(2, "0")], ["Min", String(countdown.minutes).padStart(2, "0")], ["Sek", String(countdown.seconds).padStart(2, "0")] ].map(([label, value]) => (
+          <div key={label}>
+            <div className={cls("font-serif font-black text-amber-200", compact ? "text-lg" : "text-xl")}>{value}</div>
+            <div className="text-[9px] uppercase tracking-[0.14em] text-amber-100/60">{label}</div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  function renderFlightPlayerCard(playerId, index = 0) {
+    const player = withFallbackAlias((allPlayers?.length ? allPlayers : fallbackPlayers).find((item) => String(item.id) === String(playerId)) || { id: playerId });
+    return (
+      <motion.div key={playerId} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.9, ease: "easeOut", delay: index * 0.08 }} className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)]">
+        <div className="font-serif text-xl font-black leading-tight text-amber-100">{player.alias_name || player.character_name || playerId}</div>
+        <div className="text-[10px] uppercase tracking-[0.16em] text-amber-100/50">{player.character_name || player.display_name || playerId}</div>
+      </motion.div>
+    );
+  }
+
+  function renderFlightCards(roundPlan, revealCount = Infinity) {
+    let remaining = Number(revealCount);
+    return (
+      <div className="mt-3 space-y-2">
+        {(roundPlan?.flights || []).map((flight) => {
+          const visibleCount = Math.max(0, Math.min((flight.players || []).length, remaining));
+          remaining -= (flight.players || []).length;
+          const shownPlayers = (flight.players || []).slice(0, visibleCount);
+          return (
+            <div key={`${roundPlan.round_id}-${flight.flight_number}`} className="rounded-2xl border border-amber-500/35 bg-stone-950/65 p-3 text-left shadow-xl shadow-black/30">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="font-serif text-lg font-black text-amber-200">Flight {flight.flight_number}</div>
+                <div className="text-xs text-amber-100/55">{shownPlayers.length}/{(flight.players || []).length}</div>
+              </div>
+              {shownPlayers.length ? <div className="grid gap-1.5">{shownPlayers.map((playerId, index) => renderFlightPlayerCard(playerId, index))}</div> : <div className="rounded-xl border border-amber-700/25 bg-black/25 px-3 py-2 text-sm text-amber-100/60">Das Pergament bleibt noch verschlossen ...</div>}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  function renderFlightCeremonyStage() {
+    const timeline = flightCeremonyTimeline;
+    const step = timeline[Math.min(flightCeremonyStepIndex, Math.max(0, timeline.length - 1))];
+    if (!step) return null;
+    return (
+      <div className="absolute inset-0 flex items-center justify-center px-3 py-5">
+        <div className="max-h-full w-full max-w-md overflow-auto rounded-3xl border border-amber-400/55 bg-stone-950/82 p-4 text-center text-amber-50 shadow-2xl shadow-black/80 backdrop-blur-md [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="text-[10px] uppercase tracking-[0.28em] text-amber-300/75">DER RAT VON BRUCHTAL</div>
+          {step.type === "reveal" ? (
+            <>
+              <div className="mt-2 font-serif text-2xl font-black text-amber-200">{step.roundPlan?.round_name || "Runde"}</div>
+              {renderFlightCards(step.roundPlan, step.revealCount)}
+              <div className="mt-3 text-xs uppercase tracking-[0.2em] text-amber-100/55">Kapitel {step.chapter} von 3</div>
+            </>
+          ) : (
+            <div className="mt-5 rounded-3xl border border-amber-500/35 bg-black/30 p-5 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)]">
+              <div className="font-serif text-2xl font-black text-amber-200">{step.title}</div>
+              <AnimatePresence mode="wait">
+                <motion.div key={`${step.type}-${flightCeremonyStepIndex}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 1.15, ease: "easeInOut" }}>
+                  <div className="mt-4 text-lg font-semibold leading-relaxed text-amber-50">{step.text}</div>
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function renderStaticFlightPlayerCard(playerId) {
+    const player = withFallbackAlias((allPlayers?.length ? allPlayers : fallbackPlayers).find((item) => String(item.id) === String(playerId)) || { id: playerId });
+    return (
+      <div key={playerId} className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-3 py-2 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)]">
+        <div className="font-serif text-lg font-black leading-tight text-amber-100">{player.alias_name || player.character_name || playerId}</div>
+        <div className="text-[10px] uppercase tracking-[0.16em] text-amber-100/50">{player.character_name || player.display_name || playerId}</div>
+      </div>
+    );
+  }
+
+  function renderFlightDrawSummary() {
+    const drawRounds = (flightDraw?.rounds || []).filter((roundPlan) => ["r1", "r2", "r3"].includes(String(roundPlan.round_id || "")));
+    if (!drawRounds.length) {
+      return <div className="mt-2 rounded-2xl border border-amber-700/35 bg-black/25 p-3 text-sm text-amber-100/75">Keine gespeicherten Flights gefunden.</div>;
+    }
+    return (
+      <div className="space-y-3 text-left">
+        {drawRounds.map((roundPlan) => (
+          <div key={roundPlan.round_id} className="rounded-2xl border border-amber-700/35 bg-black/25 p-3">
+            <div className="font-serif text-lg font-black text-amber-200">{roundPlan.round_name || roundPlan.round_id}</div>
+            <div className="mt-2 space-y-2">
+              {(roundPlan.flights || []).map((flight) => (
+                <div key={`${roundPlan.round_id}-${flight.flight_number}`} className="rounded-2xl border border-amber-700/30 bg-stone-950/55 p-2">
+                  <div className="mb-2 font-serif text-base font-black text-amber-200">Flight {flight.flight_number}</div>
+                  <div className="grid gap-1.5">{(flight.players || []).map((playerId) => renderStaticFlightPlayerCard(playerId))}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        <div className="rounded-2xl border border-amber-500/25 bg-black/25 p-3 text-sm text-amber-100/75">Die Flights der ersten drei Kapitel sind besiegelt. Was am Schicksalsberg geschieht, entscheidet allein die Tabelle.</div>
+      </div>
+    );
+  }
+
+  function renderLockedFlightDrawPanel() {
+    const hasDraw = Boolean(flightDraw?.rounds?.length);
+    return (
+      <div className="rounded-3xl border border-amber-500/35 bg-black/55 p-3 text-center text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm">
+        <div className="text-[9px] uppercase tracking-[0.28em] text-amber-300/75">DER RAT VON BRUCHTAL</div>
+        <div className="mt-0.5 font-serif text-xl font-black text-amber-200">Flightziehung - Das Öffnen der Pergamente</div>
+        <div className="mx-auto mt-2 max-w-[210px] rounded-2xl border border-amber-400/40 bg-amber-500/10 p-2 shadow-[inset_0_1px_0_rgba(251,191,36,0.14)]">
+          <div className="text-[10px] uppercase tracking-[0.18em] text-amber-100/65">Flight-Ziehung</div>
+          <div className="mt-0.5 font-serif text-xl font-black text-amber-200">21.05.26</div>
+          <div className="font-serif text-lg font-black text-amber-100">20:00 Uhr</div>
+          <div className="mt-1 rounded-full bg-black/30 px-3 py-0.5 text-[10px] font-bold uppercase tracking-[0.18em] text-amber-300">Hier live</div>
+        </div>
+        <p className="mt-2 text-xs text-amber-100/75">Bitte öffnet die App 1–2 Minuten vorher, damit die Pergamente rechtzeitig geladen sind.</p>
+        {flightDrawUnlocked && !flightCeremonyCompleted ? (
+          <div className="mt-3 rounded-2xl border border-amber-700/35 bg-black/25 p-3">
+            <div className="font-serif text-lg font-black text-amber-200">{hasDraw ? "Die Pergamente öffnen sich von selbst." : "Die Pergamente öffnen sich ..."}</div>
+            {!hasDraw ? <p className="mt-2 rounded-xl border border-red-500/40 bg-red-950/35 p-2 text-sm text-red-100">Keine gespeicherte Flight-Ziehung gefunden. Bitte zuerst im Admin-Bereich „Flights neu bestimmen“ ausführen.</p> : null}
+          </div>
+        ) : flightCeremonyCompleted && !flightCeremonyRunning ? (
+          <div className="mt-3 rounded-2xl border border-amber-700/35 bg-black/25 p-3">
+            <button type="button" onClick={() => setFlightSummaryOpen((value) => !value)} aria-expanded={flightSummaryOpen} className="flex w-full items-center justify-between rounded-2xl border border-amber-500/40 bg-amber-600/85 px-4 py-2.5 font-bold text-amber-50 shadow-lg shadow-black/25 transition active:scale-[0.98]">
+              <span className="font-serif text-lg">{flightSummaryOpen ? "Flights schließen" : "Flights öffnen"}</span>
+              <span className="text-sm uppercase tracking-[0.16em]">{flightSummaryOpen ? "schließen" : "öffnen"}</span>
+            </button>
+            {flightSummaryOpen ? (
+              <div className="mt-2 max-h-[38vh] overflow-y-auto overscroll-contain pr-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {renderFlightDrawSummary()}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  function renderSplashOverlay() {
+    if (!((showSplash || appLocked) && !lockAdminBypass)) return null;
+    return (
+      <div className="fixed inset-0 z-[100] bg-black">
+        <div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/lord-bg.webp')" }} />
+        <div className="absolute inset-0 bg-black/35" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.04),rgba(0,0,0,0.45)_40%,rgba(0,0,0,0.88)_100%)]" />
+        {flightCeremonyRunning ? renderFlightCeremonyStage() : appLocked ? (
+          <div className="absolute inset-x-3 top-[30vh] bottom-4 mx-auto flex max-w-md flex-col justify-start gap-2 overflow-hidden pt-2 pb-[env(safe-area-inset-bottom)]">
+            {renderLockedFlightDrawPanel()}
+            <div className="rounded-3xl border border-amber-500/35 bg-black/55 p-3 text-center text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm">
+              <div className="font-serif text-lg font-black text-amber-200">Der Rat ist noch nicht einberufen.</div>
+              <div className="mt-1.5 text-xs text-amber-100/80">Im Weimarer Land werden Stimmen gesenkt, alte Karten entrollt und verdächtig ernste Blicke ausgetauscht. Die Gefährten werden bald gerufen.</div>
+              {atomicTimeActive ? <div className="mt-2">{renderCountdownGrid(lockCountdown, true)}</div> : <div className="mt-2 rounded-2xl border border-red-400/35 bg-red-950/35 p-2 text-xs font-semibold text-red-100">{getTimeSourceLabel()}</div>}
+              <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/35 p-2 text-xs text-amber-100/75">Die Pforten sind noch verschlossen. Gandalf selbst würde jetzt sagen: „Du kommst hier noch nicht rein.“</div>
+              {error ? <div className="mt-3 rounded-2xl border border-amber-500/35 bg-amber-950/60 p-3 text-sm text-amber-100">{error}</div> : null}
+            </div>
+          </div>
+        ) : (
+          <div className="absolute inset-x-0 bottom-8 flex justify-center px-6 pb-[env(safe-area-inset-bottom)]">
+            <button type="button" disabled={splashEntering} onClick={enterRoundFromSplash} className="w-full max-w-xs rounded-2xl border border-amber-300/55 bg-black/55 px-5 py-2.5 font-serif text-lg font-black tracking-wide text-amber-200 shadow-2xl shadow-black/70 backdrop-blur-sm active:scale-[0.98] disabled:opacity-60">{splashEntering ? "Datenbank wird geladen ..." : "Die Saga beginnt"}</button>
+          </div>
+        )}
+        {appLocked ? <button type="button" onClick={() => setLockUnlockOpen(true)} className="absolute bottom-3 left-3 h-8 w-8 rounded-full text-[10px] text-amber-100/10" aria-label="Admin-Zugang">•</button> : null}
+        {appLocked && lockUnlockOpen ? (
+          <div className="absolute inset-x-4 bottom-8 mx-auto max-w-xs rounded-2xl border border-amber-700/35 bg-black/80 p-3 text-amber-50 shadow-2xl shadow-black/70 backdrop-blur-sm">
+            <div className="mb-2 text-xs uppercase tracking-[0.18em] text-amber-300/70">Admin</div>
+            <input type="password" value={lockPasswordInput} onChange={(e) => setLockPasswordInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") startFlightCeremonyAsAdmin(); }} placeholder="Passwort" className="mb-2 w-full rounded-xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" autoFocus />
+            <div className="grid grid-cols-2 gap-2"><button type="button" onClick={() => { setLockUnlockOpen(false); setLockPasswordInput(""); }} className="rounded-xl bg-stone-800 py-2 text-sm font-bold text-amber-100">Abbrechen</button><button type="button" onClick={startFlightCeremonyAsAdmin} className="rounded-xl bg-amber-600 py-2 text-sm font-bold text-amber-50 active:scale-[0.98]">Zeremonienmeister</button></div>
+            <button type="button" onClick={enterLockedAppAsAdmin} className="mt-2 w-full rounded-xl border border-amber-500/35 bg-black/35 py-2 text-sm font-bold text-amber-100 shadow-[inset_0_1px_0_rgba(251,191,36,0.08)] active:scale-[0.98]">Direkt in die App</button>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-black text-amber-50">
+      <div className="fixed inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: "url('/lord-bg.webp')" }} />
+      <div className="fixed inset-0 bg-black/45" />
+      <div className="fixed inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.06),rgba(0,0,0,0.58)_38%,rgba(0,0,0,0.86)_100%)]" />
+      {renderSplashOverlay()}
+      <main className="relative z-10 mx-auto max-w-md px-2 py-1.5">
+        {renderHeader()}
+        {renderStatusMessages()}
+        {renderActiveView()}
+        <footer className="pb-2 pt-1 text-center text-[9px] uppercase tracking-[0.16em] text-amber-100/35">© Lord of the Holes Association</footer>
+      </main>
+      {setupSavedMessage ? <div className="fixed inset-x-3 top-4 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/50 bg-emerald-950/95 p-3 text-emerald-50 shadow-2xl shadow-black/60 backdrop-blur"><div className="flex items-start justify-between gap-2"><div><div className="font-serif text-lg text-emerald-100">Gespeichert</div><div className="mt-0.5 text-sm text-emerald-100/85">{setupSavedMessage}</div></div><button type="button" onClick={() => setSetupSavedMessage("")} className="rounded-xl border border-emerald-400/40 bg-black/25 px-3 py-1 text-sm font-bold text-emerald-50">×</button></div></div> : null}
+      {backupSavedMessage ? <div className="fixed inset-x-3 top-4 z-50 mx-auto max-w-md rounded-2xl border border-emerald-500/50 bg-emerald-950/95 p-3 text-emerald-50 shadow-2xl shadow-black/60 backdrop-blur"><div className="flex items-start justify-between gap-2"><div><div className="font-serif text-lg text-emerald-100">Backup erstellt</div><div className="mt-0.5 text-sm text-emerald-100/85">{backupSavedMessage}</div></div><button type="button" onClick={() => setBackupSavedMessage("")} className="rounded-xl border border-emerald-400/40 bg-black/25 px-3 py-1 text-sm font-bold text-emerald-50">×</button></div></div> : null}
+      {renderPopupStandingsTable()}
+      {roundSummaryPopup ? (
+        <div className="fixed inset-0 z-[94] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-400/60 bg-stone-950 text-center text-amber-50 shadow-2xl shadow-black/80">
+            <div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.25),transparent_45%),linear-gradient(180deg,rgba(41,37,36,0.92),rgba(12,10,9,1))] p-5">
+              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full border border-amber-300/50 bg-black/30 text-3xl shadow-xl shadow-amber-950/40">📜</div>
+              <div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/70">{roundSummaryPopup.subtitle}</div>
+              <div className="mt-2 font-serif text-2xl font-black text-amber-200">{roundSummaryPopup.title}</div>
+              <div className="mt-1 text-sm font-semibold text-amber-100/80">{roundSummaryPopup.playerName}</div>
+              <div className="mt-4 grid grid-cols-2 gap-2 text-left text-sm">
+                <div className="rounded-2xl border border-amber-500/30 bg-black/25 p-3"><div className="text-xs uppercase tracking-[0.18em] text-amber-300/70">Strokes</div><div className="font-serif text-2xl font-black text-amber-200">{roundSummaryPopup.strokes}</div><div className="text-xs text-amber-100/65">{formatToPar(roundSummaryPopup.toPar, true)} zu Par</div></div>
+                <div className="rounded-2xl border border-amber-500/30 bg-black/25 p-3"><div className="text-xs uppercase tracking-[0.18em] text-amber-300/70">HCP adjusted</div><div className="font-serif text-2xl font-black text-amber-200">{roundSummaryPopup.hcpAdjustedStrokes}</div><div className="text-xs text-amber-100/65">Strokes HCP</div></div>
+                <div className="rounded-2xl border border-amber-500/30 bg-black/25 p-3"><div className="text-xs uppercase tracking-[0.18em] text-amber-300/70">Netto Stblf.</div><div className="font-serif text-2xl font-black text-amber-200">{roundSummaryPopup.netStableford}</div><div className="text-xs text-amber-100/65">Punkte</div></div>
+                <div className="rounded-2xl border border-amber-500/30 bg-black/25 p-3"><div className="text-xs uppercase tracking-[0.18em] text-amber-300/70">Brutto</div><div className="font-serif text-2xl font-black text-amber-200">{roundSummaryPopup.grossStableford}</div><div className="text-xs text-amber-100/65">Punkte</div></div>
+              </div>
+              <div className="mt-3 grid grid-cols-4 gap-1.5 text-xs text-amber-100/80">
+                <div className="rounded-xl bg-amber-500/10 p-2"><b className="block text-amber-200">{roundSummaryPopup.putts}</b>Putts</div>
+                <div className="rounded-xl bg-emerald-500/10 p-2"><b className="block text-emerald-200">{roundSummaryPopup.girCount}</b>GIR</div>
+                <div className="rounded-xl bg-amber-500/10 p-2"><b className="block text-amber-200">{roundSummaryPopup.birdiesOrBetter}</b>Birdie+</div>
+                <div className="rounded-xl bg-red-500/10 p-2"><b className="block text-red-100">{roundSummaryPopup.pickedUp}</b>X</div>
+              </div>
+            </div>
+            <div className="p-3">
+              <button type="button" onClick={() => setRoundSummaryDismissedKeys((current) => Array.from(new Set([...(current || []), roundSummaryPopup.key])))} className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-2.5 text-sm font-bold text-amber-50">Chronik schließen ×</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {zeroNetTributePopup ? (
+        <div className="fixed inset-0 z-[105] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-sky-400/55 bg-stone-950 text-center text-sky-50 shadow-2xl shadow-black/80">
+            <div className="bg-[radial-gradient(circle_at_50%_0%,rgba(56,189,248,0.22),transparent_45%),linear-gradient(180deg,rgba(12,74,110,0.55),rgba(12,10,9,1))] p-5">
+              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-sky-300/45 bg-black/30 text-3xl shadow-xl shadow-sky-950/40">🍻</div>
+              <div className="text-[10px] uppercase tracking-[0.28em] text-sky-100/70">Loch {zeroNetTributePopup.holeNumber} · Der Rat des Flights raunt</div>
+              <div className="mt-2 font-serif text-xl font-black text-sky-100">Tribut an Mordor</div>
+              <div className="mt-2 rounded-2xl border border-sky-300/35 bg-black/25 p-3 text-sm font-semibold text-sky-50">{zeroNetTributePopup.text}</div>
+              <div className="mt-2 text-xs text-sky-100/70">Dieser Hinweis erscheint einmalig für diesen Tribut — auch wenn ihr schon am nächsten Loch seid.</div>
+            </div>
+            <div className="p-3">
+              <button type="button" onClick={() => setZeroNetTributeDismissedKeys((current) => Array.from(new Set([...(current || []), zeroNetTributePopup.key])))} className="w-full rounded-2xl border border-sky-400/45 bg-sky-700 px-4 py-2.5 text-sm font-bold text-sky-50">Tribut zur Kenntnis nehmen ×</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {showDevicePlayerGate ? <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm"><div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-500/45 bg-stone-950 text-amber-50 shadow-2xl shadow-black/80"><div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.20),transparent_45%),linear-gradient(180deg,rgba(41,37,36,0.94),rgba(12,10,9,1))] p-4 text-center"><div className="text-[10px] uppercase tracking-[0.24em] text-amber-300/75">Dieses Handy</div><div className="mt-1 font-serif text-2xl font-black text-amber-200">Wer bist du?</div><div className="mt-1 text-sm text-amber-100/70">Wähle deinen eigenen Spieler. Diese Auswahl bleibt auf diesem Handy gespeichert.</div><div className="mt-4 grid gap-2">{visiblePlayers.map((player) => <button key={player.id} type="button" onClick={() => { setMyPlayerId(player.id); writeLocalJson("lordOfTheHoles.myPlayerId", player.id); setForceMyPlayerPromptOpen(false); setScoreEntryMode("player"); }} className="rounded-2xl border border-amber-700/35 bg-stone-900 px-3 py-3 font-serif text-base font-bold text-amber-100 transition active:scale-[0.98]">{getPlayerLabel(player)}</button>)}</div></div></div></div> : null}
+      {showRoundHonorPopup ? (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/75 px-4 py-4 backdrop-blur-sm">
+          <div className="flex max-h-[92vh] w-full max-w-md flex-col overflow-hidden rounded-3xl border border-amber-400/60 bg-stone-950 text-center text-amber-50 shadow-2xl shadow-black/80">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.28),transparent_45%),linear-gradient(180deg,rgba(120,53,15,0.55),rgba(12,10,9,1))] p-5 [scrollbar-width:thin]">
+              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-amber-300/50 bg-black/30 text-3xl shadow-xl shadow-amber-950/40">⚜</div>
+              <div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/70">{displayedRoundHonorCelebration.roundName} beendet</div>
+              <div className="mt-2 font-serif text-lg font-black text-amber-200">Gondors Erlass</div>
+              <div className="mt-1 text-sm text-amber-100/70">Die Runde ist gespielt. Den Herren von Gondor werden ihre Schildträger zur Seite gestellt — der Hofstaat wird neu geordnet.</div>
+              <div className="mt-2 rounded-2xl border border-amber-300/40 bg-amber-500/10 p-3 text-sm font-semibold text-amber-50">{roundHonorPersonalMessage}</div>
+              <div className="mt-2 rounded-2xl border border-amber-500/35 bg-black/25 p-3 text-left">
+                <div className="text-xs uppercase tracking-[0.22em] text-amber-300/75">{displayedRoundHonorCelebration.lords.length === 1 ? "Herr von Gondor" : "Herren von Gondor"}</div>
+                <div className="mt-2 space-y-1">{displayedRoundHonorCelebration.lords.map((player, index) => <div key={player.id} className="flex items-center justify-between gap-2 rounded-xl bg-amber-500/10 px-2 py-1.5"><span className="font-serif text-lg font-black text-amber-200">{index + 1}. {getPlayerLabel(player)}</span><span className="text-xs text-amber-100/70">{player.hcpAdjustedStrokes}</span></div>)}</div>
+              </div>
+              {displayedRoundHonorCelebration.lordPlayoff?.length ? <div className="mt-2 rounded-2xl border border-amber-400/45 bg-amber-500/10 p-3 text-left"><div className="text-xs uppercase tracking-[0.22em] text-amber-300/80">Entscheidungsputten um {displayedRoundHonorCelebration.lordPlayoffSlots} Herr{displayedRoundHonorCelebration.lordPlayoffSlots === 1 ? "enplatz" : "enplätze"}</div><div className="mt-2 space-y-1">{displayedRoundHonorCelebration.lordPlayoff.map((player) => <div key={player.id} className="flex items-center justify-between gap-2 rounded-xl bg-amber-500/10 px-2 py-1.5"><span className="font-serif text-lg font-black text-amber-200">{getPlayerLabel(player)}</span><span className="text-xs text-amber-100/70">{player.hcpAdjustedStrokes}</span></div>)}</div><div className="mt-2 text-xs text-amber-100/75">Diese Spieler müssen ins Entscheidungsputten, bis die offenen Herrenplätze geklärt sind.</div></div> : null}
+              <div className="mt-2 rounded-2xl border border-red-500/35 bg-black/25 p-3 text-left">
+                <div className="text-xs uppercase tracking-[0.22em] text-red-200/80">Schildträger im Dienst der Herren</div>
+                <div className="mt-2 space-y-1">{displayedRoundHonorCelebration.butlers.map((player) => <div key={player.id} className="flex items-center justify-between gap-2 rounded-xl bg-red-500/10 px-2 py-1.5"><span className="font-serif text-lg font-black text-red-100">{getPlayerLabel(player)}</span><span className="text-xs text-red-100/70">{player.hcpAdjustedStrokes}</span></div>)}</div>
+              </div>
+              {displayedRoundHonorCelebration.butlerPlayoff?.length ? <div className="mt-2 rounded-2xl border border-red-400/45 bg-red-500/10 p-3 text-left"><div className="text-xs uppercase tracking-[0.22em] text-red-200/80">Entscheidungsputten um {displayedRoundHonorCelebration.butlerPlayoffSlots} Schildträgerplatz{displayedRoundHonorCelebration.butlerPlayoffSlots === 1 ? "" : "plätze"}</div><div className="mt-2 space-y-1">{displayedRoundHonorCelebration.butlerPlayoff.map((player) => <div key={player.id} className="flex items-center justify-between gap-2 rounded-xl bg-red-500/10 px-2 py-1.5"><span className="font-serif text-lg font-black text-red-100">{getPlayerLabel(player)}</span><span className="text-xs text-red-100/70">{player.hcpAdjustedStrokes}</span></div>)}</div><div className="mt-2 text-xs text-red-100/75">Nur diese punktgleichen Spieler müssen ins Entscheidungsputten um den offenen Schildträgerdienst. Bereits eindeutig feststehende Schildträger müssen nicht antreten.</div></div> : null}
+              <div className="mt-2 rounded-2xl border border-amber-500/25 bg-black/20 p-2 text-sm text-amber-100/75">{displayedRoundHonorCelebration.hasPlayoff ? "Gondor wartet auf das Entscheidungsputten. Erst danach ist geklärt, wer Krone trägt und wer Schild hält." : displayedRoundHonorCelebration.roundOrder === 1 ? "Der Herr von Gondor steht fest. Sein Schildträger ebenso. Der Dienst ist ehrenvoll — und vermutlich leicht erniedrigend." : "Die Herren von Gondor und ihre Schildträger stehen fest. Der Hofstaat ist informiert, die Eide sind gesprochen, die Knie zittern."}</div>
+            </div>
+            <div className="shrink-0 border-t border-amber-400/25 bg-stone-950/95 p-3"><button type="button" onClick={() => {
+                    const key = displayedRoundHonorCelebration?.key;
+                    if (!key) return;
+                    setRoundHonorDismissedKeys((current) => Array.from(new Set([...(current || []), key])));
+                  }} className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-2.5 text-sm font-bold text-amber-50">{roundHonorCloseLabel || "Erlass schließen ×"}</button></div>
+          </div>
+        </div>
+      ) : null}
+      {showFinalWinnerPopup && !roundSummaryPopup ? (
+        <div className="fixed inset-0 z-[96] flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md overflow-hidden rounded-3xl border border-amber-400/60 bg-stone-950 text-center text-amber-50 shadow-2xl shadow-black/80">
+            <div className="bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.28),transparent_45%),linear-gradient(180deg,rgba(120,53,15,0.55),rgba(12,10,9,1))] p-5">
+              <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full border border-amber-300/50 bg-black/30 text-3xl shadow-xl shadow-amber-950/40">♛</div>
+              <div className="text-[10px] uppercase tracking-[0.28em] text-amber-100/70">Finale beendet</div>
+              <div className="mt-2 font-serif text-lg font-black text-amber-200">Lord of the Holes 2026 ist</div>
+              <div className="mt-2 font-serif text-4xl font-black text-amber-300 drop-shadow">{finalWinnerCelebration?.winnerName}</div>
+              <div className="mt-2 text-sm text-amber-100/70">{finalWinnerCelebration?.winnerLabel}</div>
+              <div className="mt-2 rounded-2xl border border-amber-500/35 bg-black/25 p-2 text-sm text-amber-100">Final Strokes HCP: <b className="text-amber-200">{finalWinnerCelebration?.finalHcpAdjustedStrokes ?? "–"}</b></div>
+            </div>
+            <div className="p-3"><button type="button" onClick={() => setWinnerPopupDismissedKey(finalWinnerPopupKey)} className="w-full rounded-2xl border border-amber-500/45 bg-amber-600 px-4 py-2.5 text-sm font-bold text-amber-50">Krone anerkennen ×</button></div>
+          </div>
+        </div>
+      ) : null}
+      {clearScoresConfirmOpen ? <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"><div className="w-full max-w-md rounded-3xl border border-red-500/60 bg-stone-950 p-4 text-red-50 shadow-2xl shadow-black/70"><div className="font-serif text-lg text-red-100">Alle Scores löschen?</div><p className="mt-2 text-sm text-red-100/80">Dadurch werden alle Einträge im Tab Scores gelöscht. Vorher wird automatisch ein Backup erstellt. Backup-Tabs bleiben erhalten.</p><div className="mt-2 grid grid-cols-2 gap-2"><button type="button" disabled={clearScoresSaving} onClick={() => setClearScoresConfirmOpen(false)} className="rounded-2xl border border-amber-700/40 bg-stone-900 px-3 py-2.5 text-sm font-bold text-amber-100 disabled:opacity-50">Abbrechen</button><button type="button" disabled={clearScoresSaving} onClick={clearAllScores} className="rounded-2xl border border-red-400/60 bg-red-700 px-3 py-2.5 text-sm font-bold text-red-50 disabled:opacity-50">{clearScoresSaving ? "Lösche ..." : "Ja, Scores löschen"}</button></div></div></div> : null}
+    </div>
+  );
 }
 
 export default function LordOfTheHolesPWA() {
