@@ -1552,6 +1552,52 @@ function TournamentStandings({ players, rounds, holes, scores, courses = fallbac
   );
 }
 
+function buildFlightCeremonyTimeline(draw) {
+  const rounds = Array.isArray(draw?.rounds) ? draw.rounds : [];
+  if (!rounds.length) return [];
+  const steps = [
+    {
+      type: "text",
+      title: "Die Flüge werden offenbart",
+      text: "Der Rat von Bruchtal öffnet das Pergament der Flight-Auslosung. Runde für Runde treten die Gefährten hervor.",
+    },
+  ];
+
+  rounds.forEach((roundPlan) => {
+    const flights = Array.isArray(roundPlan?.flights) ? roundPlan.flights : [];
+    const totalPlayers = flights.reduce((sum, flight) => sum + (Array.isArray(flight.players) ? flight.players.length : 0), 0);
+    steps.push({
+      type: "text",
+      title: roundPlan.round_name || roundPlan.round_id || "Runde",
+      text: roundPlan.note || "Ein neues Kapitel wird geöffnet. Die Flights treten aus dem Nebel.",
+      roundPlan,
+    });
+    for (let revealCount = 1; revealCount <= totalPlayers; revealCount += 1) {
+      steps.push({
+        type: "reveal",
+        title: roundPlan.round_name || roundPlan.round_id || "Runde",
+        text: "Die Namen erscheinen nacheinander im Pergament.",
+        roundPlan,
+        revealCount,
+      });
+    }
+    steps.push({
+      type: "reveal",
+      title: `${roundPlan.round_name || roundPlan.round_id || "Runde"} · vollständig`,
+      text: "Der Flight ist besiegelt. Ab jetzt gibt es keine Ausreden mehr, nur noch Zeugen.",
+      roundPlan,
+      revealCount: totalPlayers,
+    });
+  });
+
+  steps.push({
+    type: "text",
+    title: "Die Flights sind gesprochen",
+    text: "Die Chronik ist versiegelt. Wer nun klagt, möge dies bitte vor dem ersten Abschlag erledigen.",
+  });
+  return steps;
+}
+
 function LordOfTheHolesApp() {
   const cachedState = readLocalJson("lordOfTheHoles.cachedState", null);
   const [players, setPlayers] = useState(cachedState?.players?.length ? cachedState.players : fallbackPlayers);
