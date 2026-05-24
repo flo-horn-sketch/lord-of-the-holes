@@ -1230,18 +1230,27 @@ function buildGrossStrokeStandings(players, rounds, holes, scores) {
 
 function buildFinalNetStandings(players, rounds, holes, scores, courses = fallbackCourses) {
   const qualificationStandings = buildTournamentNetStandings(players, rounds, holes, scores, courses);
+  const getQualificationRank = (index) => {
+    const current = qualificationStandings[index];
+    if (!current || current.totalBestTwo == null) return index + 1;
+    const value = Number(current.totalBestTwo);
+    const betterCount = qualificationStandings.filter((item) => item.totalBestTwo != null && Number(item.totalBestTwo) < value).length;
+    return betterCount + 1;
+  };
   const finalRound = getFinalRound(rounds);
   const finalHoles = getRoundHoles(finalRound, holes);
   const withFinalScores = qualificationStandings.map((player, qualificationIndex) => {
     const finalScores = (scores || []).filter((score) => String(score.round_id) === String(finalRound?.round_id) && String(score.player_id) === String(player.id) && score.strokes !== "" && score.strokes != null);
-    const playerForRound = getPlayerForCourse(player, finalRound?.course_id || "goethe");
+    const playerForRound = getPlayerForCourse(player, finalRound?.course_id || "goethe", courses);
     const finalGrossStrokes = finalScores.reduce((sum, score) => sum + Number(score.strokes || 0), 0);
     const finalHcpShotsUsed = finalScores.reduce((sum, score) => sum + getShotsOnHole(playerForRound.course_hcp, finalHoles.find((h) => Number(h.hole_number) === Number(score.hole_number))?.hcp), 0);
-    return { ...withFallbackAlias(player), qualificationRank: qualificationIndex + 1, finalHcpAdjustedStrokes: finalScores.length ? finalGrossStrokes - finalHcpShotsUsed : null, finalGrossStrokes, finalHcpShotsUsed, finalPlayed: finalScores.length, finalGroup: qualificationIndex < 3 ? "championship" : "placement" };
+    const qualificationRank = getQualificationRank(qualificationIndex);
+    return { ...withFallbackAlias(player), qualificationRank, finalHcpAdjustedStrokes: finalScores.length ? finalGrossStrokes - finalHcpShotsUsed : null, finalGrossStrokes, finalHcpShotsUsed, finalPlayed: finalScores.length, finalGroup: qualificationRank <= 3 ? "championship" : "placement" };
   });
-  const sortFinalGroup = (items) => [...items].sort((a, b) => (a.finalHcpAdjustedStrokes == null && b.finalHcpAdjustedStrokes != null ? 1 : b.finalHcpAdjustedStrokes == null && a.finalHcpAdjustedStrokes != null ? -1 : Number(a.finalHcpAdjustedStrokes || 0) - Number(b.finalHcpAdjustedStrokes || 0) || Number(a.qualificationRank || 0) - Number(b.qualificationRank || 0)));
+  const sortFinalGroup = (items) => [...items].sort((a, b) => (a.finalHcpAdjustedStrokes == null && b.finalHcpAdjustedStrokes != null ? 1 : b.finalHcpAdjustedStrokes == null && a.finalHcpAdjustedStrokes != null ? -1 : Number(a.finalHcpAdjustedStrokes || 0) - Number(b.finalHcpAdjustedStrokes || 0) || Number(a.qualificationRank || 0) - Number(b.qualificationRank || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0)));
   const championshipGroup = sortFinalGroup(withFinalScores.filter((p) => p.finalGroup === "championship")).map((p, i) => ({ ...p, finalRank: i + 1 }));
-  const placementGroup = sortFinalGroup(withFinalScores.filter((p) => p.finalGroup === "placement")).map((p, i) => ({ ...p, finalRank: i + 4 }));
+  const placementStartRank = championshipGroup.length + 1;
+  const placementGroup = sortFinalGroup(withFinalScores.filter((p) => p.finalGroup === "placement")).map((p, i) => ({ ...p, finalRank: placementStartRank + i }));
   return [...championshipGroup, ...placementGroup];
 }
 
