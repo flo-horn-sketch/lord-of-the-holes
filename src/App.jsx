@@ -3710,50 +3710,83 @@ function LordOfTheHolesApp() {
   }
 
   function buildDummyRound3TeamCeremonyTimeline() {
-    const dummyTeams = [
-      { teamId: "A", players: [{ id: "dummy-a1", alias_name: "Waldläufer", character_name: "Wanderer aus Bree" }, { id: "dummy-a2", alias_name: "Hüter", character_name: "Hüter des Westens" }] },
-      { teamId: "B", players: [{ id: "dummy-b1", alias_name: "Reiter", character_name: "Reiter Rohans" }, { id: "dummy-b2", alias_name: "Zwerg", character_name: "Zwerg aus Erebor" }] },
-      { teamId: "C", players: [{ id: "dummy-c1", alias_name: "Bote", character_name: "Bote Gondors" }, { id: "dummy-c2", alias_name: "Elb", character_name: "Elb aus Lórien" }] },
+    const dummyRows = [
+      { team_number: "A", player_id: "dummy-a1", player_name: "Wanderer aus Bree", player_alias: "Waldläufer" },
+      { team_number: "A", player_id: "dummy-a2", player_name: "Hüter des Westens", player_alias: "Hüter" },
+      { team_number: "B", player_id: "dummy-b1", player_name: "Reiter Rohans", player_alias: "Reiter" },
+      { team_number: "B", player_id: "dummy-b2", player_name: "Zwerg aus Erebor", player_alias: "Zwerg" },
+      { team_number: "C", player_id: "dummy-c1", player_name: "Bote Gondors", player_alias: "Bote" },
+      { team_number: "C", player_id: "dummy-c2", player_name: "Elb aus Lórien", player_alias: "Elb" },
     ];
-    const holeWinners = ["B", "A", "C", "A", "B", "B", "C", "A", "C", "B", "A", "A", "C", "B", "C", "A", "B", "C"];
-    const running = { A: 0, B: 0, C: 0 };
+    const teamMap = { A: dummyRows.slice(0, 2), B: dummyRows.slice(2, 4), C: dummyRows.slice(4, 6) };
+    const teamsByLetter = ["A", "B", "C"].map((teamId) => ({ teamId, players: teamMap[teamId], value: 0, detail: "Dummy-Wertung", ceremonyRank: 0 }));
+    const playerCeremonyLabel = (row) => row?.player_alias ? `${row.player_alias} (${row.player_name || row.player_id})` : (row?.player_name || row?.player_id || "");
+    const teamPlayersText = (team) => (team.players || []).map(playerCeremonyLabel).filter(Boolean).join(" und ") || `Team ${team.teamId}`;
+
     const steps = [
-      { type: "intro", testMode: true, title: "TESTMODUS · Keine echten Teams", text: "Dies ist nur eine Probe der Runde-3-Zeremonie. Namen, Teams und Ergebnisse sind Platzhalter — die echte Auslosung bleibt verborgen." },
-      { type: "teamBoard", testMode: true, title: "Die Gefährten werden gebunden", text: "Drei Schatten treten an. Keiner davon verrät, wer heute wirklich zusammen in Mordor marschiert.", teams: dummyTeams.map((team) => ({ ...team, revealCount: 0 })) },
+      { type: "text", testMode: true, title: "TESTMODUS · Keine echten Teams", text: "Dies ist nur eine Probe der Runde-3-Zeremonie. Namen, Teams und Ergebnisse sind Platzhalter — die echte Auslosung bleibt verborgen.", waitLabel: "Das Testpergament wird entrollt ..." },
+      { type: "text", testMode: true, title: "Die Mannschaften werden offenbart", text: "Zuerst werden nur die Bündnisse gezogen. Die Wertung bleibt noch im Schatten, bis alle Namen gefallen sind.", waitLabel: "Die Dummy-Bündnisse werden entrollt ..." },
+      { type: "teamBoard", testMode: true, title: "Drei leere Banner", teams: teamsByLetter, revealCounts: { A: 0, B: 0, C: 0 }, revealLine: "Drei Banner werden erhoben. Noch ist kein Name sichtbar. Der Palantír sammelt Atem.", waitLabel: "Die ersten Namen werden gerufen ..." },
+      { type: "teamBoard", testMode: true, title: "Die ersten Namen fallen", teams: teamsByLetter, revealCounts: { A: 1, B: 0, C: 0 }, revealLine: "Vor den Toren Mordors erscheint der erste Gefährte im roten Licht.", waitLabel: "Team A erhält den ersten Gefährten ..." },
+      { type: "teamBoard", testMode: true, title: "Die ersten Namen fallen", teams: teamsByLetter, revealCounts: { A: 1, B: 1, C: 0 }, revealLine: "Das Pergament wandert weiter. Auch Team B wird berufen.", waitLabel: "Team B erhält den ersten Gefährten ..." },
+      { type: "teamBoard", testMode: true, title: "Die ersten Namen fallen", teams: teamsByLetter, revealCounts: { A: 1, B: 1, C: 1 }, revealLine: "Das dritte Fenster glimmt. Team C bekommt seinen ersten Namen.", waitLabel: "Team C erhält den ersten Gefährten ..." },
+      { type: "text", testMode: true, title: "Die halben Bündnisse stehen", text: "Drei Namen sind gefallen. Drei Schatten fehlen noch. Der Rat tuschelt, der Palantír glimmt, und irgendwo rechnet jemand bereits heimlich Netto-Punkte nach.", waitLabel: "Die zweiten Siegel werden vorbereitet ..." },
+      { type: "teamBoard", testMode: true, title: "Die Bündnisse schließen sich", teams: teamsByLetter, revealCounts: { A: 2, B: 1, C: 1 }, revealLine: "Der zweite Name fällt. Team A wird vollständig.", waitLabel: "Team A wird vollständig ..." },
+      { type: "teamBoard", testMode: true, title: "Die Bündnisse schließen sich", teams: teamsByLetter, revealCounts: { A: 2, B: 2, C: 1 }, revealLine: "Ein weiterer Name fällt. Team B ist nun vollständig.", waitLabel: "Team B wird vollständig ..." },
+      { type: "teamBoard", testMode: true, title: "Die Bündnisse schließen sich", teams: teamsByLetter, revealCounts: { A: 2, B: 2, C: 2 }, revealLine: "Das letzte Siegel bricht. Auch Team C steht nun vollständig im Licht.", waitLabel: "Alle Bündnisse sind offenbart ..." },
+      { type: "intro", testMode: true, title: "Die Tore Mordors öffnen sich", text: "Nun wird Loch für Loch enthüllt. Nach jedem Loch verschiebt sich die Rangordnung — und der Palantír kennt kein Mitleid." },
     ];
 
-    dummyTeams.forEach((team) => {
-      steps.push({ type: "teamBoard", testMode: true, title: `Team ${team.teamId} erscheint`, text: `Team ${team.teamId} tritt aus dem Nebel. Dies sind nur Testnamen.`, teams: dummyTeams.map((item) => ({ ...item, revealCount: item.teamId === team.teamId ? 2 : item.teamId < team.teamId ? 2 : 0 })) });
-    });
+    const running = { A: 0, B: 0, C: 0 };
+    const dummyHolePlan = [
+      { winner: ["B"], values: { A: [2, 1], B: [3, 2], C: [1, 1] } },
+      { winner: ["A"], values: { A: [4, 2], B: [2, 1], C: [3, 1] } },
+      { winner: ["C"], values: { A: [1, 1], B: [2, 2], C: [3, 2] } },
+      { winner: ["A", "B"], values: { A: [3, 2], B: [3, 1], C: [2, 1] } },
+      { winner: ["B"], values: { A: [2, 0], B: [4, 2], C: [1, 1] } },
+      { winner: ["C"], values: { A: [2, 1], B: [2, 2], C: [4, 3] } },
+      { winner: ["A"], values: { A: [3, 2], B: [1, 1], C: [2, 1] } },
+      { winner: ["B"], values: { A: [2, 2], B: [3, 2], C: [2, 0] } },
+      { winner: ["C"], values: { A: [1, 1], B: [2, 1], C: [3, 3] } },
+      { winner: ["A"], values: { A: [4, 2], B: [3, 1], C: [2, 1] } },
+      { winner: ["B"], values: { A: [2, 1], B: [4, 2], C: [3, 1] } },
+      { winner: ["C"], values: { A: [1, 1], B: [2, 2], C: [4, 2] } },
+      { winner: ["A"], values: { A: [3, 2], B: [2, 1], C: [1, 1] } },
+      { winner: ["B", "C"], values: { A: [2, 1], B: [3, 2], C: [3, 2] } },
+      { winner: ["A"], values: { A: [4, 1], B: [2, 2], C: [3, 1] } },
+      { winner: ["C"], values: { A: [2, 2], B: [1, 1], C: [3, 2] } },
+      { winner: ["B"], values: { A: [2, 1], B: [4, 2], C: [3, 2] } },
+      { winner: ["C"], values: { A: [2, 1], B: [3, 1], C: [4, 2] } },
+    ];
 
-    steps.push({ type: "intro", testMode: true, title: "Die Tore Mordors öffnen sich", text: "Nun wird Loch für Loch enthüllt. Nach jedem Loch verschiebt sich die Rangordnung — wie ein Palantír, der sehr gerne Tabellen sortiert." });
-
-    holeWinners.forEach((winnerTeamId, index) => {
-      running[winnerTeamId] += 1;
+    dummyHolePlan.forEach((holePlan, index) => {
       const holeNumber = index + 1;
-      const standings = Object.entries(running)
-        .map(([teamId, points]) => ({ teamId, points }))
-        .sort((a, b) => Number(b.points || 0) - Number(a.points || 0) || String(a.teamId).localeCompare(String(b.teamId)));
-      steps.push({
-        type: "holeReveal",
-        testMode: true,
-        title: `Loch ${holeNumber} · Der Schatten wandert`,
-        text: `Loch ${holeNumber} geht an Team ${winnerTeamId}. Der Stand ordnet sich neu.`,
-        holeNumber,
-        winnerTeamId,
-        standings,
-        teams: dummyTeams,
+      const winners = holePlan.winner || [];
+      winners.forEach((teamId) => { running[teamId] = Number(running[teamId] || 0) + (1 / winners.length); });
+      const teams = teamsByLetter.map((team) => {
+        const values = holePlan.values?.[team.teamId] || [0, 0];
+        const best = Math.max(...values);
+        const players = (team.players || []).map((row, playerIndex) => ({
+          player: { id: row.player_id, alias_name: row.player_alias, character_name: row.player_name, display_name: row.player_name },
+          score: { strokes: values[playerIndex] === 0 ? 9 : 6 - values[playerIndex], putts_count: playerIndex + 1, picked_up: false },
+          points: values[playerIndex] || 0,
+        }));
+        return { teamId: team.teamId, players, value: best, matchplayPoints: winners.includes(team.teamId) ? Number((1 / winners.length).toFixed(2)) : 0 };
       });
+      const standings = Object.entries(running).map(([teamId, points]) => ({ teamId, points })).sort((a, b) => Number(b.points || 0) - Number(a.points || 0) || String(a.teamId).localeCompare(String(b.teamId)));
+      const winnerText = winners.length > 1 ? `geteilt von Team ${winners.join(" und Team ")}` : `an Team ${winners[0]}`;
+      steps.push({ type: "holeReveal", testMode: true, title: `Loch ${holeNumber} · Der Schatten wandert`, text: `Loch ${holeNumber} geht ${winnerText}.`, holeNumber, winnerTeamId: winners[0] || "", winnerTeamIds: winners, standings, teams });
     });
 
-    const finalTeams = Object.entries(running)
-      .map(([teamId, points]) => ({ teamId, points, players: dummyTeams.find((team) => team.teamId === teamId)?.players || [] }))
-      .sort((a, b) => Number(a.points || 0) - Number(b.points || 0));
-    finalTeams.forEach((team, index) => {
-      const rank = index + 1;
-      steps.push({ type: "teamResult", testMode: true, title: `${rank}. Platz · TEST`, text: `Team ${team.teamId} landet im Test auf Platz ${rank} mit ${team.points} Lochpunkten. Keine echten Spieler, keine echte Tageswertung.`, team, rank });
+    const rankedTeams = Object.entries(running).map(([teamId, points]) => ({ teamId, points, value: points, detail: `${points} Lochpunkte`, players: teamMap[teamId] || [] })).sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
+    rankedTeams.forEach((team, index) => {
+      team.ceremonyRank = getCompetitionRank(rankedTeams, index, (item) => Number(item.value || 0));
+      team.ceremonyRankLabel = formatCompetitionRank(rankedTeams, index, (item) => Number(item.value || 0));
     });
-    steps.push({ type: "outro", testMode: true, title: "Test beendet", text: "Die echte Runde-3-Zeremonie bleibt versiegelt. Keine Teams wurden verraten, kein Marker wurde gesetzt." });
+    rankedTeams.slice().sort((a, b) => Number(b.ceremonyRank || 0) - Number(a.ceremonyRank || 0)).forEach((team) => {
+      steps.push({ type: "teamResult", testMode: true, title: `${team.ceremonyRankLabel}. Platz · TEST`, text: `Auf Platz ${team.ceremonyRankLabel} landen ${teamPlayersText(team)} mit ${team.detail}. Keine echten Spieler, keine echte Tageswertung.`, teamId: team.teamId, rank: team.ceremonyRank, detail: team.detail });
+    });
+    steps.push({ type: "text", testMode: true, title: "Test beendet", text: "Die echte Runde-3-Zeremonie bleibt versiegelt. Keine Teams wurden verraten, kein Marker wurde gesetzt." });
     return steps;
   }
 
@@ -3770,13 +3803,23 @@ function LordOfTheHolesApp() {
       });
       const winners = (row.teams || []).filter((team) => Number(team.matchplayPoints || 0) > 0).map((team) => team.teamId);
       const winnerText = winners.length > 1 ? `geteilt von Team ${winners.join(" und Team ")}` : winners.length ? `an Team ${winners[0]}` : "an niemanden";
+      const teamReasonText = (row.teams || []).map((team) => {
+        const playerBits = (team.players || []).map((playerRow) => {
+          const scoreValue = playerRow.score ? (normalizeBoolean(playerRow.score.picked_up) ? "X" : playerRow.score.strokes) : "–";
+          const putts = playerRow.score?.putts_count !== "" && playerRow.score?.putts_count != null ? `, ${playerRow.score.putts_count} Putts` : "";
+          return `${playerRow.player?.alias_name || playerRow.player?.character_name || playerRow.player?.display_name || playerRow.player?.id}: ${scoreValue}${putts} · ${playerRow.points} Netto`;
+        }).join(" · ");
+        return `Team ${team.teamId}: ${playerBits} → Best Ball ${team.value}`;
+      }).join("
+");
       const standings = Object.entries(running)
         .map(([teamId, points]) => ({ teamId, points }))
         .sort((a, b) => Number(b.points || 0) - Number(a.points || 0) || String(a.teamId).localeCompare(String(b.teamId)));
       steps.push({
         type: "holeReveal",
         title: `Loch ${row.hole.hole_number} · Der Schatten wandert`,
-        text: `Loch ${row.hole.hole_number} geht ${winnerText}. Der Stand ordnet sich neu.`,
+        text: `Loch ${row.hole.hole_number} geht ${winnerText}.`,
+        reasonText: teamReasonText,
         holeNumber: row.hole.hole_number,
         winnerTeamId: winners[0] || "",
         winnerTeamIds: winners,
@@ -3808,9 +3851,6 @@ function LordOfTheHolesApp() {
       return { ...standing, teamId, players: teamMap[teamId] || [] };
     });
     const rankedTeams = teamsByLetter.slice().sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
-    if (String(roundId) === "r3") {
-      steps.push(...buildRealRound3HoleRevealSteps(roundId));
-    }
 
     rankedTeams.forEach((team, index) => {
       team.ceremonyRank = getCompetitionRank(rankedTeams, index, (item) => Number(item.value || 0));
@@ -3903,6 +3943,14 @@ function LordOfTheHolesApp() {
 
     steps.push({
       type: "teamBoard",
+      title: "Drei leere Banner",
+      teams: teamsByLetter,
+      revealCounts: { A: 0, B: 0, C: 0 },
+      revealLine: "Drei Banner werden erhoben. Noch ist kein Name sichtbar. Der Palantír sammelt Atem.",
+      waitLabel: "Die ersten Namen werden gerufen ...",
+    });
+    steps.push({
+      type: "teamBoard",
       title: "Die ersten Namen fallen",
       teams: teamsByLetter,
       revealCounts: { A: 1, B: 0, C: 0 },
@@ -3958,12 +4006,16 @@ function LordOfTheHolesApp() {
       waitLabel: "Alle Bündnisse sind offenbart ...",
     });
 
-    steps.push({
-      type: "text",
-      title: "Alle Bündnisse sind offenbart",
-      text: "Die Namen sind gefallen. Nun richtet der Palantír die Teams nach ihrer Tageswertung — und plötzlich wird aus einer Ziehung ein Urteil.",
-      waitLabel: "Die Rangfolge wird enthüllt ...",
-    });
+    if (String(roundId) === "r3") {
+      steps.push(...buildRealRound3HoleRevealSteps(roundId));
+    } else {
+      steps.push({
+        type: "text",
+        title: "Alle Bündnisse sind offenbart",
+        text: "Die Namen sind gefallen. Nun richtet der Palantír die Teams nach ihrer Tageswertung — und plötzlich wird aus einer Ziehung ein Urteil.",
+        waitLabel: "Die Rangfolge wird enthüllt ...",
+      });
+    }
 
     resultRevealTeams.forEach((team) => {
       const rank = Number(team.ceremonyRank || 0);
@@ -4061,16 +4113,35 @@ function LordOfTheHolesApp() {
               <motion.div key={`hole-${teamCeremonyStepIndex}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="mx-auto mt-5 max-w-md rounded-3xl border border-sky-500/35 bg-black/28 p-4">
                 <div className="mb-2 text-xs uppercase tracking-[0.22em] text-sky-200/70">Loch {step.holeNumber} · Mordors Schlachtbericht</div>
                 <p className="text-base leading-relaxed text-amber-100/85">{step.text}</p>
-                <div className="mt-3 grid grid-cols-3 gap-2">
+                <div className="mt-3 grid grid-cols-1 gap-2">
                   {['A', 'B', 'C'].map((teamId) => {
                     const standing = (step.standings || []).find((item) => item.teamId === teamId) || { teamId, points: 0 };
                     const rankIndex = (step.standings || []).findIndex((item) => item.teamId === teamId);
                     const isWinner = (step.winnerTeamIds || [step.winnerTeamId]).map(String).includes(String(teamId));
+                    const teamDetail = (step.teams || []).find((team) => String(team.teamId) === String(teamId));
+                    const teamPlayers = teamDetail?.players || [];
                     return (
-                      <div key={teamId} className={cls("rounded-2xl border p-2 text-center", isWinner ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-100" : "border-amber-700/35 bg-stone-950/60 text-amber-100")}> 
-                        <div className="text-[10px] uppercase tracking-[0.16em] opacity-70">{rankIndex >= 0 ? `Rang ${rankIndex + 1}` : "Rang –"}</div>
-                        <div className="font-serif text-3xl font-black">{teamId}</div>
-                        <div className="text-xs">{Number(standing.points || 0)} Lochpunkte</div>
+                      <div key={teamId} className={cls("rounded-2xl border p-2 text-left", isWinner ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-100" : "border-amber-700/35 bg-stone-950/60 text-amber-100")}> 
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="text-[10px] uppercase tracking-[0.16em] opacity-70">{rankIndex >= 0 ? `Rang ${rankIndex + 1}` : "Rang –"}</div>
+                            <div className="font-serif text-xl font-black">Team {teamId}</div>
+                            <div className="text-[11px] text-amber-100/65">{teamPlayers.map((row) => row.player?.alias_name || row.player?.character_name || row.player?.display_name || row.player?.id).filter(Boolean).join(' · ') || 'noch versiegelt'}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-serif text-2xl font-black text-amber-300">{Number(standing.points || 0)}</div>
+                            <div className="text-[10px] uppercase tracking-[0.12em] opacity-70">Lochpunkte</div>
+                          </div>
+                        </div>
+                        <div className="mt-2 grid gap-1 text-[11px] text-amber-100/78">
+                          {teamPlayers.map((playerRow) => {
+                            const scoreValue = playerRow.score ? (normalizeBoolean(playerRow.score.picked_up) ? 'X' : playerRow.score.strokes) : '–';
+                            const putts = playerRow.score?.putts_count !== '' && playerRow.score?.putts_count != null ? ` · ${playerRow.score.putts_count} Putts` : '';
+                            const name = playerRow.player?.alias_name || playerRow.player?.character_name || playerRow.player?.display_name || playerRow.player?.id;
+                            return <div key={playerRow.player?.id || name} className="rounded-xl bg-black/22 px-2 py-1"><b className="text-amber-100">{name}</b>: Score {scoreValue}{putts} · Netto {playerRow.points} P</div>;
+                          })}
+                          <div className={cls("rounded-xl px-2 py-1 font-bold", isWinner ? "bg-emerald-400/15 text-emerald-100" : "bg-black/18 text-amber-100/65")}>Best Ball: {teamDetail?.value ?? 0}{teamDetail?.matchplayPoints ? ` · +${teamDetail.matchplayPoints} Lochpunkt` : ""}</div>
+                        </div>
                       </div>
                     );
                   })}
