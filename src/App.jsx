@@ -2080,3 +2080,4 @@ export default function LordOfTheHolesPWA() {
     </AppErrorBoundary>
   );
 }
+}
