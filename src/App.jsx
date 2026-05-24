@@ -57,7 +57,7 @@ const TEAM_DRAW_STORAGE_KEY = "lordOfTheHoles.teamDraw";
 const TEAM_DRAW_TARGETS = {
   r1: new Date("2026-05-22T21:00:00+02:00"),
   r2: new Date("2026-05-23T19:30:00+02:00"),
-  r3: new Date("2026-05-24T19:45:00+02:00"),
+  r3: new Date("2026-05-24T20:15:00+02:00"),
 };
 
 const fallbackAliases = {
@@ -3673,7 +3673,7 @@ function LordOfTheHolesApp() {
     const labels = {
       r1: "22.05.2026 · 21:00 Uhr",
       r2: "23.05.2026 · 19:30 Uhr",
-      r3: "24.05.2026 · 19:45 Uhr",
+      r3: "24.05.2026 · 20:15 Uhr",
     };
     return labels[roundId] || "noch nicht festgelegt";
   }
