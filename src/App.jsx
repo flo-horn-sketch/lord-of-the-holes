@@ -2073,11 +2073,12 @@ function ensureSecondSealWaitStep(timeline = []) {
   return steps;
 }
 
+}
+
 export default function LordOfTheHolesPWA() {
   return (
     <AppErrorBoundary>
       <LordOfTheHolesApp />
     </AppErrorBoundary>
   );
-}
 }
