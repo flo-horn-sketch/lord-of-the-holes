@@ -57,7 +57,7 @@ const TEAM_DRAW_STORAGE_KEY = "lordOfTheHoles.teamDraw";
 const TEAM_DRAW_TARGETS = {
   r1: new Date("2026-05-22T21:00:00+02:00"),
   r2: new Date("2026-05-23T19:30:00+02:00"),
-  r3: new Date("2026-05-24T21:00:00+02:00"),
+  r3: new Date("2026-05-24T19:45:00+02:00"),
 };
 
 const fallbackAliases = {
@@ -2048,6 +2048,7 @@ function LordOfTheHolesApp() {
   }, [flightCeremonyRunning, flightCeremonyTimeline, flightCeremonySyncStartAt, serverTimeOffsetMs]);
 
   function getTeamCeremonyStepDuration(step) {
+    if (step?.type === "holeReveal") return 10500;
     const textLength = String(step?.text || step?.revealLine || "").length + (step?.type === "teamBoard" ? 120 : step?.type === "team" ? 110 : 0);
     return Math.max(4200, Math.min(9000, 2500 + textLength * 28));
   }
@@ -3672,7 +3673,7 @@ function LordOfTheHolesApp() {
     const labels = {
       r1: "22.05.2026 · 21:00 Uhr",
       r2: "23.05.2026 · 19:30 Uhr",
-      r3: "24.05.2026 · 21:00 Uhr",
+      r3: "24.05.2026 · 19:45 Uhr",
     };
     return labels[roundId] || "noch nicht festgelegt";
   }
@@ -4124,8 +4125,8 @@ function LordOfTheHolesApp() {
                         <div className="flex items-start justify-between gap-2">
                           <div>
                             <div className="text-[10px] uppercase tracking-[0.16em] opacity-70">{rankIndex >= 0 ? `Rang ${rankIndex + 1}` : "Rang –"}</div>
-                            <div className="font-serif text-xl font-black">Team {teamId}</div>
-                            <div className="text-[11px] text-amber-100/65">{teamPlayers.map((row) => row.player?.alias_name || row.player?.character_name || row.player?.display_name || row.player?.id).filter(Boolean).join(' · ') || 'noch versiegelt'}</div>
+                            <div className="font-serif text-xl font-black">{teamPlayers.map((row) => row.player?.alias_name || row.player?.character_name || row.player?.display_name || row.player?.id).filter(Boolean).join(' & ') || `Team ${teamId}`}</div>
+                            <div className="text-[11px] text-amber-100/65">{rankIndex >= 0 ? `Rang ${rankIndex + 1}` : "Rang –"}</div>
                           </div>
                           <div className="text-right">
                             <div className="font-serif text-2xl font-black text-amber-300">{Number(standing.points || 0)}</div>
@@ -4134,27 +4135,14 @@ function LordOfTheHolesApp() {
                         </div>
                         <div className="mt-2 grid gap-1 text-[11px] text-amber-100/78">
                           {teamPlayers.map((playerRow) => {
-                            const scoreValue = playerRow.score ? (normalizeBoolean(playerRow.score.picked_up) ? 'X' : playerRow.score.strokes) : '–';
-                            const putts = playerRow.score?.putts_count !== '' && playerRow.score?.putts_count != null ? ` · ${playerRow.score.putts_count} Putts` : '';
                             const name = playerRow.player?.alias_name || playerRow.player?.character_name || playerRow.player?.display_name || playerRow.player?.id;
-                            return <div key={playerRow.player?.id || name} className="rounded-xl bg-black/22 px-2 py-1"><b className="text-amber-100">{name}</b>: Score {scoreValue}{putts} · Netto {playerRow.points} P</div>;
+                            return <div key={playerRow.player?.id || name} className="rounded-xl bg-black/22 px-2 py-1"><b className="text-amber-100">{name}</b>: {playerRow.points} Netto-Punkte</div>;
                           })}
                           <div className={cls("rounded-xl px-2 py-1 font-bold", isWinner ? "bg-emerald-400/15 text-emerald-100" : "bg-black/18 text-amber-100/65")}>Best Ball: {teamDetail?.value ?? 0}{teamDetail?.matchplayPoints ? ` · +${teamDetail.matchplayPoints} Lochpunkt` : ""}</div>
                         </div>
                       </div>
                     );
                   })}
-                </div>
-                <div className="mt-3 rounded-2xl border border-amber-700/35 bg-stone-950/60 p-3 text-left">
-                  <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-amber-300/70">Aktueller Stand nach Loch {step.holeNumber}</div>
-                  <div className="space-y-1">
-                    {(step.standings || []).map((team, index) => (
-                      <div key={team.teamId} className="flex items-center justify-between rounded-xl bg-black/25 px-3 py-1.5 text-sm text-amber-100">
-                        <span className="font-bold">{index + 1}. Team {team.teamId}</span>
-                        <span className="font-serif text-lg font-black text-amber-300">{Number(team.points || 0)}</span>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               </motion.div>
             ) : step.type === "teamIntro" || step.type === "teamResult" ? (
