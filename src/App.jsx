@@ -1620,6 +1620,7 @@ function LordOfTheHolesApp() {
   const [teamDrawRows, setTeamDrawRows] = useState(cachedState?.teamDrawRows || []);
   const [teamDrawSaving, setTeamDrawSaving] = useState(false);
   const [teamCeremonyRunning, setTeamCeremonyRunning] = useState(false);
+  const [teamCeremonyTestMode, setTeamCeremonyTestMode] = useState(false);
   const [teamCeremonyRoundId, setTeamCeremonyRoundId] = useState("");
   const [teamCeremonyStepIndex, setTeamCeremonyStepIndex] = useState(0);
   const [teamCeremonySyncStartAt, setTeamCeremonySyncStartAt] = useState("");
@@ -1915,7 +1916,7 @@ function LordOfTheHolesApp() {
   const flightDrawUnlocked = atomicTimeActive && syncedNow.getTime() >= FLIGHT_DRAW_TARGET.getTime();
   const flightCeremonyTimeline = useMemo(() => buildFlightCeremonyTimeline(flightDraw), [flightDraw]);
   const unlockedTeamDrawRoundIds = useMemo(() => atomicTimeActive ? Object.entries(TEAM_DRAW_TARGETS).filter(([, target]) => syncedNow.getTime() >= target.getTime()).map(([roundId]) => roundId) : [], [syncedNow, atomicTimeActive]);
-  const teamCeremonyTimeline = useMemo(() => buildTeamCeremonyTimeline(teamCeremonyRoundId), [teamCeremonyRoundId, teamDrawRows, allPlayers, officialAllScores]);
+  const teamCeremonyTimeline = useMemo(() => teamCeremonyTestMode && String(teamCeremonyRoundId) === "r3" ? buildDummyRound3TeamCeremonyTimeline() : buildTeamCeremonyTimeline(teamCeremonyRoundId), [teamCeremonyTestMode, teamCeremonyRoundId, teamDrawRows, allPlayers, officialAllScores]);
   const isTeamDrawRoundVisible = (roundId) => {
     const key = `team_ceremony_${roundId}`;
     return Boolean((teamCeremonyDismissedKeys || []).includes(key));
@@ -2086,8 +2087,9 @@ function LordOfTheHolesApp() {
       const syncedIndex = getSyncedTeamCeremonyIndex(timeline, teamCeremonySyncStartAt);
       if (syncedIndex >= timeline.length) {
         const key = `team_ceremony_${teamCeremonyRoundId}`;
-        setTeamCeremonyDismissedKeys((current) => Array.from(new Set([...(current || []), key])));
+        if (!teamCeremonyTestMode) setTeamCeremonyDismissedKeys((current) => Array.from(new Set([...(current || []), key])));
         setTeamCeremonyRunning(false);
+        setTeamCeremonyTestMode(false);
         setTeamCeremonyRoundId("");
         setTeamCeremonyStepIndex(0);
         setTeamCeremonySyncStartAt("");
@@ -2096,7 +2098,7 @@ function LordOfTheHolesApp() {
       setTeamCeremonyStepIndex(syncedIndex);
     }, 250);
     return () => window.clearInterval(timer);
-  }, [teamCeremonyRunning, teamCeremonyTimeline, teamCeremonyRoundId, teamCeremonySyncStartAt]);
+  }, [teamCeremonyRunning, teamCeremonyTimeline, teamCeremonyRoundId, teamCeremonySyncStartAt, teamCeremonyTestMode]);
   useEffect(() => {
     if (!appLocked || lockAdminBypass || flightCeremonyRunning || flightCeremonyCompleted) return;
     if (!flightDrawUnlocked || !flightDraw?.rounds?.length) return;
@@ -3321,12 +3323,13 @@ function LordOfTheHolesApp() {
             </div>
             <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
               <div className="mb-2 text-sm font-bold text-amber-200">Team-Zeremonie testen</div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <Button disabled={!isAdminUnlocked} onClick={() => startTeamCeremonyTest("r1")} className="rounded-2xl border border-amber-500/40 bg-amber-950/60 py-2 text-xs font-bold text-amber-100 disabled:opacity-50">R1</Button>
                 <Button disabled={!isAdminUnlocked} onClick={() => startTeamCeremonyTest("r2")} className="rounded-2xl border border-amber-500/40 bg-amber-950/60 py-2 text-xs font-bold text-amber-100 disabled:opacity-50">R2</Button>
-                <Button disabled={!isAdminUnlocked} onClick={() => startTeamCeremonyTest("r3")} className="rounded-2xl border border-amber-500/40 bg-amber-950/60 py-2 text-xs font-bold text-amber-100 disabled:opacity-50">R3</Button>
+                <Button disabled={!isAdminUnlocked} onClick={() => startTeamCeremonyTest("r3")} className="rounded-2xl border border-amber-500/40 bg-amber-950/60 py-2 text-xs font-bold text-amber-100 disabled:opacity-50">R3 echt</Button>
+                <Button disabled={!isAdminUnlocked} onClick={startDummyRound3TeamCeremonyTest} className="rounded-2xl border border-sky-500/40 bg-sky-950/60 py-2 text-xs font-bold text-sky-100 disabled:opacity-50">R3 Dummy</Button>
               </div>
-              <div className="mt-1 text-[11px] text-amber-100/45">Startet die jeweilige Teamdraw-Zeremonie sofort auf diesem Gerät.</div>
+              <div className="mt-1 text-[11px] text-amber-100/45">R3 Dummy testet spoilerfrei mit Platzhaltern. Echte Teams, Scores und Marker bleiben verborgen.</div>
             </div>
             <Button disabled={!isAdminUnlocked || connectionStatus !== "online" || teamDrawSaving} onClick={async () => { setTeamCeremonyDismissedKeys([]); writeLocalJson("lordOfTheHoles.teamCeremonyDismissedKeys", []); await fullResetForAllDevices(); await generateAndSaveTeamDrawToSheet(); }} className="mt-2 w-full rounded-2xl border border-red-400/60 bg-red-950/80 py-2 text-red-100 disabled:opacity-50">Runde beginnen</Button>
             </> : null}
@@ -3610,10 +3613,21 @@ function LordOfTheHolesApp() {
 
   function startTeamCeremonyTest(roundId) {
     const key = `team_ceremony_${roundId}`;
+    setTeamCeremonyTestMode(false);
     setTeamCeremonyDismissedKeys((current) => (current || []).filter((item) => item !== key));
     setTeamCeremonyRoundId(roundId);
     setTeamCeremonyStepIndex(0);
     setTeamCeremonySyncStartAt(getNextSyncedCeremonyStart(roundId, buildTeamCeremonyTimeline(roundId), true));
+    setShowSplash(false);
+    setTeamCeremonyRunning(true);
+  }
+
+  function startDummyRound3TeamCeremonyTest() {
+    const timeline = buildDummyRound3TeamCeremonyTimeline();
+    setTeamCeremonyTestMode(true);
+    setTeamCeremonyRoundId("r3");
+    setTeamCeremonyStepIndex(0);
+    setTeamCeremonySyncStartAt(getNextSyncedCeremonyStart("r3", timeline, true));
     setShowSplash(false);
     setTeamCeremonyRunning(true);
   }
@@ -3695,6 +3709,85 @@ function LordOfTheHolesApp() {
     return (teamDrawRows || []).map(normalizeTeamDrawRow).filter((row) => String(row.round_id) === String(roundId)).sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
   }
 
+  function buildDummyRound3TeamCeremonyTimeline() {
+    const dummyTeams = [
+      { teamId: "A", players: [{ id: "dummy-a1", alias_name: "Waldläufer", character_name: "Wanderer aus Bree" }, { id: "dummy-a2", alias_name: "Hüter", character_name: "Hüter des Westens" }] },
+      { teamId: "B", players: [{ id: "dummy-b1", alias_name: "Reiter", character_name: "Reiter Rohans" }, { id: "dummy-b2", alias_name: "Zwerg", character_name: "Zwerg aus Erebor" }] },
+      { teamId: "C", players: [{ id: "dummy-c1", alias_name: "Bote", character_name: "Bote Gondors" }, { id: "dummy-c2", alias_name: "Elb", character_name: "Elb aus Lórien" }] },
+    ];
+    const holeWinners = ["B", "A", "C", "A", "B", "B", "C", "A", "C", "B", "A", "A", "C", "B", "C", "A", "B", "C"];
+    const running = { A: 0, B: 0, C: 0 };
+    const steps = [
+      { type: "intro", testMode: true, title: "TESTMODUS · Keine echten Teams", text: "Dies ist nur eine Probe der Runde-3-Zeremonie. Namen, Teams und Ergebnisse sind Platzhalter — die echte Auslosung bleibt verborgen." },
+      { type: "teamBoard", testMode: true, title: "Die Gefährten werden gebunden", text: "Drei Schatten treten an. Keiner davon verrät, wer heute wirklich zusammen in Mordor marschiert.", teams: dummyTeams.map((team) => ({ ...team, revealCount: 0 })) },
+    ];
+
+    dummyTeams.forEach((team) => {
+      steps.push({ type: "teamBoard", testMode: true, title: `Team ${team.teamId} erscheint`, text: `Team ${team.teamId} tritt aus dem Nebel. Dies sind nur Testnamen.`, teams: dummyTeams.map((item) => ({ ...item, revealCount: item.teamId === team.teamId ? 2 : item.teamId < team.teamId ? 2 : 0 })) });
+    });
+
+    steps.push({ type: "intro", testMode: true, title: "Die Tore Mordors öffnen sich", text: "Nun wird Loch für Loch enthüllt. Nach jedem Loch verschiebt sich die Rangordnung — wie ein Palantír, der sehr gerne Tabellen sortiert." });
+
+    holeWinners.forEach((winnerTeamId, index) => {
+      running[winnerTeamId] += 1;
+      const holeNumber = index + 1;
+      const standings = Object.entries(running)
+        .map(([teamId, points]) => ({ teamId, points }))
+        .sort((a, b) => Number(b.points || 0) - Number(a.points || 0) || String(a.teamId).localeCompare(String(b.teamId)));
+      steps.push({
+        type: "holeReveal",
+        testMode: true,
+        title: `Loch ${holeNumber} · Der Schatten wandert`,
+        text: `Loch ${holeNumber} geht an Team ${winnerTeamId}. Der Stand ordnet sich neu.`,
+        holeNumber,
+        winnerTeamId,
+        standings,
+        teams: dummyTeams,
+      });
+    });
+
+    const finalTeams = Object.entries(running)
+      .map(([teamId, points]) => ({ teamId, points, players: dummyTeams.find((team) => team.teamId === teamId)?.players || [] }))
+      .sort((a, b) => Number(a.points || 0) - Number(b.points || 0));
+    finalTeams.forEach((team, index) => {
+      const rank = index + 1;
+      steps.push({ type: "teamResult", testMode: true, title: `${rank}. Platz · TEST`, text: `Team ${team.teamId} landet im Test auf Platz ${rank} mit ${team.points} Lochpunkten. Keine echten Spieler, keine echte Tageswertung.`, team, rank });
+    });
+    steps.push({ type: "outro", testMode: true, title: "Test beendet", text: "Die echte Runde-3-Zeremonie bleibt versiegelt. Keine Teams wurden verraten, kein Marker wurde gesetzt." });
+    return steps;
+  }
+
+  function buildRealRound3HoleRevealSteps(roundId) {
+    if (String(roundId) !== "r3") return [];
+    const holeDetails = buildDailyTeamHoleDetails(roundId, true);
+    if (!holeDetails.length) return [];
+    const running = { A: 0, B: 0, C: 0 };
+    const steps = [{ type: "intro", title: "Die Tore Mordors öffnen sich", text: "Nun wird Loch für Loch enthüllt. Nach jedem Loch verschiebt sich die Rangordnung — und der Palantír kennt kein Mitleid." }];
+
+    holeDetails.forEach((row) => {
+      (row.teams || []).forEach((team) => {
+        running[team.teamId] = Number(running[team.teamId] || 0) + Number(team.matchplayPoints || 0);
+      });
+      const winners = (row.teams || []).filter((team) => Number(team.matchplayPoints || 0) > 0).map((team) => team.teamId);
+      const winnerText = winners.length > 1 ? `geteilt von Team ${winners.join(" und Team ")}` : winners.length ? `an Team ${winners[0]}` : "an niemanden";
+      const standings = Object.entries(running)
+        .map(([teamId, points]) => ({ teamId, points }))
+        .sort((a, b) => Number(b.points || 0) - Number(a.points || 0) || String(a.teamId).localeCompare(String(b.teamId)));
+      steps.push({
+        type: "holeReveal",
+        title: `Loch ${row.hole.hole_number} · Der Schatten wandert`,
+        text: `Loch ${row.hole.hole_number} geht ${winnerText}. Der Stand ordnet sich neu.`,
+        holeNumber: row.hole.hole_number,
+        winnerTeamId: winners[0] || "",
+        winnerTeamIds: winners,
+        standings,
+        teams: row.teams,
+      });
+    });
+
+    return steps;
+  }
+
   function buildTeamCeremonyTimeline(roundId) {
     const rows = getTeamDrawRowsForRound(roundId);
     if (!roundId || !rows.length) return [];
@@ -3715,6 +3808,10 @@ function LordOfTheHolesApp() {
       return { ...standing, teamId, players: teamMap[teamId] || [] };
     });
     const rankedTeams = teamsByLetter.slice().sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
+    if (String(roundId) === "r3") {
+      steps.push(...buildRealRound3HoleRevealSteps(roundId));
+    }
+
     rankedTeams.forEach((team, index) => {
       team.ceremonyRank = getCompetitionRank(rankedTeams, index, (item) => Number(item.value || 0));
       team.ceremonyRankLabel = formatCompetitionRank(rankedTeams, index, (item) => Number(item.value || 0));
@@ -3902,7 +3999,11 @@ function LordOfTheHolesApp() {
     const timeline = teamCeremonyTimeline;
     const step = timeline[Math.min(teamCeremonyStepIndex, Math.max(0, timeline.length - 1))];
     if (!step) return null;
-    const playerLabel = (row) => row.player_alias ? `${row.player_alias} (${row.player_name || row.player_id})` : (row.player_name || row.player_id);
+    const playerLabel = (row) => {
+      const alias = row?.player_alias || row?.alias_name || "";
+      const name = row?.player_name || row?.character_name || row?.display_name || row?.player_id || row?.id || "";
+      return alias ? `${alias} (${name})` : name;
+    };
     const playerMetaLabel = (row, teamId, index) => {
       const meta = getDailyTeamPlayerMeta(teamCeremonyRoundId, teamId, row.player_id, index, true);
       return meta.isLoanPlayer ? `Leihspieler in Team C · zählt hier mit, Stammteam ${meta.homeTeamId}` : "";
@@ -3912,14 +4013,14 @@ function LordOfTheHolesApp() {
         <Card className="relative overflow-hidden rounded-3xl border-amber-500/45 bg-[radial-gradient(circle_at_50%_0%,rgba(245,158,11,0.28),transparent_44%),linear-gradient(180deg,rgba(32,23,15,0.96),rgba(12,10,9,0.96))] shadow-2xl">
           <CardContent className="p-4 text-center">
             <div className="mx-auto mb-3 h-1.5 w-24 rounded-full bg-amber-400/70 shadow-[0_0_18px_rgba(251,191,36,0.35)]" />
-            <p className="text-[10px] uppercase tracking-[0.28em] text-amber-300/75">Team-Zeremonie</p>
+            <p className="text-[10px] uppercase tracking-[0.28em] text-amber-300/75">{teamCeremonyTestMode || step.testMode ? "TESTMODUS · Keine echten Teams" : "Team-Zeremonie"}</p>
             <h2 className="mt-1 font-serif text-2xl font-black text-amber-200">{step.title}</h2>
             {step.type === "teamBoard" ? (
               <motion.div key={`team-board-${teamCeremonyStepIndex}`} initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="mt-5 rounded-3xl border border-amber-500/35 bg-black/28 p-3">
                 <p className="mb-3 text-sm italic text-amber-100/70">{step.revealLine}</p>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 landscape:grid-cols-3">
                   {(step.teams || []).map((team) => {
-                    const revealCount = Number(step.revealCounts?.[team.teamId] || 0);
+                    const revealCount = Number(step.revealCounts?.[team.teamId] ?? team.revealCount ?? 0);
                     const shownPlayers = (team.players || []).slice(0, revealCount);
                     return (
                       <div key={team.teamId} className="rounded-2xl border border-amber-700/35 bg-stone-950/65 p-2 text-center">
@@ -3954,6 +4055,36 @@ function LordOfTheHolesApp() {
                       {playerMetaLabel(row, step.teamId, index) ? <div className="mt-1 font-sans text-[11px] font-bold uppercase tracking-[0.16em] text-amber-300/70">{playerMetaLabel(row, step.teamId, index)}</div> : null}
                     </motion.div>
                   ))}
+                </div>
+              </motion.div>
+            ) : step.type === "holeReveal" ? (
+              <motion.div key={`hole-${teamCeremonyStepIndex}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="mx-auto mt-5 max-w-md rounded-3xl border border-sky-500/35 bg-black/28 p-4">
+                <div className="mb-2 text-xs uppercase tracking-[0.22em] text-sky-200/70">Loch {step.holeNumber} · Mordors Schlachtbericht</div>
+                <p className="text-base leading-relaxed text-amber-100/85">{step.text}</p>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {['A', 'B', 'C'].map((teamId) => {
+                    const standing = (step.standings || []).find((item) => item.teamId === teamId) || { teamId, points: 0 };
+                    const rankIndex = (step.standings || []).findIndex((item) => item.teamId === teamId);
+                    const isWinner = (step.winnerTeamIds || [step.winnerTeamId]).map(String).includes(String(teamId));
+                    return (
+                      <div key={teamId} className={cls("rounded-2xl border p-2 text-center", isWinner ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-100" : "border-amber-700/35 bg-stone-950/60 text-amber-100")}> 
+                        <div className="text-[10px] uppercase tracking-[0.16em] opacity-70">{rankIndex >= 0 ? `Rang ${rankIndex + 1}` : "Rang –"}</div>
+                        <div className="font-serif text-3xl font-black">{teamId}</div>
+                        <div className="text-xs">{Number(standing.points || 0)} Lochpunkte</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-3 rounded-2xl border border-amber-700/35 bg-stone-950/60 p-3 text-left">
+                  <div className="mb-2 text-[10px] uppercase tracking-[0.18em] text-amber-300/70">Aktueller Stand nach Loch {step.holeNumber}</div>
+                  <div className="space-y-1">
+                    {(step.standings || []).map((team, index) => (
+                      <div key={team.teamId} className="flex items-center justify-between rounded-xl bg-black/25 px-3 py-1.5 text-sm text-amber-100">
+                        <span className="font-bold">{index + 1}. Team {team.teamId}</span>
+                        <span className="font-serif text-lg font-black text-amber-300">{Number(team.points || 0)}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </motion.div>
             ) : step.type === "teamIntro" || step.type === "teamResult" ? (
