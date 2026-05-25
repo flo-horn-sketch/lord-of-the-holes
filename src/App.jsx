@@ -1440,6 +1440,11 @@ function TournamentStandings({ players, rounds, holes, scores, courses = fallbac
   const finalRound = getFinalRound(rounds);
   const isFinalActive = String(activeRoundId) === String(finalRound?.round_id || "r4");
   const orderedRounds = (rounds?.length ? rounds : fallbackRounds).slice().sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
+  const finalGroupSize = finalStandings.filter((player) => player.finalGroup === "championship").length;
+  const placementGroupSize = finalStandings.filter((player) => player.finalGroup === "placement").length;
+  const placementStartRank = finalGroupSize + 1;
+  const placementEndRank = finalGroupSize + placementGroupSize;
+  const placementGroupLabel = placementGroupSize <= 0 ? "" : placementGroupSize === 1 ? `Platzierungsgruppe · Platz ${placementStartRank}` : `Platzierungsgruppe · Plätze ${placementStartRank}–${placementEndRank}`;
 
   const getQualRank = (index) => {
     const current = standings[index];
@@ -1499,7 +1504,7 @@ function TournamentStandings({ players, rounds, holes, scores, courses = fallbac
             <tbody>
               {isFinalActive ? finalStandings.map((player, index) => (
                 <React.Fragment key={player.id}>
-                  {index === 3 && <tr><td colSpan={6} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-amber-200">Platzierungsgruppe · Plätze 4–6</td></tr>}
+                  {index === finalGroupSize && placementGroupSize > 0 && <tr><td colSpan={6} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2 py-2 text-center text-xs font-bold uppercase tracking-[0.2em] text-amber-200">{placementGroupLabel}</td></tr>}
                   <tr className={cls("border-t border-amber-700/20", index < 3 && "bg-emerald-500/5")}>
                     <td className="px-2 py-1.5 font-serif text-lg font-bold text-amber-300">{formatCompetitionRank(finalStandings, index, (item) => `${item.finalGroup}|${item.finalHcpAdjustedStrokes ?? ""}`)}</td>
                     <td className="px-2 py-1.5 font-semibold text-amber-100">{getPlayerLabel(player)}</td>
@@ -3090,7 +3095,7 @@ function LordOfTheHolesApp() {
                 <div className="grid grid-cols-3 gap-1.5 text-center text-[11px]">
                   <button type="button" onClick={() => setStandingsPopup("strokePlay")} className="rounded-xl border border-amber-500/20 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(0,0,0,0.18))] p-1.5 text-amber-50 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)] transition active:scale-[0.98]"><div className="text-amber-100">Tats. Strokes</div><b className="text-base text-amber-200">{myCurrentStats.played ? myCurrentStats.total : "–"}</b><div className="mt-0.5 text-[9px] text-amber-100/70">Platz {strokePlayLeaderboard.findIndex((player) => String(player.id) === String(myPlayerId)) >= 0 ? strokePlayLeaderboard.findIndex((player) => String(player.id) === String(myPlayerId)) + 1 : "–"}</div></button>
                   <button type="button" onClick={() => setStandingsPopup("hcpAdjusted")} className="rounded-xl border border-amber-500/20 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(0,0,0,0.18))] p-1.5 text-amber-50 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)] transition active:scale-[0.98]"><div className="text-amber-100">HCP +/−</div><b className="text-base text-amber-200">{myCurrentStats.played ? formatToPar(myCurrentStats.hcpAdjustedToPar, true) : "–"}</b><div className="mt-0.5 text-[9px] text-amber-100/70">Platz {myHcpAdjustedStrokeRank || "–"}</div></button>
-                  <button type="button" onClick={() => setStandingsPopup("netStableford")} className="rounded-xl border border-amber-500/20 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(0,0,0,0.18))] p-1.5 text-amber-50 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)] transition active:scale-[0.98]"><div className="text-amber-100">Netto Stbl</div><b className="text-base text-amber-200">{myCurrentStats.netStableford}</b><div className="mt-0.5 text-[9px] text-amber-100/70">Platz {myNetStablefordRank || "–"}</div></button>
+                  <button type="button" onClick={() => setStandingsPopup(String(displayedActiveRound?.round_id || "") === "r4" ? "finalHcpAdjusted" : "netStableford")} className="rounded-xl border border-amber-500/20 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(0,0,0,0.18))] p-1.5 text-amber-50 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)] transition active:scale-[0.98]"><div className="text-amber-100">Netto Stbl</div><b className="text-base text-amber-200">{myCurrentStats.netStableford}</b><div className="mt-0.5 text-[9px] text-amber-100/70">Platz {myNetStablefordRank || "–"}</div></button>
                 </div>
               </div>
             ) : <div className="mb-2 rounded-xl border border-amber-700/30 bg-black/25 p-1.5 text-[10px] text-amber-100/75">Wähle zuerst im Start-Popup deinen Spieler aus.</div>}
@@ -4724,14 +4729,80 @@ function LordOfTheHolesApp() {
     if (!standingsPopup) return null;
     const isNetStableford = standingsPopup === "netStableford";
     const isStrokePlay = standingsPopup === "strokePlay";
-    const title = isStrokePlay ? "Klassisches Zählspiel" : isNetStableford ? "Netto Stableford" : "Strokes HCP adjusted";
-    const tablePlayers = isStrokePlay ? strokePlayLeaderboard : isNetStableford ? netStablefordLeaderboard : hcpAdjustedStrokeLeaderboard;
-    const getPopupRankValue = (player) => isStrokePlay
-      ? (player.played ? player.toPar : "")
-      : isNetStableford
-        ? (player.played ? player.netStableford : "")
-        : (player.played ? player.hcpAdjustedToPar : "");
-    return <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 px-3 backdrop-blur-sm"><div className="max-h-[82vh] w-full max-w-md overflow-hidden rounded-3xl border border-amber-500/45 bg-stone-950 text-amber-50 shadow-2xl shadow-black/80"><div className="flex items-start justify-between gap-2 border-b border-amber-700/35 bg-amber-500/10 p-3"><div><div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Tabelle</div><div className="font-serif text-lg text-amber-200">{title}</div></div><button type="button" onClick={() => setStandingsPopup(null)} className="rounded-xl border border-amber-500/40 bg-black/25 px-3 py-1 text-lg font-bold leading-none text-amber-100">×</button></div><div className="max-h-[68vh] overflow-auto p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"><table className="w-full border-collapse text-sm text-amber-50"><thead><tr className="text-left text-xs uppercase tracking-wider text-amber-100/80"><th className="px-2 py-2">#</th><th className="px-2 py-2">Spieler</th><th className="px-2 py-2 text-right">{isNetStableford ? "Punkte" : "+/−"}</th><th className="px-2 py-2 text-right">Löcher</th></tr></thead><tbody>{tablePlayers.map((player, index) => <tr key={player.id} className={cls("border-t border-amber-700/20", myPlayerId && String(player.id) === String(myPlayerId) && "bg-amber-500/15")}><td className="px-2 py-2 text-amber-200/80">{formatCompetitionRank(tablePlayers, index, getPopupRankValue)}</td><td className="px-2 py-2 font-semibold text-amber-100">{getPlayerLabel(player)}</td><td className="px-2 py-2 text-right font-serif text-lg font-bold text-amber-300">{isStrokePlay ? formatToPar(player.toPar, player.played) : isNetStableford ? player.netStableford : formatToPar(player.hcpAdjustedToPar, player.played)}</td><td className="px-2 py-2 text-right text-amber-100/80">{player.played}/18</td></tr>)}</tbody></table></div></div></div>;
+    const isFinalHcpAdjusted = standingsPopup === "finalHcpAdjusted";
+    const finalPopupPlayers = isFinalHcpAdjusted ? buildFinalNetStandings(allPlayers, rounds, allHoles, getOfficialScores(allScores), courses) : [];
+    const finalGroupSize = finalPopupPlayers.filter((player) => player.finalGroup === "championship").length;
+    const placementGroupSize = finalPopupPlayers.filter((player) => player.finalGroup === "placement").length;
+    const placementStartRank = finalGroupSize + 1;
+    const placementEndRank = finalGroupSize + placementGroupSize;
+    const placementGroupLabel = placementGroupSize <= 0 ? "" : placementGroupSize === 1 ? `Platzierungsgruppe · Platz ${placementStartRank}` : `Platzierungsgruppe · Plätze ${placementStartRank}–${placementEndRank}`;
+    const title = isFinalHcpAdjusted ? "Finalwertung Strokes HCP adjusted" : isStrokePlay ? "Klassisches Zählspiel" : isNetStableford ? "Netto Stableford" : "Strokes HCP adjusted";
+    const tablePlayers = isFinalHcpAdjusted ? finalPopupPlayers : isStrokePlay ? strokePlayLeaderboard : isNetStableford ? netStablefordLeaderboard : hcpAdjustedStrokeLeaderboard;
+    const getPopupRankValue = (player) => isFinalHcpAdjusted
+      ? `${player.finalGroup || ""}|${player.finalHcpAdjustedStrokes ?? ""}`
+      : isStrokePlay
+        ? (player.played ? player.toPar : "")
+        : isNetStableford
+          ? (player.played ? player.netStableford : "")
+          : (player.played ? player.hcpAdjustedToPar : "");
+
+    return (
+      <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/70 px-3 backdrop-blur-sm">
+        <div className="max-h-[82vh] w-full max-w-md overflow-hidden rounded-3xl border border-amber-500/45 bg-stone-950 text-amber-50 shadow-2xl shadow-black/80">
+          <div className="flex items-start justify-between gap-2 border-b border-amber-700/35 bg-amber-500/10 p-3">
+            <div>
+              <div className="text-xs uppercase tracking-[0.2em] text-amber-300/75">{isFinalHcpAdjusted ? "Turnierwertung" : "Tabelle"}</div>
+              <div className="font-serif text-lg text-amber-200">{title}</div>
+              {isFinalHcpAdjusted ? <div className="mt-0.5 text-xs text-amber-100/60">Finaltag · gleiche Wertung wie Turnierstand</div> : null}
+            </div>
+            <button type="button" onClick={() => setStandingsPopup(null)} className="rounded-xl border border-amber-500/40 bg-black/25 px-3 py-1 text-lg font-bold leading-none text-amber-100">×</button>
+          </div>
+          <div className="max-h-[68vh] overflow-auto p-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <table className="w-full border-collapse text-sm text-amber-50">
+              <thead>
+                {isFinalHcpAdjusted ? (
+                  <tr className="text-left text-xs uppercase tracking-wider text-amber-100/80">
+                    <th className="px-2 py-2">#</th>
+                    <th className="px-2 py-2">Spieler</th>
+                    <th className="px-2 py-2 text-right">Quali</th>
+                    <th className="px-2 py-2 text-right">Final HCP</th>
+                    <th className="px-2 py-2 text-right">Löcher</th>
+                  </tr>
+                ) : (
+                  <tr className="text-left text-xs uppercase tracking-wider text-amber-100/80">
+                    <th className="px-2 py-2">#</th>
+                    <th className="px-2 py-2">Spieler</th>
+                    <th className="px-2 py-2 text-right">{isNetStableford ? "Punkte" : "+/−"}</th>
+                    <th className="px-2 py-2 text-right">Löcher</th>
+                  </tr>
+                )}
+              </thead>
+              <tbody>
+                {tablePlayers.map((player, index) => isFinalHcpAdjusted ? (
+                  <React.Fragment key={player.id}>
+                    {index === finalGroupSize && placementGroupSize > 0 ? <tr><td colSpan={5} className="border-y-2 border-amber-400/70 bg-amber-500/10 px-2 py-2 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-amber-200">{placementGroupLabel}</td></tr> : null}
+                    <tr className={cls("border-t border-amber-700/20", myPlayerId && String(player.id) === String(myPlayerId) && "bg-amber-500/15", player.finalGroup === "championship" && "bg-emerald-500/5")}>
+                      <td className="px-2 py-2 text-amber-200/80">{formatCompetitionRank(tablePlayers, index, getPopupRankValue)}</td>
+                      <td className="px-2 py-2 font-semibold text-amber-100">{getPlayerLabel(player)}</td>
+                      <td className="px-2 py-2 text-right text-amber-100/75">{player.qualificationRank}</td>
+                      <td className="px-2 py-2 text-right font-serif text-lg font-bold text-amber-300">{player.finalHcpAdjustedStrokes ?? "–"}</td>
+                      <td className="px-2 py-2 text-right text-amber-100/80">{player.finalPlayed}/18</td>
+                    </tr>
+                  </React.Fragment>
+                ) : (
+                  <tr key={player.id} className={cls("border-t border-amber-700/20", myPlayerId && String(player.id) === String(myPlayerId) && "bg-amber-500/15")}>
+                    <td className="px-2 py-2 text-amber-200/80">{formatCompetitionRank(tablePlayers, index, getPopupRankValue)}</td>
+                    <td className="px-2 py-2 font-semibold text-amber-100">{getPlayerLabel(player)}</td>
+                    <td className="px-2 py-2 text-right font-serif text-lg font-bold text-amber-300">{isStrokePlay ? formatToPar(player.toPar, player.played) : isNetStableford ? player.netStableford : formatToPar(player.hcpAdjustedToPar, player.played)}</td>
+                    <td className="px-2 py-2 text-right text-amber-100/80">{player.played}/18</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   function buildFlightCeremonyTimeline(draw = flightDraw) {
