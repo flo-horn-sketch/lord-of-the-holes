@@ -3071,6 +3071,11 @@ function LordOfTheHolesApp() {
 
   function renderScoreView() {
     const scoringTintClass = isScorerEntryMode ? "[--score-accent:56_189_248]" : "[--score-accent:245_158_11]";
+    const isFinalRoundScoring = String(displayedActiveRound?.round_id || "") === "r4";
+    const finalStandingsForMyStand = isFinalRoundScoring ? buildFinalNetStandings(allPlayers, rounds, allHoles, getOfficialScores(allScores), courses) : [];
+    const myFinalStandingIndex = finalStandingsForMyStand.findIndex((player) => String(player.id) === String(myPlayerId));
+    const myFinalStanding = myFinalStandingIndex >= 0 ? finalStandingsForMyStand[myFinalStandingIndex] : null;
+    const myFinalRankLabel = myFinalStandingIndex >= 0 ? formatCompetitionRank(finalStandingsForMyStand, myFinalStandingIndex, (item) => `${item.finalGroup || ""}|${item.finalHcpAdjustedStrokes ?? ""}`) : "–";
     return (
       <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }}>
         <Card className="mb-2 rounded-2xl bg-transparent shadow-none">
@@ -3095,7 +3100,7 @@ function LordOfTheHolesApp() {
                 <div className="grid grid-cols-3 gap-1.5 text-center text-[11px]">
                   <button type="button" onClick={() => setStandingsPopup("strokePlay")} className="rounded-xl border border-amber-500/20 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(0,0,0,0.18))] p-1.5 text-amber-50 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)] transition active:scale-[0.98]"><div className="text-amber-100">Tats. Strokes</div><b className="text-base text-amber-200">{myCurrentStats.played ? myCurrentStats.total : "–"}</b><div className="mt-0.5 text-[9px] text-amber-100/70">Platz {strokePlayLeaderboard.findIndex((player) => String(player.id) === String(myPlayerId)) >= 0 ? strokePlayLeaderboard.findIndex((player) => String(player.id) === String(myPlayerId)) + 1 : "–"}</div></button>
                   <button type="button" onClick={() => setStandingsPopup("hcpAdjusted")} className="rounded-xl border border-amber-500/20 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(0,0,0,0.18))] p-1.5 text-amber-50 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)] transition active:scale-[0.98]"><div className="text-amber-100">HCP +/−</div><b className="text-base text-amber-200">{myCurrentStats.played ? formatToPar(myCurrentStats.hcpAdjustedToPar, true) : "–"}</b><div className="mt-0.5 text-[9px] text-amber-100/70">Platz {myHcpAdjustedStrokeRank || "–"}</div></button>
-                  <button type="button" onClick={() => setStandingsPopup(String(displayedActiveRound?.round_id || "") === "r4" ? "finalHcpAdjusted" : "netStableford")} className="rounded-xl border border-amber-500/20 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(0,0,0,0.18))] p-1.5 text-amber-50 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)] transition active:scale-[0.98]"><div className="text-amber-100">Netto Stbl</div><b className="text-base text-amber-200">{myCurrentStats.netStableford}</b><div className="mt-0.5 text-[9px] text-amber-100/70">Platz {myNetStablefordRank || "–"}</div></button>
+                  <button type="button" onClick={() => setStandingsPopup(isFinalRoundScoring ? "finalHcpAdjusted" : "netStableford")} className="rounded-xl border border-amber-500/20 bg-[linear-gradient(180deg,rgba(251,191,36,0.08),rgba(0,0,0,0.18))] p-1.5 text-amber-50 shadow-[inset_0_1px_0_rgba(251,191,36,0.10)] transition active:scale-[0.98]"><div className="text-amber-100">{isFinalRoundScoring ? "Finalwertung" : "Netto Stbl"}</div><b className="text-base text-amber-200">{isFinalRoundScoring ? (myFinalStanding?.finalHcpAdjustedStrokes ?? "–") : myCurrentStats.netStableford}</b><div className="mt-0.5 text-[9px] text-amber-100/70">Platz {isFinalRoundScoring ? myFinalRankLabel : (myNetStablefordRank || "–")}</div></button>
                 </div>
               </div>
             ) : <div className="mb-2 rounded-xl border border-amber-700/30 bg-black/25 p-1.5 text-[10px] text-amber-100/75">Wähle zuerst im Start-Popup deinen Spieler aus.</div>}
