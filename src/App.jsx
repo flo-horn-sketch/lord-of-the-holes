@@ -322,19 +322,6 @@ function buildFlightDraw(players = fallbackPlayers, rounds = fallbackRounds) {
   };
 }
 
-function stableFlightDrawSignature(draw) {
-  if (!draw) return "";
-  try {
-    return JSON.stringify(draw);
-  } catch {
-    return String(Date.now());
-  }
-}
-
-function areFlightDrawsEqual(a, b) {
-  return stableFlightDrawSignature(a) === stableFlightDrawSignature(b);
-}
-
 function getAssignedScoredPlayerIdFromDraw(flightDraw, roundId, scorerPlayerId) {
   const normalizedRoundId = String(roundId || "").trim();
   const normalizedScorerId = String(scorerPlayerId || "").trim();
@@ -536,21 +523,6 @@ function formatCompetitionRank(items = [], index = 0, getValue) {
   return isTiedAtRank(items, index, getValue) ? `T${rank}` : String(rank);
 }
 
-function getQualificationRankLabel(index) {
-  return String(Number(index || 0) + 1);
-}
-
-function getRankValue(item) {
-  if (!item) return "";
-  if (item.totalBestTwo !== undefined && item.totalBestTwo !== null) return item.totalBestTwo;
-  if (item.finalHcpAdjustedStrokes !== undefined && item.finalHcpAdjustedStrokes !== null) return `${item.finalGroup || ""}|${item.finalHcpAdjustedStrokes}`;
-  if (item.hcpAdjustedStrokes !== undefined && item.hcpAdjustedStrokes !== null) return item.hcpAdjustedStrokes;
-  if (item.value !== undefined && item.value !== null) return item.value;
-  if (item.points !== undefined && item.points !== null) return item.points;
-  if (item.total !== undefined && item.total !== null) return item.total;
-  return "";
-}
-
 function normalizeHoles(rawHoles) {
   const validHoles = Array.isArray(rawHoles) ? rawHoles.filter((h) => Number(h.hole_number) > 0 && Number(h.par) > 0 && Number(h.hcp) > 0) : [];
   return validHoles.length ? validHoles : fallbackHoles;
@@ -609,10 +581,6 @@ function mergeScoresPreservingPending(sheetScores = [], pendingScores = [], loca
     map.set(getScoreIdentityKey(score), normalizeScoreRecord(score));
   });
   return Array.from(map.values());
-}
-
-function hasLocalScoreState(pendingScores = [], localDrafts = []) {
-  return (pendingScores || []).some(isValidScorePayload) || (localDrafts || []).some(isValidScorePayload);
 }
 
 function getOfficialScores(scores) {
@@ -1135,29 +1103,6 @@ function buildFunHoleStats(players, holes, scores) {
       snakes: holeScores.filter((score) => normalizeBoolean(score.over_two_putts)).length,
     };
   }).filter((item) => item.played > 0);
-}
-
-function buildScorerMismatchStats(mismatches, players) {
-  const playerMap = new Map((players || []).map((player) => [String(player.id), withFallbackAlias(player)]));
-  const stats = new Map();
-  (players || []).forEach((player) => stats.set(String(player.id), { ...withFallbackAlias(player), asPlayer: 0, asScorer: 0, total: 0 }));
-  (mismatches || []).forEach((item) => {
-    const playerId = String(item.playerId || "");
-    const scorerId = String(item.officialScorerId || "");
-    if (playerId) {
-      const current = stats.get(playerId) || { ...(playerMap.get(playerId) || { id: playerId, character_name: playerId }), asPlayer: 0, asScorer: 0, total: 0 };
-      current.asPlayer += 1;
-      current.total += 1;
-      stats.set(playerId, current);
-    }
-    if (scorerId) {
-      const current = stats.get(scorerId) || { ...(playerMap.get(scorerId) || { id: scorerId, character_name: scorerId }), asPlayer: 0, asScorer: 0, total: 0 };
-      current.asScorer += 1;
-      current.total += 1;
-      stats.set(scorerId, current);
-    }
-  });
-  return Array.from(stats.values()).sort((a, b) => Number(b.total || 0) - Number(a.total || 0) || Number(a.sort_order || 0) - Number(b.sort_order || 0));
 }
 
 function getQualificationRounds(rounds) {
@@ -2400,16 +2345,6 @@ function LordOfTheHolesApp() {
     upsertVisibleScore(normalizedScore);
   }
 
-  function removeLocalScoreDraft(score) {
-    if (!isValidScorePayload(score)) return;
-    const key = getScoreIdentityKey(score);
-    const currentDrafts = Array.isArray(localScoreDraftsRef.current) ? localScoreDraftsRef.current : [];
-    const nextDrafts = currentDrafts.filter((item) => getScoreIdentityKey(item) !== key);
-    localScoreDraftsRef.current = nextDrafts;
-    writeLocalJson("lordOfTheHoles.localScoreDrafts", nextDrafts);
-    setLocalScoreDrafts(nextDrafts);
-  }
-
   function optimisticUpdate(patch) {
     const safeRoundId = String(displayedActiveRound?.round_id || "").trim();
     const safePlayerId = String(entryPlayerId || "").trim();
@@ -2455,21 +2390,6 @@ function LordOfTheHolesApp() {
     setPendingScores(nextPendingScores);
   }
 
-  function queueScoreForSync(score, overrides = {}) {
-    if (!isValidScorePayload(score)) return null;
-    const nextScore = normalizeScoreRecord({
-      ...score,
-      ...overrides,
-      updated_at: new Date().toISOString(),
-    });
-
-    // Simpler Offline-Speicher: pro Score-Identität genau ein Eintrag.
-    // Wenn dasselbe Loch später erneut mit "nächstes Loch" bestätigt wird,
-    // überschreibt dieser neue sichtbare Stand den alten Pending-Stand.
-    addPendingScore(nextScore);
-    return nextScore;
-  }
-
   function queueCurrentHoleScoresForSync() {
     const roundId = String(displayedActiveRound?.round_id || "").trim();
     const holeNumber = Number(activeHole || 0);
@@ -2502,60 +2422,6 @@ function LordOfTheHolesApp() {
 
     scoresToQueue.forEach(addPendingScore);
     return scoresToQueue.length > 0;
-  }
-
-  function removePendingScore(score) {
-    setPendingScores((current) => {
-      const targetKey = getScoreIdentityKey(score);
-      const targetUpdatedAt = String(score?.updated_at || "");
-      const nextPendingScores = current.filter((item) => {
-        const sameKey = getScoreIdentityKey(item) === targetKey;
-        const sameVersion = String(item?.updated_at || "") === targetUpdatedAt;
-        // Nur exakt den Score entfernen, der erfolgreich gespeichert wurde.
-        // Wenn der Nutzer während eines Hintergrund-Uploads zurückgeht und denselben Score ändert,
-        // bleibt die neuere lokale Version in pendingScores erhalten.
-        return !(sameKey && sameVersion);
-      });
-      pendingScoresRef.current = nextPendingScores;
-      writeLocalJson("lordOfTheHoles.pendingScores", nextPendingScores);
-      return nextPendingScores;
-    });
-  }
-
-  function isTemporarySheetLockError(err) {
-    const message = String(err?.message || err || "").toLowerCase();
-    return message.includes("exklusiv") || message.includes("lock") || message.includes("timeout") || message.includes("zeitüberschreitung") || message.includes("another operation") || message.includes("try again");
-  }
-
-  function waitForRetry(ms) {
-    return new Promise((resolve) => window.setTimeout(resolve, ms));
-  }
-
-  async function savePendingScore(score) {
-    if (!isValidScorePayload(score)) { removePendingScore(score); return true; }
-    const retryDelays = [0, 700, 1600];
-    let lastError = null;
-
-    for (let attempt = 0; attempt < retryDelays.length; attempt += 1) {
-      if (retryDelays[attempt] > 0) await waitForRetry(retryDelays[attempt]);
-      try {
-        await callSheetApi({ action: "upsertScore", score });
-        removePendingScore(score);
-        removeLocalScoreDraft(score);
-        setConnectionStatus("online");
-        setError("");
-        return true;
-      } catch (err) {
-        lastError = err;
-        if (!isTemporarySheetLockError(err)) break;
-      }
-    }
-
-    setConnectionStatus("offline");
-    setError(isTemporarySheetLockError(lastError)
-      ? "Score bleibt lokal gespeichert. Die Datenbank ist gerade durch einen anderen Vorgang gesperrt und wird später erneut synchronisiert."
-      : lastError?.message || "Score ist lokal gesichert und wird später synchronisiert.");
-    return false;
   }
 
   async function savePendingScoresBatch(scoresToSave = []) {
@@ -3583,54 +3449,6 @@ function LordOfTheHolesApp() {
     return rows;
   }
 
-  function buildTeamDrawRowsFromSelections() {
-    const createdAt = new Date().toISOString();
-    const drawKey = `teamdraw_${createdAt.replace(/[-:.TZ]/g, "").slice(0, 14)}`;
-    const rows = [];
-    ["r1", "r2", "r3"].forEach((roundId, roundIndex) => {
-      const round = (rounds.length ? rounds : fallbackRounds).find((item) => String(item.round_id) === String(roundId));
-      const slots = getDailyTeamSlots(roundId);
-      ["A", "B", "C"].forEach((teamId, teamIndex) => {
-        (slots?.[teamId] || []).forEach((playerId, slotIndex) => {
-          const player = allPlayers.find((item) => String(item.id) === String(playerId));
-          if (!playerId || !player) return;
-          rows.push({
-            draw_key: drawKey,
-            round_id: roundId,
-            round_name: round?.round_name || getRoundChapterLabel(round),
-            team_number: teamId,
-            player_id: player.id,
-            player_name: player.character_name || player.display_name || player.id,
-            player_alias: player.alias_name || "",
-            sort_order: Number(roundIndex + 1) * 1000 + Number(teamIndex + 1) * 100 + Number(slotIndex + 1),
-            created_at: createdAt,
-            updated_at: createdAt,
-            is_test: false,
-          });
-        });
-      });
-    });
-    return rows;
-  }
-
-  async function saveTeamDrawToSheet() {
-    setTeamDrawSaving(true);
-    setError("");
-    try {
-      const rows = buildTeamDrawRowsFromSelections();
-      const result = await callSheetApi({ action: "saveTeamDraw", rows });
-      const nextRows = result?.team_draw_rows || result?.teamDrawRows || rows;
-      setTeamDrawRows(nextRows);
-      setSetupSavedMessage("Team-Ziehung wurde in der Datenbank gespeichert.");
-      setConnectionStatus("online");
-    } catch (err) {
-      setConnectionStatus("offline");
-      setError(err.message || "Team-Ziehung konnte nicht gespeichert werden.");
-    } finally {
-      setTeamDrawSaving(false);
-    }
-  }
-
   function startTeamCeremonyTest(roundId) {
     const key = `team_ceremony_${roundId}`;
     setTeamCeremonyTestMode(false);
@@ -3666,23 +3484,6 @@ function LordOfTheHolesApp() {
     } catch (err) {
       setConnectionStatus("offline");
       setError(err.message || "Team-Ziehung konnte nicht ausgelost werden.");
-    } finally {
-      setTeamDrawSaving(false);
-    }
-  }
-
-  async function clearTeamDrawInSheet() {
-    setTeamDrawSaving(true);
-    setError("");
-    try {
-      await callSheetApi({ action: "clearTeamDraw" });
-      setTeamDrawRows([]);
-      setDailyTeamSelections({});
-      setSetupSavedMessage("Team-Ziehung wurde gelöscht.");
-      setConnectionStatus("online");
-    } catch (err) {
-      setConnectionStatus("offline");
-      setError(err.message || "Team-Ziehung konnte nicht gelöscht werden.");
     } finally {
       setTeamDrawSaving(false);
     }
@@ -4316,10 +4117,6 @@ function LordOfTheHolesApp() {
       return { ...team, value: result.value, detail: result.detail };
     }).sort((a, b) => Number(b.value || 0) - Number(a.value || 0));
     return { round, mode, title, teams: enrichedTeams };
-  }
-
-  function updateDailyTeamSlot(roundId, teamId, slotIndex, playerId) {
-    return;
   }
 
   function isDailyTeamPlayerAlreadySelected(roundId, playerId, currentTeamId, currentSlotIndex) {
