@@ -3338,7 +3338,7 @@ function LordOfTheHolesApp() {
               <div className="mt-1 text-[11px] text-amber-100/55">Öffnet die aktuelle Runde lokal auf diesem Gerät, falls du nachträglich Scores korrigieren musst.</div>
               <Button disabled={!isAdminUnlocked} onClick={() => setAdminScoreEntryUnlocks((current) => {
                 const roundId = String(displayedActiveRound?.round_id || selectedActiveRoundId || "");
-                return { ...(current || {}), [roundId]: !Boolean(current?.[roundId]) };
+                return { ...(current || {}), [roundId]: !current?.[roundId] };
               })} className={cls("mt-2 w-full rounded-2xl border py-2 text-sm font-bold disabled:opacity-50", adminScoreEntryUnlocks?.[String(displayedActiveRound?.round_id || selectedActiveRoundId || "")] ? "border-amber-400/55 bg-amber-700/45 text-amber-50" : "border-amber-500/40 bg-stone-950/70 text-amber-100")}>{adminScoreEntryUnlocks?.[String(displayedActiveRound?.round_id || selectedActiveRoundId || "")] ? "Score-Sperre wieder aktivieren" : "Score-Sperre für aktuelle Runde aufheben"}</Button>
             </div>
             <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
@@ -4400,7 +4400,7 @@ function LordOfTheHolesApp() {
                       </div>
                       {['r2', 'r3'].includes(String(roundId)) ? (
                         <div className="rounded-xl border border-amber-700/25 bg-stone-950/45 p-2">
-                          <button type="button" onClick={() => setOpenTeamHoleDetails((current) => ({ ...(current || {}), [roundId]: !Boolean(current?.[roundId]) }))} className="flex w-full items-center justify-between gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-left text-sm font-bold text-amber-100">
+                          <button type="button" onClick={() => setOpenTeamHoleDetails((current) => ({ ...(current || {}), [roundId]: !current?.[roundId] }))} className="flex w-full items-center justify-between gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-left text-sm font-bold text-amber-100">
                             <span>Lochwertung der Teams anzeigen</span>
                             <span className="text-amber-300">{detailsOpen ? '−' : '+'}</span>
                           </button>
