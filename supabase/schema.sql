@@ -122,6 +122,16 @@ create table if not exists app_state (
 insert into app_state (id) values (1) on conflict (id) do nothing;
 
 -- ------------------------------------------------------------------
+-- Backups: Schnappschuss der Scores einer Runde (vor Löschen/Reset).
+-- ------------------------------------------------------------------
+create table if not exists score_backups (
+  id         bigint generated always as identity primary key,
+  round_id   text,
+  created_at timestamptz not null default now(),
+  snapshot   jsonb
+);
+
+-- ------------------------------------------------------------------
 -- Sicherheit: Row Level Security an, KEIN direkter Zugriff von außen.
 -- Der Zugriff läuft ausschließlich über die Server-Funktion (Vercel),
 -- die den geheimen service_role-Schlüssel nutzt und RLS umgeht.
@@ -136,4 +146,5 @@ alter table scores        enable row level security;
 alter table team_draw     enable row level security;
 alter table flight_draw   enable row level security;
 alter table app_state     enable row level security;
+alter table score_backups enable row level security;
 -- (bewusst keine "policies" -> anon/public-Schlüssel darf gar nichts)

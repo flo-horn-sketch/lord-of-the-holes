@@ -199,13 +199,27 @@ async function resetDeviceAssignments() {
   return { ok: true, device_assignments_reset_at: marker, deviceAssignmentsResetAt: marker };
 }
 
+async function createRoundBackup(roundId) {
+  const rid = String(roundId || "").trim();
+  if (!rid) return { ok: false, error: "round_id fehlt." };
+  const rows = must(await supabase.from("scores").select("*").eq("round_id", rid)) || [];
+  must(await supabase.from("score_backups").insert({
+    round_id: rid,
+    created_at: new Date().toISOString(),
+    snapshot: rows,
+  }));
+  return { ok: true, round_id: rid, backed_up: rows.length };
+}
+
 async function fullReset() {
   const marker = new Date().toISOString();
   must(await supabase.from("scores").delete().gte("hole_number", 0));
   must(await supabase.from("team_draw").delete().gt("id", 0));
   must(await supabase.from("flight_draw").delete().eq("id", 1));
+  // app_locked bewusst mit auf true setzen, damit der Reset auf allen Geräten
+  // konsistent bleibt (sonst entsperrt der nächste 30s-Sync die Splash wieder).
   must(await supabase.from("app_state").update({
-    full_reset_at: marker, scores_reset_at: marker, device_assignments_reset_at: marker, updated_at: marker,
+    app_locked: true, full_reset_at: marker, scores_reset_at: marker, device_assignments_reset_at: marker, updated_at: marker,
   }).eq("id", 1));
   return { ok: true, full_reset_at: marker, fullResetAt: marker };
 }
@@ -231,7 +245,7 @@ export default async function handler(req, res) {
       case "clearScores": return res.status(200).json(await clearScores());
       case "resetDeviceAssignments": return res.status(200).json(await resetDeviceAssignments());
       case "clearResetMarkersAndFullReset": return res.status(200).json(await fullReset());
-      case "createRoundBackup": return res.status(200).json({ ok: true, note: "Historie bleibt in Supabase erhalten." });
+      case "createRoundBackup": return res.status(200).json(await createRoundBackup(body.round_id));
       default: return res.status(400).json({ ok: false, error: "Unbekannte Aktion: " + String(action) });
     }
   } catch (e) {
