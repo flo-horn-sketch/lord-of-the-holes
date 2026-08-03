@@ -51,7 +51,21 @@ class AppErrorBoundary extends React.Component {
 // Zugang zur Datenbank läuft jetzt über die eigene Server-"Tür-Funktion" (/api/data
 // -> Supabase). Der geheime Schlüssel liegt serverseitig, nie in dieser App.
 const DATA_API_URL = "/api/data";
-const ADMIN_PASSWORD = "weimar";
+// Das Admin-Passwort steht bewusst NICHT mehr hier: es lag sonst im Bundle und
+// war für jeden lesbar. Geprüft wird es serverseitig in /api/data; diese Liste
+// sagt nur, welchen Aktionen das eingegebene Passwort mitgeschickt werden muss.
+const ADMIN_ACTIONS = new Set([
+  "verifyAdmin",
+  "saveSetup",
+  "saveFlightDraw",
+  "saveTeamDraw",
+  "clearTeamDraw",
+  "setAppLocked",
+  "clearScores",
+  "resetDeviceAssignments",
+  "clearResetMarkersAndFullReset",
+  "createRoundBackup",
+]);
 const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T10:00:00+02:00");
 const FLIGHT_DRAW_TARGET = new Date("2026-05-21T20:00:00+02:00");
 const FLIGHT_DRAW_STORAGE_KEY = "lordOfTheHoles.flightDraw";
@@ -1379,6 +1393,150 @@ function getFinalWinnerCelebration(players, rounds, holes, scores, roundPlayers,
   return { roundId: finalRound.round_id, winner, winnerName: getPlayerLabel(winner), winnerLabel: winner.character_name || winner.display_name || winner.id, finalHcpAdjustedStrokes: winner.finalHcpAdjustedStrokes };
 }
 
+// ---- Erfolge / Chronik vergangener Turniere ------------------------
+// Wertet eine abgeschlossene Saison aus. Nutzt bewusst dieselben Funktionen
+// wie die laufende App (buildFinalNetStandings, buildFunPlayerStats), damit
+// im Archiv nie ein anderer Sieger steht als im Turnier selbst.
+function buildSeasonReport(seasonData, holes, courses = fallbackCourses) {
+  if (!seasonData) return null;
+  const players = seasonData.players || [];
+  const rounds = seasonData.rounds || [];
+  const rawScores = (seasonData.scores || []).map(normalizeScoreRecord);
+  const scores = getOfficialScores(rawScores);
+  if (!players.length || !rounds.length || !scores.length) return null;
+
+  const finalStandings = buildFinalNetStandings(players, rounds, holes, scores, courses);
+  const qualiStandings = buildTournamentNetStandings(players, rounds, holes, scores, courses);
+  const finalRound = getFinalRound(rounds);
+
+  // Beste Einzelrunde des Turniers (HCP-bereinigt), ueber Quali und Finale.
+  const roundBests = [];
+  qualiStandings.forEach((player) => {
+    (player.roundResults || []).forEach((result) => {
+      if (result.hcpAdjustedStrokes != null && result.played > 0) {
+        roundBests.push({ player, roundName: result.round_name || result.round_id, netto: result.hcpAdjustedStrokes, gross: result.grossStrokes });
+      }
+    });
+  });
+  finalStandings.forEach((player) => {
+    if (player.finalHcpAdjustedStrokes != null && player.finalPlayed > 0) {
+      roundBests.push({ player, roundName: finalRound?.round_name || "Finale", netto: player.finalHcpAdjustedStrokes, gross: player.finalGrossStrokes });
+    }
+  });
+  const bestNetRound = [...roundBests].sort((a, b) => a.netto - b.netto)[0] || null;
+  const bestGrossRound = [...roundBests].sort((a, b) => a.gross - b.gross)[0] || null;
+
+  // Zaehlstatistiken: course_hcp je Platz gibt es hier nicht sinnvoll fuer
+  // beide Plaetze gleichzeitig, deshalb nur platzunabhaengige Kennzahlen
+  // (Birdies, Pars, Putts) verwenden - genau wie die Mittelerde-Tabellen.
+  const funStats = buildFunPlayerStats(getPlayersForCourse(players, finalRound?.course_id || "goethe", courses), holes, scores);
+  const topBy = (key) => [...funStats].filter((p) => Number(p[key]) > 0).sort((a, b) => Number(b[key]) - Number(a[key]))[0] || null;
+
+  const podium = finalStandings.slice(0, 3);
+  const champion = podium[0] || null;
+  const runnerUp = podium[1] || null;
+  const margin = champion && runnerUp && champion.finalHcpAdjustedStrokes != null && runnerUp.finalHcpAdjustedStrokes != null
+    ? Number(runnerUp.finalHcpAdjustedStrokes) - Number(champion.finalHcpAdjustedStrokes)
+    : null;
+
+  // Gleichstaende in der Qualifikation - erzeugen die Besonderheit, dass die
+  // Meisterschaftsgruppe groesser als drei sein kann.
+  const qualiTies = [];
+  qualiStandings.forEach((a, i) => {
+    qualiStandings.slice(i + 1).forEach((b) => {
+      if (a.totalBestTwo != null && a.totalBestTwo === b.totalBestTwo) qualiTies.push([a, b]);
+    });
+  });
+  const championshipSize = finalStandings.filter((p) => p.finalGroup === "championship").length;
+
+  return {
+    season: Number(seasonData.season),
+    title: seasonData.title || "",
+    standings: finalStandings,
+    qualiStandings,
+    podium,
+    champion,
+    runnerUp,
+    third: podium[2] || null,
+    margin,
+    championshipSize,
+    qualiTies,
+    bestNetRound,
+    bestGrossRound,
+    mostBirdies: topBy("birdies"),
+    mostEagles: topBy("eaglesOrBetter"),
+    mostPars: topBy("pars"),
+    mostThreePutts: topBy("threePutts"),
+    roundsPlayed: rounds.length,
+    holesPlayed: scores.length,
+  };
+}
+
+// Erzeugt die Chronik aus den Fakten der Saison, nicht aus fest getipptem
+// Text - damit steht naechstes Jahr automatisch die richtige Geschichte da.
+function buildSeasonChronicle(report) {
+  if (!report) return [];
+  const name = (p) => (p ? (p.alias_name || p.character_name || p.display_name || p.id) : "Niemand");
+  const lines = [];
+
+  if (report.champion) {
+    const wonQuali = Number(report.champion.qualificationRank) === 1;
+    lines.push(
+      wonQuali
+        ? `${name(report.champion)} führte schon nach der Qualifikation und ließ den Ring bis zum letzten Loch nicht mehr los.`
+        : `${name(report.champion)} ging erst als ${report.champion.qualificationRank}. der Qualifikation in den Finaltag — und kehrte als Herr der Löcher zurück.`
+    );
+  }
+  if (report.margin != null) {
+    lines.push(
+      report.margin === 0
+        ? `Zwischen Sieg und Niederlage lag am Ende kein einziger Schlag. Erst die Qualifikation entschied.`
+        : report.margin === 1
+          ? `Ein einziger Schlag trennte ${name(report.champion)} von ${name(report.runnerUp)}. Ein Putt mehr, und die Geschichte ginge anders.`
+          : `${report.margin} Schläge lagen zwischen ${name(report.champion)} und ${name(report.runnerUp)}.`
+    );
+  }
+  if (report.championshipSize > 3) {
+    lines.push(`Weil sich ${report.championshipSize > 4 ? "mehrere Gefährten" : "zwei Gefährten"} punktgleich in die Qualifikation teilten, zogen ${report.championshipSize} statt drei in die Meisterschaftsgruppe ein.`);
+  }
+  if (report.bestNetRound) {
+    lines.push(`Die beste Runde des Turniers spielte ${name(report.bestNetRound.player)}: ${report.bestNetRound.netto} netto in ${report.bestNetRound.roundName}.`);
+  }
+  if (report.bestGrossRound && report.bestGrossRound.player !== report.bestNetRound?.player) {
+    lines.push(`Das sauberste Brutto gelang ${name(report.bestGrossRound.player)} mit ${report.bestGrossRound.gross} Schlägen.`);
+  }
+  if (report.mostThreePutts && Number(report.mostThreePutts.threePutts) >= 3) {
+    lines.push(`${name(report.mostThreePutts)} sammelte ${report.mostThreePutts.threePutts} Drei-Putts — die Schlange von Mittelerde hatte einen klaren Liebling.`);
+  }
+  return lines;
+}
+
+// Ewige Bestenliste ueber alle ausgewerteten Saisons.
+function buildAllTimeTable(reports = []) {
+  const byPlayer = new Map();
+  (reports || []).forEach((report) => {
+    (report.standings || []).forEach((player) => {
+      const id = String(player.id);
+      const entry = byPlayer.get(id) || {
+        id, alias_name: player.alias_name, character_name: player.character_name,
+        display_name: player.display_name, titles: 0, podiums: 0, seasons: 0, bestRank: null, ranks: [],
+      };
+      const rank = Number(player.finalRank || 0);
+      entry.seasons += 1;
+      if (rank === 1) entry.titles += 1;
+      if (rank >= 1 && rank <= 3) entry.podiums += 1;
+      if (rank > 0) {
+        entry.ranks.push(rank);
+        entry.bestRank = entry.bestRank == null ? rank : Math.min(entry.bestRank, rank);
+      }
+      byPlayer.set(id, entry);
+    });
+  });
+  return [...byPlayer.values()]
+    .map((e) => ({ ...e, avgRank: e.ranks.length ? Number((e.ranks.reduce((s, r) => s + r, 0) / e.ranks.length).toFixed(2)) : null }))
+    .sort((a, b) => b.titles - a.titles || b.podiums - a.podiums || (a.avgRank ?? 99) - (b.avgRank ?? 99));
+}
+
 function TournamentStandings({ players, rounds, holes, scores, courses = fallbackCourses, activeRoundId = "" }) {
   const standings = useMemo(() => buildTournamentNetStandings(players, rounds, holes, scores, courses), [players, rounds, holes, scores, courses]);
   const finalStandings = useMemo(() => buildFinalNetStandings(players, rounds, holes, scores, courses), [players, rounds, holes, scores, courses]);
@@ -1537,6 +1695,18 @@ function LordOfTheHolesApp() {
   const [mainMenu, setMainMenu] = useState("current");
   const [menuOpen, setMenuOpen] = useState(false);
   const [openMenuGroups, setOpenMenuGroups] = useState(() => readLocalJson("lordOfTheHoles.openMenuGroups", { tournament: true, round: false, info: false, system: false }));
+  // Erfolge: vergangene Turniere. Wird beim ersten Oeffnen der Seite geladen
+  // und lokal gecacht, damit sie auch ohne Netz lesbar bleibt.
+  // Saison-Info inkl. Terminen. Kommt aus getState; die Konstanten oben
+  // dienen nur noch als Notnagel, falls die Datenbank nichts liefert.
+  const [seasonInfo, setSeasonInfo] = useState(() => readLocalJson("lordOfTheHoles.seasonInfo", null));
+  const [history, setHistory] = useState(() => readLocalJson("lordOfTheHoles.history", []));
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historySeason, setHistorySeason] = useState(0);
+  const [seasonSaving, setSeasonSaving] = useState(false);
+  const [seasonDraftDates, setSeasonDraftDates] = useState({});
+  const [newSeasonYear, setNewSeasonYear] = useState("");
+  const [startSeasonConfirmOpen, setStartSeasonConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [scoreSyncCount, setScoreSyncCount] = useState(0);
@@ -1549,6 +1719,8 @@ function LordOfTheHolesApp() {
   const [forceMyPlayerPromptOpen, setForceMyPlayerPromptOpen] = useState(false);
   const [adminPinInput, setAdminPinInput] = useState("");
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+  // Nur im Arbeitsspeicher: geht bei Reload verloren, genau wie isAdminUnlocked.
+  const adminPasswordRef = useRef("");
   const [adminEditing, setAdminEditing] = useState(false);
   const [setupSavedMessage, setSetupSavedMessage] = useState("");
   const [backupSavedMessage, setBackupSavedMessage] = useState("");
@@ -1852,29 +2024,40 @@ function LordOfTheHolesApp() {
   const showRoundHonorPopup = Boolean(displayedRoundHonorCelebration && !showFinalWinnerPopup && !roundSummaryPopup);
   const identityFlowActive = !showSplash && (!appLocked || lockAdminBypass);
   const myPlayerIsKnown = Boolean(myPlayerId && ([...(visiblePlayers || []), ...(allPlayers || [])].some((player) => String(player.id) === String(myPlayerId))));
-  const showDevicePlayerGate = Boolean(identityFlowActive && (!myPlayerIsKnown || forceMyPlayerPromptOpen));
+  // Auf der Erfolge-Seite wird nur gelesen - dafuer braucht es keine Identitaet.
+  // Sonst legt sich die Spielerabfrage vor die Chronik, obwohl sie dort nichts
+  // beitraegt. Bei ausdruecklichem Aufruf (forceMyPlayerPromptOpen) trotzdem zeigen.
+  const showDevicePlayerGate = Boolean(identityFlowActive && (!myPlayerIsKnown || forceMyPlayerPromptOpen) && (view !== "erfolge" || forceMyPlayerPromptOpen));
+  const parseTarget = (value, fallback) => {
+    const parsed = new Date(String(value || ""));
+    return Number.isNaN(parsed.getTime()) ? fallback : parsed;
+  };
+  const lockTarget = useMemo(() => parseTarget(seasonInfo?.lock_at, LOCK_COUNTDOWN_TARGET), [seasonInfo]);
+  const flightTarget = useMemo(() => parseTarget(seasonInfo?.flight_draw_at, FLIGHT_DRAW_TARGET), [seasonInfo]);
+  const flightTargetRef = useRef(flightTarget);
+  useEffect(() => { flightTargetRef.current = flightTarget; }, [flightTarget]);
   const lockCountdown = useMemo(() => {
-    const diffMs = Math.max(0, LOCK_COUNTDOWN_TARGET.getTime() - (lockCountdownNow.getTime() + serverTimeOffsetMs));
+    const diffMs = Math.max(0, lockTarget.getTime() - (lockCountdownNow.getTime() + serverTimeOffsetMs));
     const totalSeconds = Math.floor(diffMs / 1000);
     const days = Math.floor(totalSeconds / 86400);
     const hours = Math.floor((totalSeconds % 86400) / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
     return { days, hours, minutes, seconds };
-  }, [lockCountdownNow, serverTimeOffsetMs]);
+  }, [lockCountdownNow, serverTimeOffsetMs, lockTarget]);
   const flightDrawCountdown = useMemo(() => {
-    const diffMs = Math.max(0, FLIGHT_DRAW_TARGET.getTime() - (lockCountdownNow.getTime() + serverTimeOffsetMs));
+    const diffMs = Math.max(0, flightTarget.getTime() - (lockCountdownNow.getTime() + serverTimeOffsetMs));
     const totalSeconds = Math.floor(diffMs / 1000);
     const days = Math.floor(totalSeconds / 86400);
     const hours = Math.floor((totalSeconds % 86400) / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
     return { days, hours, minutes, seconds };
-  }, [lockCountdownNow, serverTimeOffsetMs]);
+  }, [lockCountdownNow, serverTimeOffsetMs, flightTarget]);
   const atomicTimeActive = ["itime.live", "itime.live-vercel"].includes(String(lastServerSync?.source || "")) && atomicTimeStatus === "online";
   const syncedNow = useMemo(() => new Date(lockCountdownNow.getTime() + (atomicTimeActive ? serverTimeOffsetMs : 0)), [lockCountdownNow, serverTimeOffsetMs, atomicTimeActive]);
   const getSyncedNowMs = () => Date.now() + (atomicTimeActive ? serverTimeOffsetMs : 0);
-  const flightDrawUnlocked = atomicTimeActive && syncedNow.getTime() >= FLIGHT_DRAW_TARGET.getTime();
+  const flightDrawUnlocked = atomicTimeActive && syncedNow.getTime() >= flightTarget.getTime();
   const flightCeremonyTimeline = useMemo(() => buildFlightCeremonyTimeline(flightDraw), [flightDraw]);
   const unlockedTeamDrawRoundIds = useMemo(() => atomicTimeActive ? Object.entries(TEAM_DRAW_TARGETS).filter(([, target]) => syncedNow.getTime() >= target.getTime()).map(([roundId]) => roundId) : [], [syncedNow, atomicTimeActive]);
   const teamCeremonyTimeline = useMemo(() => teamCeremonyTestMode && String(teamCeremonyRoundId) === "r3" ? buildDummyRound3TeamCeremonyTimeline() : buildTeamCeremonyTimeline(teamCeremonyRoundId), [teamCeremonyTestMode, teamCeremonyRoundId, teamDrawRows, allPlayers, officialAllScores]);
@@ -1969,9 +2152,10 @@ function LordOfTheHolesApp() {
 
   function getNextSyncedFlightCeremonyStart(timeline = [], forceImmediate = false) {
     const now = getSyncedNowMs();
-    if (!forceImmediate && now < FLIGHT_DRAW_TARGET.getTime()) return FLIGHT_DRAW_TARGET.toISOString();
+    const target = flightTargetRef.current || FLIGHT_DRAW_TARGET;
+    if (!forceImmediate && now < target.getTime()) return target.toISOString();
     const totalDuration = (timeline || []).reduce((sum, step) => sum + getFlightCeremonyStepDuration(step), 0);
-    if (!forceImmediate && totalDuration > 0 && now - FLIGHT_DRAW_TARGET.getTime() < totalDuration) return FLIGHT_DRAW_TARGET.toISOString();
+    if (!forceImmediate && totalDuration > 0 && now - target.getTime() < totalDuration) return target.toISOString();
     const nextBoundary = Math.ceil((now + 2500) / 10000) * 10000;
     return new Date(nextBoundary).toISOString();
   }
@@ -2178,15 +2362,48 @@ function LordOfTheHolesApp() {
     }
   }
 
+  // Prüft das eingegebene Passwort beim Server. Bei Erfolg wird es für die
+  // laufende Sitzung gemerkt, damit die Admin-Aktionen es mitschicken können.
+  async function unlockAdminWithPassword(candidate) {
+    const password = String(candidate || "");
+    if (!password) {
+      setError("Bitte Passwort eingeben.");
+      return false;
+    }
+    const previousPassword = adminPasswordRef.current;
+    adminPasswordRef.current = password;
+    try {
+      await callSheetApi({ action: "verifyAdmin" });
+      setIsAdminUnlocked(true);
+      setError("");
+      return true;
+    } catch (err) {
+      adminPasswordRef.current = previousPassword;
+      setError(err.message || "Admin-Passwort ist falsch.");
+      return false;
+    }
+  }
+
   async function callSheetApi(payload) {
     const requestStartedAt = Date.now();
+    const requestBody = { ...(payload || {}), _client_request_started_at: requestStartedAt };
+    // Verändernde Aktionen brauchen das Admin-Passwort. Es liegt nur im
+    // Arbeitsspeicher (nicht in localStorage) und geht nie ins Bundle.
+    if (ADMIN_ACTIONS.has(requestBody.action)) {
+      requestBody.admin_password = adminPasswordRef.current || "";
+    }
     const response = await fetch(DATA_API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...(payload || {}), _client_request_started_at: requestStartedAt }),
+      body: JSON.stringify(requestBody),
     });
 
-    if (!response.ok) throw new Error("Datenbank nicht erreichbar.");
+    if (!response.ok) {
+      // Fehlermeldung des Servers durchreichen (z. B. "Admin-Passwort ist
+      // falsch."), sonst käme jede Ablehnung als Verbindungsfehler an.
+      const serverError = await response.json().then((d) => d?.error).catch(() => "");
+      throw new Error(serverError || "Datenbank nicht erreichbar.");
+    }
     const responseReceivedAt = Date.now();
     const data = await response.json();
     const atomicSynced = false;
@@ -2220,6 +2437,21 @@ function LordOfTheHolesApp() {
       const nextFullResetAt = String(data.full_reset_at || data.fullResetAt || "");
       const localFullResetAt = String(readLocalJson("lordOfTheHoles.fullResetAt", "") || "");
       if (nextFullResetAt && nextFullResetAt !== localFullResetAt) applyLocalCacheClear(nextFullResetAt, "Kompletter Reset wurde übernommen.");
+      // Saison und Termine aus der Datenbank uebernehmen (loesen die
+      // frueheren Konstanten ab). Aeltere Server-Antworten ohne diese Felder
+      // lassen den bisherigen Stand unangetastet.
+      if (data.season) {
+        const nextSeasonInfo = {
+          season: Number(data.season),
+          title: data.season_title || data.seasonTitle || "",
+          status: data.season_status || data.seasonStatus || "",
+          lock_at: data.lock_at || data.lockAt || "",
+          flight_draw_at: data.flight_draw_at || data.flightDrawAt || "",
+          seasons: data.seasons || [],
+        };
+        setSeasonInfo(nextSeasonInfo);
+        writeLocalJson("lordOfTheHoles.seasonInfo", nextSeasonInfo);
+      }
       const nextScoresResetAt = String(data.scores_reset_at || data.scoresResetAt || "");
       const localScoresResetAt = String(readLocalJson("lordOfTheHoles.scoresResetAt", "") || "");
       if (nextScoresResetAt && nextScoresResetAt !== localScoresResetAt) {
@@ -2806,8 +3038,8 @@ function LordOfTheHolesApp() {
     }
   }
 
-  function enterLockedAppAsAdmin() {
-    if (lockPasswordInput !== ADMIN_PASSWORD) { setError("Passwort ist falsch."); return; }
+  async function enterLockedAppAsAdmin() {
+    if (!(await unlockAdminWithPassword(lockPasswordInput))) return;
     const storedMyPlayerId = readLocalJson("lordOfTheHoles.myPlayerId", "");
     const knownPlayers = [...(visiblePlayers || []), ...(allPlayers || [])];
     const hasKnownDeviceOwner = Boolean((myPlayerId || storedMyPlayerId) && knownPlayers.some((player) => String(player.id) === String(myPlayerId || storedMyPlayerId)));
@@ -2839,10 +3071,72 @@ function LordOfTheHolesApp() {
     setScoredPlayerByRound(next);
   }
 
+  // Vergangene Turniere nachladen. Bewusst getrennt von getState: die Daten
+  // aendern sich nach dem Archivieren nicht mehr, also nicht bei jedem Sync.
+  async function loadHistory() {
+    if (historyLoading) return;
+    setHistoryLoading(true);
+    try {
+      const result = await callSheetApi({ action: "getHistory" });
+      const seasons = result?.seasons || [];
+      setHistory(seasons);
+      writeLocalJson("lordOfTheHoles.history", seasons);
+    } catch {
+      // Ohne Netz bleibt der zuletzt gecachte Stand stehen.
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  async function saveSeasonDates() {
+    if (!seasonInfo?.season) return;
+    setSeasonSaving(true);
+    setError("");
+    try {
+      // datetime-local liefert Ortszeit ohne Zone - new Date() interpretiert
+      // das als lokale Zeit des Geraets, was hier genau richtig ist.
+      const toIso = (v) => (v ? new Date(v).toISOString() : undefined);
+      await callSheetApi({
+        action: "saveSeason",
+        season: seasonInfo.season,
+        lock_at: toIso(seasonDraftDates.lock_at) ?? seasonInfo.lock_at,
+        flight_draw_at: toIso(seasonDraftDates.flight_draw_at) ?? seasonInfo.flight_draw_at,
+      });
+      setSetupSavedMessage("Termine wurden gespeichert.");
+      await loadData({ silent: true });
+    } catch (err) {
+      setError(err.message || "Termine konnten nicht gespeichert werden.");
+    } finally {
+      setSeasonSaving(false);
+    }
+  }
+
+  async function startNewSeasonFromAdmin() {
+    const year = Number(newSeasonYear);
+    if (!year) return;
+    setSeasonSaving(true);
+    setStartSeasonConfirmOpen(false);
+    setError("");
+    try {
+      await callSheetApi({ action: "startNewSeason", season: year, title: `Turnier ${year}` });
+      clearLocalScoreStorage();
+      setNewSeasonYear("");
+      setHistory([]);
+      setSetupSavedMessage(`Saison ${year} wurde gestartet. Das Vorjahr steht jetzt unter „Erfolge & Chronik".`);
+      await loadData({ silent: true });
+      await loadHistory();
+    } catch (err) {
+      setError(err.message || "Neue Saison konnte nicht gestartet werden.");
+    } finally {
+      setSeasonSaving(false);
+    }
+  }
+
   function setMainMenuAndView(value) {
     setMainMenu(value);
     setMenuOpen(false);
     if (value === "current") setView("score");
+    if (value === "erfolge") { setView("erfolge"); if (!history.length) loadHistory(); }
     if (value === "roundTables") setView("leaderboard");
     if (value === "tournament") setView("tournament");
     if (value === "dailyTeams") setView("dailyTeams");
@@ -2856,7 +3150,7 @@ function LordOfTheHolesApp() {
   }
 
   function renderHeader() {
-    const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "flights" ? "Flights" : mainMenu === "rules" ? "Regeln" : mainMenu === "dailyTeams" ? "Tageswertungen" : mainMenu === "prizes" ? "Kasse & Ehre" : mainMenu === "admin" ? "Admin & HCPs" : mainMenu === "settings" ? "Einstellungen" : "Scoring";
+    const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "erfolge" ? "Erfolge & Chronik" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "flights" ? "Flights" : mainMenu === "rules" ? "Regeln" : mainMenu === "dailyTeams" ? "Tageswertungen" : mainMenu === "prizes" ? "Kasse & Ehre" : mainMenu === "admin" ? "Admin & HCPs" : mainMenu === "settings" ? "Einstellungen" : "Scoring";
     return (
       <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-1 pt-1">
         <div className="relative flex h-8 items-center justify-center">
@@ -2917,7 +3211,7 @@ function LordOfTheHolesApp() {
                 return (
                   <>
                     {renderMenuButton("current", "Scoring", true)}
-                    {renderMenuGroup("tournament", "Turnier", [["tournament", "Turnierstand"], ["dailyTeams", "Tageswertungen"], ["prizes", "Kasse & Ehre"], ["archive", "Scorekarten"]])}
+                    {renderMenuGroup("tournament", "Turnier", [["tournament", "Turnierstand"], ["dailyTeams", "Tageswertungen"], ["prizes", "Kasse & Ehre"], ["archive", "Scorekarten"], ["erfolge", "Erfolge & Chronik"]])}
                     {renderMenuGroup("round", "Runde", [["roundTables", "Tabellen Runde"], ["fun", "Mittelerde"], ["flights", "Flights"]])}
                     {renderMenuGroup("info", "Info", [["rules", "Regeln"]])}
                     {renderMenuGroup("system", "System", [["settings", "Einstellungen"], ["admin", "Admin & HCPs"]])}
@@ -2928,6 +3222,217 @@ function LordOfTheHolesApp() {
           ) : null}
         </div>
       </motion.header>
+    );
+  }
+
+  // Saison-Verwaltung im Admin: Termine pflegen und das Turnierjahr wechseln.
+  // Ersetzt die frueher fest verdrahteten Countdown-Konstanten.
+  function renderSeasonAdminBox() {
+    const toLocalInput = (value) => {
+      const d = new Date(String(value || ""));
+      if (Number.isNaN(d.getTime())) return "";
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+    const current = seasonInfo || {};
+    const busy = seasonSaving || connectionStatus !== "online";
+    return (
+      <div className="mt-2 rounded-2xl border border-amber-700/40 bg-black/30 p-3">
+        <div className="font-serif text-base text-amber-200">Saison {current.season || "–"}</div>
+        <div className="mb-2 text-[11px] text-amber-100/60">{current.title || "ohne Titel"} · {current.status || "unbekannt"}</div>
+
+        <label className="mt-1 block text-[11px] uppercase tracking-wider text-amber-100/70">Flight-Ziehung</label>
+        <input type="datetime-local" defaultValue={toLocalInput(current.flight_draw_at)}
+          onChange={(e) => setSeasonDraftDates((d) => ({ ...d, flight_draw_at: e.target.value }))}
+          className="mb-2 w-full rounded-xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50" />
+
+        <label className="block text-[11px] uppercase tracking-wider text-amber-100/70">Turnierstart</label>
+        <input type="datetime-local" defaultValue={toLocalInput(current.lock_at)}
+          onChange={(e) => setSeasonDraftDates((d) => ({ ...d, lock_at: e.target.value }))}
+          className="mb-2 w-full rounded-xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50" />
+
+        <Button disabled={busy} onClick={saveSeasonDates}
+          className="w-full rounded-2xl bg-amber-600 py-2 text-amber-50 disabled:opacity-50">
+          {seasonSaving ? "Speichert ..." : "Termine speichern"}
+        </Button>
+
+        <div className="mt-3 border-t border-amber-700/25 pt-3">
+          <label className="block text-[11px] uppercase tracking-wider text-amber-100/70">Neues Turnierjahr</label>
+          <input type="number" value={newSeasonYear} onChange={(e) => setNewSeasonYear(e.target.value)}
+            placeholder={String((Number(current.season) || new Date().getFullYear()) + 1)}
+            className="mb-2 w-full rounded-xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50" />
+          <Button disabled={busy || !newSeasonYear} onClick={() => setStartSeasonConfirmOpen(true)}
+            className="w-full rounded-2xl border border-emerald-500/40 bg-emerald-800/70 py-2 text-emerald-50 disabled:opacity-50">
+            Neue Saison starten
+          </Button>
+          <p className="mt-1.5 text-[11px] leading-snug text-amber-100/55">
+            Archiviert {current.season || "die laufende Saison"} und legt vier frische Runden an.
+            Die alten Ergebnisse bleiben vollständig erhalten und sind danach unter „Erfolge&nbsp;&amp;&nbsp;Chronik" nachlesbar.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  function renderErfolgeView() {
+    const reports = (history || [])
+      .map((seasonData) => buildSeasonReport(seasonData, allHoles, courses))
+      .filter(Boolean)
+      .sort((a, b) => b.season - a.season);
+
+    if (historyLoading && !reports.length) {
+      return <Card className="rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl"><CardContent className="p-3 text-amber-100">⟳ Lade vergangene Turniere ...</CardContent></Card>;
+    }
+    if (!reports.length) {
+      return (
+        <Card className="rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl">
+          <CardContent className="p-4 text-center">
+            <div className="font-serif text-lg text-amber-200">Noch keine Sagen verzeichnet</div>
+            <p className="mt-2 text-sm text-amber-100/75">Sobald ein Turnier abgeschlossen und archiviert ist, steht seine Geschichte hier.</p>
+            <Button onClick={loadHistory} className="mt-3 rounded-2xl bg-amber-600 px-4 py-2 text-sm font-bold text-amber-50">Erneut laden</Button>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    const selected = reports.find((r) => r.season === historySeason) || reports[0];
+    const allTime = buildAllTimeTable(reports);
+    const chronicle = buildSeasonChronicle(selected);
+    const medal = ["🥇", "🥈", "🥉"];
+    const nameOf = (p) => (p ? (p.alias_name || p.character_name || p.display_name || p.id) : "–");
+
+    return (
+      <div className="space-y-3">
+        {reports.length > 1 ? (
+          <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {reports.map((r) => (
+              <button key={r.season} type="button" onClick={() => setHistorySeason(r.season)}
+                className={cls("shrink-0 rounded-2xl border px-3 py-1.5 text-sm font-bold transition",
+                  r.season === selected.season ? "border-amber-400 bg-amber-600 text-amber-50" : "border-amber-700/40 bg-black/25 text-amber-100/80")}>
+                {r.season}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {/* Podest */}
+        <Card className="overflow-hidden rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl">
+          <div className="border-b border-amber-700/35 bg-amber-500/10 px-3 py-2">
+            <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300/75">Turnier {selected.season}</div>
+            <div className="font-serif text-lg text-amber-200">{selected.title || "Der Herr der Löcher"}</div>
+          </div>
+          <CardContent className="p-3">
+            {selected.podium.map((player, index) => (
+              <div key={player.id} className={cls("mb-2 flex items-center gap-3 rounded-2xl border p-3 last:mb-0",
+                index === 0 ? "border-amber-400/60 bg-[linear-gradient(180deg,rgba(217,119,6,0.28),rgba(0,0,0,0.25))]" : "border-amber-700/30 bg-black/25")}>
+                <span className="text-2xl">{medal[index]}</span>
+                <span className="min-w-0 flex-1">
+                  <span className={cls("block truncate font-serif", index === 0 ? "text-xl text-amber-200" : "text-base text-amber-100")}>{nameOf(player)}</span>
+                  <span className="block truncate text-[11px] text-amber-100/65">{player.display_name}</span>
+                </span>
+                <span className="text-right">
+                  <span className="block font-serif text-xl font-black text-amber-300">{player.finalHcpAdjustedStrokes ?? "–"}</span>
+                  <span className="block text-[10px] uppercase tracking-wider text-amber-100/60">Finale</span>
+                </span>
+              </div>
+            ))}
+            {selected.margin != null ? (
+              <p className="mt-2 text-center text-xs text-amber-100/70">
+                {selected.margin === 0 ? "Sieg und Platz zwei trennte kein Schlag." : `Vorsprung: ${selected.margin} ${selected.margin === 1 ? "Schlag" : "Schläge"}`}
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        {/* Chronik */}
+        {chronicle.length ? (
+          <Card className="overflow-hidden rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl">
+            <div className="border-b border-amber-700/35 bg-amber-500/10 px-3 py-2 font-serif text-base text-amber-200">Was bisher geschah</div>
+            <CardContent className="space-y-2 p-3">
+              {chronicle.map((line, i) => (
+                <p key={i} className="text-sm leading-relaxed text-amber-100/85">{line}</p>
+              ))}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {/* Endstand */}
+        <div className="overflow-hidden rounded-2xl border border-amber-700/35 bg-black/25">
+          <div className="border-b border-amber-700/35 bg-amber-500/10 px-3 py-2 font-serif text-base text-amber-200">Endstand</div>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm text-amber-50">
+              <thead>
+                <tr className="text-left text-[11px] uppercase tracking-wider text-amber-100/70">
+                  <th className="px-2 py-2">#</th><th className="px-2 py-2">Held</th>
+                  <th className="px-2 py-2 text-right">Quali</th><th className="px-2 py-2 text-right">Finale</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selected.standings.map((player) => (
+                  <tr key={player.id} className={cls("border-t border-amber-700/20", myPlayerId && String(player.id) === String(myPlayerId) && "bg-amber-500/12")}>
+                    <td className="px-2 py-2 text-amber-200/80">{player.finalRank}</td>
+                    <td className="px-2 py-2">
+                      <span className="block font-semibold text-amber-100">{nameOf(player)}</span>
+                      <span className="block text-[10px] text-amber-100/55">{player.finalGroup === "championship" ? "Meisterschaft" : "Platzierung"}</span>
+                    </td>
+                    <td className="px-2 py-2 text-right text-amber-100/80">{player.totalBestTwo ?? "–"}</td>
+                    <td className="px-2 py-2 text-right font-serif text-base font-bold text-amber-300">{player.finalHcpAdjustedStrokes ?? "–"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Rekorde */}
+        <Card className="overflow-hidden rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl">
+          <div className="border-b border-amber-700/35 bg-amber-500/10 px-3 py-2 font-serif text-base text-amber-200">Bestleistungen</div>
+          <CardContent className="grid grid-cols-2 gap-2 p-3">
+            {[
+              ["Beste Runde (netto)", selected.bestNetRound ? `${nameOf(selected.bestNetRound.player)} · ${selected.bestNetRound.netto}` : "–", selected.bestNetRound?.roundName],
+              ["Bestes Brutto", selected.bestGrossRound ? `${nameOf(selected.bestGrossRound.player)} · ${selected.bestGrossRound.gross}` : "–", selected.bestGrossRound?.roundName],
+              ["Meiste Birdies", selected.mostBirdies ? `${nameOf(selected.mostBirdies)} · ${selected.mostBirdies.birdies}` : "–", null],
+              ["Meiste Pars", selected.mostPars ? `${nameOf(selected.mostPars)} · ${selected.mostPars.pars}` : "–", null],
+              ["Eagles oder besser", selected.mostEagles ? `${nameOf(selected.mostEagles)} · ${selected.mostEagles.eaglesOrBetter}` : "keine", null],
+              ["Die Schlange", selected.mostThreePutts ? `${nameOf(selected.mostThreePutts)} · ${selected.mostThreePutts.threePutts}` : "–", "Drei-Putts"],
+            ].map(([label, value, note]) => (
+              <div key={label} className="rounded-2xl border border-amber-700/30 bg-black/25 p-2.5">
+                <div className="text-[10px] uppercase tracking-wider text-amber-100/60">{label}</div>
+                <div className="mt-0.5 truncate font-serif text-sm text-amber-200">{value}</div>
+                {note ? <div className="text-[10px] text-amber-100/50">{note}</div> : null}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Ewige Bestenliste */}
+        <div className="overflow-hidden rounded-2xl border border-amber-700/35 bg-black/25">
+          <div className="border-b border-amber-700/35 bg-amber-500/10 px-3 py-2">
+            <div className="font-serif text-base text-amber-200">Ewige Bestenliste</div>
+            <div className="text-[10px] text-amber-100/55">über {reports.length} {reports.length === 1 ? "Turnier" : "Turniere"}</div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm text-amber-50">
+              <thead>
+                <tr className="text-left text-[11px] uppercase tracking-wider text-amber-100/70">
+                  <th className="px-2 py-2">Held</th><th className="px-2 py-2 text-right">Titel</th>
+                  <th className="px-2 py-2 text-right">Podest</th><th className="px-2 py-2 text-right">Ø Rang</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allTime.map((entry) => (
+                  <tr key={entry.id} className={cls("border-t border-amber-700/20", myPlayerId && String(entry.id) === String(myPlayerId) && "bg-amber-500/12")}>
+                    <td className="px-2 py-2 font-semibold text-amber-100">{entry.alias_name || entry.display_name || entry.id}</td>
+                    <td className="px-2 py-2 text-right font-serif text-base font-bold text-amber-300">{entry.titles || "–"}</td>
+                    <td className="px-2 py-2 text-right text-amber-100/80">{entry.podiums || "–"}</td>
+                    <td className="px-2 py-2 text-right text-amber-100/80">{entry.avgRank ?? "–"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -3187,13 +3692,14 @@ function LordOfTheHolesApp() {
         <Card className="mb-2 rounded-2xl border border-amber-500/30 bg-[linear-gradient(180deg,rgba(48,35,22,0.86),rgba(18,13,9,0.82))] shadow-[inset_0_1px_0_rgba(251,191,36,0.10),0_18px_46px_rgba(0,0,0,0.38)] backdrop-blur-sm">
           <CardContent className="p-3">
             <div className="mb-2"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Admin</p><h2 className="font-serif text-lg text-amber-200">Turnierverwaltung</h2></div>
-            {!isAdminUnlocked ? <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Admin-Passwort</label><input type="password" value={adminPinInput} onChange={(e) => setAdminPinInput(e.target.value)} placeholder="Passwort eingeben" className="mb-3 w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" /><Button onClick={() => { if (adminPinInput === ADMIN_PASSWORD) { setIsAdminUnlocked(true); setError(""); } else { setError("Admin-Passwort ist falsch."); } }} className="w-full rounded-2xl bg-amber-600 py-2 text-amber-50">Admin entsperren</Button></div> : <div className="mb-2 rounded-2xl border border-emerald-700/30 bg-emerald-950/30 p-3 text-sm text-emerald-100">Admin entsperrt. Änderungen können gespeichert werden.</div>}
+            {!isAdminUnlocked ? <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Admin-Passwort</label><input type="password" value={adminPinInput} onChange={(e) => setAdminPinInput(e.target.value)} placeholder="Passwort eingeben" className="mb-3 w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" /><Button onClick={() => { unlockAdminWithPassword(adminPinInput); }} className="w-full rounded-2xl bg-amber-600 py-2 text-amber-50">Admin entsperren</Button></div> : <div className="mb-2 rounded-2xl border border-emerald-700/30 bg-emerald-950/30 p-3 text-sm text-emerald-100">Admin entsperrt. Änderungen können gespeichert werden.</div>}
             {isAdminUnlocked ? <>
             <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Aktive Runde</label><select value={selectedActiveRoundId} onChange={(e) => { const nextRoundId = e.target.value; const nextRound = (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(nextRoundId)); const nextCourseId = nextRound?.course_id || selectedCourseId || ""; setAdminEditing(true); setSelectedActiveRoundId(nextRoundId); setSelectedCourseId(nextCourseId); setScoredPlayerId(""); lastLoadedRoundRef.current = ""; setScoreEntryMode("player"); saveAdminRoundCourse(nextRoundId, nextCourseId); }} disabled={!isAdminUnlocked} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:opacity-60"><option value="">Runde auswählen</option>{(rounds.length ? rounds : fallbackRounds).map((round) => <option key={round.round_id} value={round.round_id}>{round.round_name}</option>)}</select></div>
             <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Kurs für aktive Runde</label><select value={selectedCourseId} onChange={(e) => { const nextCourseId = e.target.value; setAdminEditing(true); setSelectedCourseId(nextCourseId); saveAdminRoundCourse(selectedActiveRoundId, nextCourseId); }} disabled={!isAdminUnlocked} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:opacity-60"><option value="">Kurs auswählen</option>{(courses.length ? courses : fallbackCourses).map((course) => <option key={course.course_id} value={course.course_id}>{course.course_name}</option>)}</select></div>
             </> : null}
             <div className="space-y-2">{allPlayers.map((p) => { const hcpIndexKey = `hcp_index_${p.id}`; const hcpIndexValue = localHandicaps[hcpIndexKey] ?? String(p.handicap_index ?? p.dgv_hcp ?? p.hcp_index ?? ""); const previewPlayer = { ...p, handicap_index: hcpIndexValue === "" || hcpIndexValue === "-" ? 0 : Number(String(hcpIndexValue).replace(",", ".")) }; const goetheSpv = getCourseHandicap(previewPlayer, "goethe", courses); const feiningerSpv = getCourseHandicap(previewPlayer, "feininger", courses); return <div key={p.id} className="rounded-xl border border-amber-700/30 bg-black/25 p-2"><div className="mb-2 font-semibold text-amber-100">{getPlayerLabel(p)}</div><input inputMode="decimal" disabled={!isAdminUnlocked} value={hcpIndexValue} onChange={(e) => { setAdminEditing(true); setLocalHandicaps((current) => ({ ...current, [hcpIndexKey]: cleanHandicapInput(e.target.value) })); }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-center text-amber-50 disabled:opacity-60" /><div className="mt-2 grid grid-cols-2 gap-2 text-center text-xs text-amber-100/75"><div className="rounded-xl bg-amber-50/5 p-2"><div>Goethe SpV</div><b className="text-lg text-amber-200">{goetheSpv}</b></div><div className="rounded-xl bg-amber-50/5 p-2"><div>Feininger SpV</div><b className="text-lg text-amber-200">{feiningerSpv}</b></div></div></div>; })}</div>
             {isAdminUnlocked ? <>
+            {renderSeasonAdminBox()}
             <Button disabled={!isAdminUnlocked} onClick={saveFullSetup} className="mt-2 w-full rounded-2xl bg-amber-600 py-2 text-amber-50 disabled:opacity-50">HCP-Werte speichern</Button>
             <Button disabled={!isAdminUnlocked} onClick={createRoundBackup} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-700/80 py-2 text-emerald-50 disabled:opacity-50">Backup für aktive Runde erstellen</Button>
             {appLocked ? <Button disabled={!isAdminUnlocked} onClick={() => { setGlobalAppLock(false); setLockAdminBypass(false); }} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-800/70 py-2 text-emerald-50 disabled:opacity-50">App für alle freigeben</Button> : <Button disabled={!isAdminUnlocked} onClick={() => { setMenuOpen(false); setLockAdminBypass(false); setGlobalAppLock(true); }} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">App für alle sperren</Button>}
@@ -4521,6 +5027,7 @@ function LordOfTheHolesApp() {
     if (view === "leaderboard") return renderLeaderboardView();
     if (view === "tournament") return renderTournamentView();
     if (view === "archive") return renderArchiveView();
+    if (view === "erfolge") return renderErfolgeView();
     if (view === "fun") return renderFunView();
     if (view === "dailyTeams") return renderDailyTeamsView();
     if (view === "prizes") return renderPrizesView();
@@ -4699,12 +5206,8 @@ function LordOfTheHolesApp() {
     return true;
   }
 
-  function startFlightCeremonyAsAdmin() {
-    if (lockPasswordInput !== ADMIN_PASSWORD) {
-      setError("Passwort ist falsch.");
-      return;
-    }
-    setIsAdminUnlocked(true);
+  async function startFlightCeremonyAsAdmin() {
+    if (!(await unlockAdminWithPassword(lockPasswordInput))) return;
     const started = startFlightCeremony(flightDraw || readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null));
     if (started) {
       setLockPasswordInput("");
@@ -4995,6 +5498,7 @@ function LordOfTheHolesApp() {
           </div>
         </div>
       ) : null}
+      {startSeasonConfirmOpen ? <div className="fixed inset-0 z-[92] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"><div className="w-full max-w-md rounded-3xl border border-amber-500/60 bg-stone-950 p-4 text-amber-50 shadow-2xl shadow-black/70"><div className="font-serif text-lg text-amber-100">Saison {newSeasonYear} starten?</div><p className="mt-2 text-sm text-amber-100/80">{seasonInfo?.season || "Die laufende Saison"} wird archiviert und {newSeasonYear} mit vier frischen Runden angelegt. Die bisherigen Ergebnisse bleiben vollständig erhalten und sind danach unter „Erfolge &amp; Chronik" nachlesbar.</p><div className="mt-3 grid grid-cols-2 gap-2"><button type="button" disabled={seasonSaving} onClick={() => setStartSeasonConfirmOpen(false)} className="rounded-2xl border border-amber-700/40 bg-stone-900 px-3 py-2.5 text-sm font-bold text-amber-100 disabled:opacity-50">Abbrechen</button><button type="button" disabled={seasonSaving} onClick={startNewSeasonFromAdmin} className="rounded-2xl border border-emerald-400/60 bg-emerald-700 px-3 py-2.5 text-sm font-bold text-emerald-50 disabled:opacity-50">{seasonSaving ? "Startet ..." : "Ja, Saison starten"}</button></div></div></div> : null}
       {clearScoresConfirmOpen ? <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"><div className="w-full max-w-md rounded-3xl border border-red-500/60 bg-stone-950 p-4 text-red-50 shadow-2xl shadow-black/70"><div className="font-serif text-lg text-red-100">Alle Scores löschen?</div><p className="mt-2 text-sm text-red-100/80">Dadurch werden alle Einträge im Tab Scores gelöscht. Vorher wird automatisch ein Backup erstellt. Backup-Tabs bleiben erhalten.</p><div className="mt-2 grid grid-cols-2 gap-2"><button type="button" disabled={clearScoresSaving} onClick={() => setClearScoresConfirmOpen(false)} className="rounded-2xl border border-amber-700/40 bg-stone-900 px-3 py-2.5 text-sm font-bold text-amber-100 disabled:opacity-50">Abbrechen</button><button type="button" disabled={clearScoresSaving} onClick={clearAllScores} className="rounded-2xl border border-red-400/60 bg-red-700 px-3 py-2.5 text-sm font-bold text-red-50 disabled:opacity-50">{clearScoresSaving ? "Lösche ..." : "Ja, Scores löschen"}</button></div></div></div> : null}
     </div>
   );
