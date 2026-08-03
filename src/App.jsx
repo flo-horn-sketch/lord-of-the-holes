@@ -48,7 +48,9 @@ class AppErrorBoundary extends React.Component {
   }
 }
 
-const GOOGLE_SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbzPTQvGhRIn9KWWaQ7Blz2WJQBAH5qjqSy-Plu48JYZpEIB5E3cqO3jCWtWKws-l2eO/exec";
+// Zugang zur Datenbank läuft jetzt über die eigene Server-"Tür-Funktion" (/api/data
+// -> Supabase). Der geheime Schlüssel liegt serverseitig, nie in dieser App.
+const DATA_API_URL = "/api/data";
 const ADMIN_PASSWORD = "weimar";
 const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T10:00:00+02:00");
 const FLIGHT_DRAW_TARGET = new Date("2026-05-21T20:00:00+02:00");
@@ -2178,9 +2180,9 @@ function LordOfTheHolesApp() {
 
   async function callSheetApi(payload) {
     const requestStartedAt = Date.now();
-    const response = await fetch(GOOGLE_SHEETS_API_URL, {
+    const response = await fetch(DATA_API_URL, {
       method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...(payload || {}), _client_request_started_at: requestStartedAt }),
     });
 
