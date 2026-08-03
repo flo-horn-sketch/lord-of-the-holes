@@ -1697,9 +1697,16 @@ function LordOfTheHolesApp() {
   const [openMenuGroups, setOpenMenuGroups] = useState(() => readLocalJson("lordOfTheHoles.openMenuGroups", { tournament: true, round: false, info: false, system: false }));
   // Erfolge: vergangene Turniere. Wird beim ersten Oeffnen der Seite geladen
   // und lokal gecacht, damit sie auch ohne Netz lesbar bleibt.
+  // Saison-Info inkl. Terminen. Kommt aus getState; die Konstanten oben
+  // dienen nur noch als Notnagel, falls die Datenbank nichts liefert.
+  const [seasonInfo, setSeasonInfo] = useState(() => readLocalJson("lordOfTheHoles.seasonInfo", null));
   const [history, setHistory] = useState(() => readLocalJson("lordOfTheHoles.history", []));
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historySeason, setHistorySeason] = useState(0);
+  const [seasonSaving, setSeasonSaving] = useState(false);
+  const [seasonDraftDates, setSeasonDraftDates] = useState({});
+  const [newSeasonYear, setNewSeasonYear] = useState("");
+  const [startSeasonConfirmOpen, setStartSeasonConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [scoreSyncCount, setScoreSyncCount] = useState(0);
@@ -2021,28 +2028,36 @@ function LordOfTheHolesApp() {
   // Sonst legt sich die Spielerabfrage vor die Chronik, obwohl sie dort nichts
   // beitraegt. Bei ausdruecklichem Aufruf (forceMyPlayerPromptOpen) trotzdem zeigen.
   const showDevicePlayerGate = Boolean(identityFlowActive && (!myPlayerIsKnown || forceMyPlayerPromptOpen) && (view !== "erfolge" || forceMyPlayerPromptOpen));
+  const parseTarget = (value, fallback) => {
+    const parsed = new Date(String(value || ""));
+    return Number.isNaN(parsed.getTime()) ? fallback : parsed;
+  };
+  const lockTarget = useMemo(() => parseTarget(seasonInfo?.lock_at, LOCK_COUNTDOWN_TARGET), [seasonInfo]);
+  const flightTarget = useMemo(() => parseTarget(seasonInfo?.flight_draw_at, FLIGHT_DRAW_TARGET), [seasonInfo]);
+  const flightTargetRef = useRef(flightTarget);
+  useEffect(() => { flightTargetRef.current = flightTarget; }, [flightTarget]);
   const lockCountdown = useMemo(() => {
-    const diffMs = Math.max(0, LOCK_COUNTDOWN_TARGET.getTime() - (lockCountdownNow.getTime() + serverTimeOffsetMs));
+    const diffMs = Math.max(0, lockTarget.getTime() - (lockCountdownNow.getTime() + serverTimeOffsetMs));
     const totalSeconds = Math.floor(diffMs / 1000);
     const days = Math.floor(totalSeconds / 86400);
     const hours = Math.floor((totalSeconds % 86400) / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
     return { days, hours, minutes, seconds };
-  }, [lockCountdownNow, serverTimeOffsetMs]);
+  }, [lockCountdownNow, serverTimeOffsetMs, lockTarget]);
   const flightDrawCountdown = useMemo(() => {
-    const diffMs = Math.max(0, FLIGHT_DRAW_TARGET.getTime() - (lockCountdownNow.getTime() + serverTimeOffsetMs));
+    const diffMs = Math.max(0, flightTarget.getTime() - (lockCountdownNow.getTime() + serverTimeOffsetMs));
     const totalSeconds = Math.floor(diffMs / 1000);
     const days = Math.floor(totalSeconds / 86400);
     const hours = Math.floor((totalSeconds % 86400) / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
     const seconds = totalSeconds % 60;
     return { days, hours, minutes, seconds };
-  }, [lockCountdownNow, serverTimeOffsetMs]);
+  }, [lockCountdownNow, serverTimeOffsetMs, flightTarget]);
   const atomicTimeActive = ["itime.live", "itime.live-vercel"].includes(String(lastServerSync?.source || "")) && atomicTimeStatus === "online";
   const syncedNow = useMemo(() => new Date(lockCountdownNow.getTime() + (atomicTimeActive ? serverTimeOffsetMs : 0)), [lockCountdownNow, serverTimeOffsetMs, atomicTimeActive]);
   const getSyncedNowMs = () => Date.now() + (atomicTimeActive ? serverTimeOffsetMs : 0);
-  const flightDrawUnlocked = atomicTimeActive && syncedNow.getTime() >= FLIGHT_DRAW_TARGET.getTime();
+  const flightDrawUnlocked = atomicTimeActive && syncedNow.getTime() >= flightTarget.getTime();
   const flightCeremonyTimeline = useMemo(() => buildFlightCeremonyTimeline(flightDraw), [flightDraw]);
   const unlockedTeamDrawRoundIds = useMemo(() => atomicTimeActive ? Object.entries(TEAM_DRAW_TARGETS).filter(([, target]) => syncedNow.getTime() >= target.getTime()).map(([roundId]) => roundId) : [], [syncedNow, atomicTimeActive]);
   const teamCeremonyTimeline = useMemo(() => teamCeremonyTestMode && String(teamCeremonyRoundId) === "r3" ? buildDummyRound3TeamCeremonyTimeline() : buildTeamCeremonyTimeline(teamCeremonyRoundId), [teamCeremonyTestMode, teamCeremonyRoundId, teamDrawRows, allPlayers, officialAllScores]);
@@ -2137,9 +2152,10 @@ function LordOfTheHolesApp() {
 
   function getNextSyncedFlightCeremonyStart(timeline = [], forceImmediate = false) {
     const now = getSyncedNowMs();
-    if (!forceImmediate && now < FLIGHT_DRAW_TARGET.getTime()) return FLIGHT_DRAW_TARGET.toISOString();
+    const target = flightTargetRef.current || FLIGHT_DRAW_TARGET;
+    if (!forceImmediate && now < target.getTime()) return target.toISOString();
     const totalDuration = (timeline || []).reduce((sum, step) => sum + getFlightCeremonyStepDuration(step), 0);
-    if (!forceImmediate && totalDuration > 0 && now - FLIGHT_DRAW_TARGET.getTime() < totalDuration) return FLIGHT_DRAW_TARGET.toISOString();
+    if (!forceImmediate && totalDuration > 0 && now - target.getTime() < totalDuration) return target.toISOString();
     const nextBoundary = Math.ceil((now + 2500) / 10000) * 10000;
     return new Date(nextBoundary).toISOString();
   }
@@ -2421,6 +2437,21 @@ function LordOfTheHolesApp() {
       const nextFullResetAt = String(data.full_reset_at || data.fullResetAt || "");
       const localFullResetAt = String(readLocalJson("lordOfTheHoles.fullResetAt", "") || "");
       if (nextFullResetAt && nextFullResetAt !== localFullResetAt) applyLocalCacheClear(nextFullResetAt, "Kompletter Reset wurde übernommen.");
+      // Saison und Termine aus der Datenbank uebernehmen (loesen die
+      // frueheren Konstanten ab). Aeltere Server-Antworten ohne diese Felder
+      // lassen den bisherigen Stand unangetastet.
+      if (data.season) {
+        const nextSeasonInfo = {
+          season: Number(data.season),
+          title: data.season_title || data.seasonTitle || "",
+          status: data.season_status || data.seasonStatus || "",
+          lock_at: data.lock_at || data.lockAt || "",
+          flight_draw_at: data.flight_draw_at || data.flightDrawAt || "",
+          seasons: data.seasons || [],
+        };
+        setSeasonInfo(nextSeasonInfo);
+        writeLocalJson("lordOfTheHoles.seasonInfo", nextSeasonInfo);
+      }
       const nextScoresResetAt = String(data.scores_reset_at || data.scoresResetAt || "");
       const localScoresResetAt = String(readLocalJson("lordOfTheHoles.scoresResetAt", "") || "");
       if (nextScoresResetAt && nextScoresResetAt !== localScoresResetAt) {
@@ -3057,6 +3088,50 @@ function LordOfTheHolesApp() {
     }
   }
 
+  async function saveSeasonDates() {
+    if (!seasonInfo?.season) return;
+    setSeasonSaving(true);
+    setError("");
+    try {
+      // datetime-local liefert Ortszeit ohne Zone - new Date() interpretiert
+      // das als lokale Zeit des Geraets, was hier genau richtig ist.
+      const toIso = (v) => (v ? new Date(v).toISOString() : undefined);
+      await callSheetApi({
+        action: "saveSeason",
+        season: seasonInfo.season,
+        lock_at: toIso(seasonDraftDates.lock_at) ?? seasonInfo.lock_at,
+        flight_draw_at: toIso(seasonDraftDates.flight_draw_at) ?? seasonInfo.flight_draw_at,
+      });
+      setSetupSavedMessage("Termine wurden gespeichert.");
+      await loadData({ silent: true });
+    } catch (err) {
+      setError(err.message || "Termine konnten nicht gespeichert werden.");
+    } finally {
+      setSeasonSaving(false);
+    }
+  }
+
+  async function startNewSeasonFromAdmin() {
+    const year = Number(newSeasonYear);
+    if (!year) return;
+    setSeasonSaving(true);
+    setStartSeasonConfirmOpen(false);
+    setError("");
+    try {
+      await callSheetApi({ action: "startNewSeason", season: year, title: `Turnier ${year}` });
+      clearLocalScoreStorage();
+      setNewSeasonYear("");
+      setHistory([]);
+      setSetupSavedMessage(`Saison ${year} wurde gestartet. Das Vorjahr steht jetzt unter „Erfolge & Chronik".`);
+      await loadData({ silent: true });
+      await loadHistory();
+    } catch (err) {
+      setError(err.message || "Neue Saison konnte nicht gestartet werden.");
+    } finally {
+      setSeasonSaving(false);
+    }
+  }
+
   function setMainMenuAndView(value) {
     setMainMenu(value);
     setMenuOpen(false);
@@ -3147,6 +3222,55 @@ function LordOfTheHolesApp() {
           ) : null}
         </div>
       </motion.header>
+    );
+  }
+
+  // Saison-Verwaltung im Admin: Termine pflegen und das Turnierjahr wechseln.
+  // Ersetzt die frueher fest verdrahteten Countdown-Konstanten.
+  function renderSeasonAdminBox() {
+    const toLocalInput = (value) => {
+      const d = new Date(String(value || ""));
+      if (Number.isNaN(d.getTime())) return "";
+      const pad = (n) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+    const current = seasonInfo || {};
+    const busy = seasonSaving || connectionStatus !== "online";
+    return (
+      <div className="mt-2 rounded-2xl border border-amber-700/40 bg-black/30 p-3">
+        <div className="font-serif text-base text-amber-200">Saison {current.season || "–"}</div>
+        <div className="mb-2 text-[11px] text-amber-100/60">{current.title || "ohne Titel"} · {current.status || "unbekannt"}</div>
+
+        <label className="mt-1 block text-[11px] uppercase tracking-wider text-amber-100/70">Flight-Ziehung</label>
+        <input type="datetime-local" defaultValue={toLocalInput(current.flight_draw_at)}
+          onChange={(e) => setSeasonDraftDates((d) => ({ ...d, flight_draw_at: e.target.value }))}
+          className="mb-2 w-full rounded-xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50" />
+
+        <label className="block text-[11px] uppercase tracking-wider text-amber-100/70">Turnierstart</label>
+        <input type="datetime-local" defaultValue={toLocalInput(current.lock_at)}
+          onChange={(e) => setSeasonDraftDates((d) => ({ ...d, lock_at: e.target.value }))}
+          className="mb-2 w-full rounded-xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50" />
+
+        <Button disabled={busy} onClick={saveSeasonDates}
+          className="w-full rounded-2xl bg-amber-600 py-2 text-amber-50 disabled:opacity-50">
+          {seasonSaving ? "Speichert ..." : "Termine speichern"}
+        </Button>
+
+        <div className="mt-3 border-t border-amber-700/25 pt-3">
+          <label className="block text-[11px] uppercase tracking-wider text-amber-100/70">Neues Turnierjahr</label>
+          <input type="number" value={newSeasonYear} onChange={(e) => setNewSeasonYear(e.target.value)}
+            placeholder={String((Number(current.season) || new Date().getFullYear()) + 1)}
+            className="mb-2 w-full rounded-xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50" />
+          <Button disabled={busy || !newSeasonYear} onClick={() => setStartSeasonConfirmOpen(true)}
+            className="w-full rounded-2xl border border-emerald-500/40 bg-emerald-800/70 py-2 text-emerald-50 disabled:opacity-50">
+            Neue Saison starten
+          </Button>
+          <p className="mt-1.5 text-[11px] leading-snug text-amber-100/55">
+            Archiviert {current.season || "die laufende Saison"} und legt vier frische Runden an.
+            Die alten Ergebnisse bleiben vollständig erhalten und sind danach unter „Erfolge&nbsp;&amp;&nbsp;Chronik" nachlesbar.
+          </p>
+        </div>
+      </div>
     );
   }
 
@@ -3575,6 +3699,7 @@ function LordOfTheHolesApp() {
             </> : null}
             <div className="space-y-2">{allPlayers.map((p) => { const hcpIndexKey = `hcp_index_${p.id}`; const hcpIndexValue = localHandicaps[hcpIndexKey] ?? String(p.handicap_index ?? p.dgv_hcp ?? p.hcp_index ?? ""); const previewPlayer = { ...p, handicap_index: hcpIndexValue === "" || hcpIndexValue === "-" ? 0 : Number(String(hcpIndexValue).replace(",", ".")) }; const goetheSpv = getCourseHandicap(previewPlayer, "goethe", courses); const feiningerSpv = getCourseHandicap(previewPlayer, "feininger", courses); return <div key={p.id} className="rounded-xl border border-amber-700/30 bg-black/25 p-2"><div className="mb-2 font-semibold text-amber-100">{getPlayerLabel(p)}</div><input inputMode="decimal" disabled={!isAdminUnlocked} value={hcpIndexValue} onChange={(e) => { setAdminEditing(true); setLocalHandicaps((current) => ({ ...current, [hcpIndexKey]: cleanHandicapInput(e.target.value) })); }} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-center text-amber-50 disabled:opacity-60" /><div className="mt-2 grid grid-cols-2 gap-2 text-center text-xs text-amber-100/75"><div className="rounded-xl bg-amber-50/5 p-2"><div>Goethe SpV</div><b className="text-lg text-amber-200">{goetheSpv}</b></div><div className="rounded-xl bg-amber-50/5 p-2"><div>Feininger SpV</div><b className="text-lg text-amber-200">{feiningerSpv}</b></div></div></div>; })}</div>
             {isAdminUnlocked ? <>
+            {renderSeasonAdminBox()}
             <Button disabled={!isAdminUnlocked} onClick={saveFullSetup} className="mt-2 w-full rounded-2xl bg-amber-600 py-2 text-amber-50 disabled:opacity-50">HCP-Werte speichern</Button>
             <Button disabled={!isAdminUnlocked} onClick={createRoundBackup} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-700/80 py-2 text-emerald-50 disabled:opacity-50">Backup für aktive Runde erstellen</Button>
             {appLocked ? <Button disabled={!isAdminUnlocked} onClick={() => { setGlobalAppLock(false); setLockAdminBypass(false); }} className="mt-2 w-full rounded-2xl border border-emerald-500/40 bg-emerald-800/70 py-2 text-emerald-50 disabled:opacity-50">App für alle freigeben</Button> : <Button disabled={!isAdminUnlocked} onClick={() => { setMenuOpen(false); setLockAdminBypass(false); setGlobalAppLock(true); }} className="mt-2 w-full rounded-2xl border border-amber-500/40 bg-stone-950/70 py-2 text-amber-100 disabled:opacity-50">App für alle sperren</Button>}
@@ -5373,6 +5498,7 @@ function LordOfTheHolesApp() {
           </div>
         </div>
       ) : null}
+      {startSeasonConfirmOpen ? <div className="fixed inset-0 z-[92] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"><div className="w-full max-w-md rounded-3xl border border-amber-500/60 bg-stone-950 p-4 text-amber-50 shadow-2xl shadow-black/70"><div className="font-serif text-lg text-amber-100">Saison {newSeasonYear} starten?</div><p className="mt-2 text-sm text-amber-100/80">{seasonInfo?.season || "Die laufende Saison"} wird archiviert und {newSeasonYear} mit vier frischen Runden angelegt. Die bisherigen Ergebnisse bleiben vollständig erhalten und sind danach unter „Erfolge &amp; Chronik" nachlesbar.</p><div className="mt-3 grid grid-cols-2 gap-2"><button type="button" disabled={seasonSaving} onClick={() => setStartSeasonConfirmOpen(false)} className="rounded-2xl border border-amber-700/40 bg-stone-900 px-3 py-2.5 text-sm font-bold text-amber-100 disabled:opacity-50">Abbrechen</button><button type="button" disabled={seasonSaving} onClick={startNewSeasonFromAdmin} className="rounded-2xl border border-emerald-400/60 bg-emerald-700 px-3 py-2.5 text-sm font-bold text-emerald-50 disabled:opacity-50">{seasonSaving ? "Startet ..." : "Ja, Saison starten"}</button></div></div></div> : null}
       {clearScoresConfirmOpen ? <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"><div className="w-full max-w-md rounded-3xl border border-red-500/60 bg-stone-950 p-4 text-red-50 shadow-2xl shadow-black/70"><div className="font-serif text-lg text-red-100">Alle Scores löschen?</div><p className="mt-2 text-sm text-red-100/80">Dadurch werden alle Einträge im Tab Scores gelöscht. Vorher wird automatisch ein Backup erstellt. Backup-Tabs bleiben erhalten.</p><div className="mt-2 grid grid-cols-2 gap-2"><button type="button" disabled={clearScoresSaving} onClick={() => setClearScoresConfirmOpen(false)} className="rounded-2xl border border-amber-700/40 bg-stone-900 px-3 py-2.5 text-sm font-bold text-amber-100 disabled:opacity-50">Abbrechen</button><button type="button" disabled={clearScoresSaving} onClick={clearAllScores} className="rounded-2xl border border-red-400/60 bg-red-700 px-3 py-2.5 text-sm font-bold text-red-50 disabled:opacity-50">{clearScoresSaving ? "Lösche ..." : "Ja, Scores löschen"}</button></div></div></div> : null}
     </div>
   );
