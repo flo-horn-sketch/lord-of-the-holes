@@ -1393,6 +1393,150 @@ function getFinalWinnerCelebration(players, rounds, holes, scores, roundPlayers,
   return { roundId: finalRound.round_id, winner, winnerName: getPlayerLabel(winner), winnerLabel: winner.character_name || winner.display_name || winner.id, finalHcpAdjustedStrokes: winner.finalHcpAdjustedStrokes };
 }
 
+// ---- Erfolge / Chronik vergangener Turniere ------------------------
+// Wertet eine abgeschlossene Saison aus. Nutzt bewusst dieselben Funktionen
+// wie die laufende App (buildFinalNetStandings, buildFunPlayerStats), damit
+// im Archiv nie ein anderer Sieger steht als im Turnier selbst.
+function buildSeasonReport(seasonData, holes, courses = fallbackCourses) {
+  if (!seasonData) return null;
+  const players = seasonData.players || [];
+  const rounds = seasonData.rounds || [];
+  const rawScores = (seasonData.scores || []).map(normalizeScoreRecord);
+  const scores = getOfficialScores(rawScores);
+  if (!players.length || !rounds.length || !scores.length) return null;
+
+  const finalStandings = buildFinalNetStandings(players, rounds, holes, scores, courses);
+  const qualiStandings = buildTournamentNetStandings(players, rounds, holes, scores, courses);
+  const finalRound = getFinalRound(rounds);
+
+  // Beste Einzelrunde des Turniers (HCP-bereinigt), ueber Quali und Finale.
+  const roundBests = [];
+  qualiStandings.forEach((player) => {
+    (player.roundResults || []).forEach((result) => {
+      if (result.hcpAdjustedStrokes != null && result.played > 0) {
+        roundBests.push({ player, roundName: result.round_name || result.round_id, netto: result.hcpAdjustedStrokes, gross: result.grossStrokes });
+      }
+    });
+  });
+  finalStandings.forEach((player) => {
+    if (player.finalHcpAdjustedStrokes != null && player.finalPlayed > 0) {
+      roundBests.push({ player, roundName: finalRound?.round_name || "Finale", netto: player.finalHcpAdjustedStrokes, gross: player.finalGrossStrokes });
+    }
+  });
+  const bestNetRound = [...roundBests].sort((a, b) => a.netto - b.netto)[0] || null;
+  const bestGrossRound = [...roundBests].sort((a, b) => a.gross - b.gross)[0] || null;
+
+  // Zaehlstatistiken: course_hcp je Platz gibt es hier nicht sinnvoll fuer
+  // beide Plaetze gleichzeitig, deshalb nur platzunabhaengige Kennzahlen
+  // (Birdies, Pars, Putts) verwenden - genau wie die Mittelerde-Tabellen.
+  const funStats = buildFunPlayerStats(getPlayersForCourse(players, finalRound?.course_id || "goethe", courses), holes, scores);
+  const topBy = (key) => [...funStats].filter((p) => Number(p[key]) > 0).sort((a, b) => Number(b[key]) - Number(a[key]))[0] || null;
+
+  const podium = finalStandings.slice(0, 3);
+  const champion = podium[0] || null;
+  const runnerUp = podium[1] || null;
+  const margin = champion && runnerUp && champion.finalHcpAdjustedStrokes != null && runnerUp.finalHcpAdjustedStrokes != null
+    ? Number(runnerUp.finalHcpAdjustedStrokes) - Number(champion.finalHcpAdjustedStrokes)
+    : null;
+
+  // Gleichstaende in der Qualifikation - erzeugen die Besonderheit, dass die
+  // Meisterschaftsgruppe groesser als drei sein kann.
+  const qualiTies = [];
+  qualiStandings.forEach((a, i) => {
+    qualiStandings.slice(i + 1).forEach((b) => {
+      if (a.totalBestTwo != null && a.totalBestTwo === b.totalBestTwo) qualiTies.push([a, b]);
+    });
+  });
+  const championshipSize = finalStandings.filter((p) => p.finalGroup === "championship").length;
+
+  return {
+    season: Number(seasonData.season),
+    title: seasonData.title || "",
+    standings: finalStandings,
+    qualiStandings,
+    podium,
+    champion,
+    runnerUp,
+    third: podium[2] || null,
+    margin,
+    championshipSize,
+    qualiTies,
+    bestNetRound,
+    bestGrossRound,
+    mostBirdies: topBy("birdies"),
+    mostEagles: topBy("eaglesOrBetter"),
+    mostPars: topBy("pars"),
+    mostThreePutts: topBy("threePutts"),
+    roundsPlayed: rounds.length,
+    holesPlayed: scores.length,
+  };
+}
+
+// Erzeugt die Chronik aus den Fakten der Saison, nicht aus fest getipptem
+// Text - damit steht naechstes Jahr automatisch die richtige Geschichte da.
+function buildSeasonChronicle(report) {
+  if (!report) return [];
+  const name = (p) => (p ? (p.alias_name || p.character_name || p.display_name || p.id) : "Niemand");
+  const lines = [];
+
+  if (report.champion) {
+    const wonQuali = Number(report.champion.qualificationRank) === 1;
+    lines.push(
+      wonQuali
+        ? `${name(report.champion)} führte schon nach der Qualifikation und ließ den Ring bis zum letzten Loch nicht mehr los.`
+        : `${name(report.champion)} ging erst als ${report.champion.qualificationRank}. der Qualifikation in den Finaltag — und kehrte als Herr der Löcher zurück.`
+    );
+  }
+  if (report.margin != null) {
+    lines.push(
+      report.margin === 0
+        ? `Zwischen Sieg und Niederlage lag am Ende kein einziger Schlag. Erst die Qualifikation entschied.`
+        : report.margin === 1
+          ? `Ein einziger Schlag trennte ${name(report.champion)} von ${name(report.runnerUp)}. Ein Putt mehr, und die Geschichte ginge anders.`
+          : `${report.margin} Schläge lagen zwischen ${name(report.champion)} und ${name(report.runnerUp)}.`
+    );
+  }
+  if (report.championshipSize > 3) {
+    lines.push(`Weil sich ${report.championshipSize > 4 ? "mehrere Gefährten" : "zwei Gefährten"} punktgleich in die Qualifikation teilten, zogen ${report.championshipSize} statt drei in die Meisterschaftsgruppe ein.`);
+  }
+  if (report.bestNetRound) {
+    lines.push(`Die beste Runde des Turniers spielte ${name(report.bestNetRound.player)}: ${report.bestNetRound.netto} netto in ${report.bestNetRound.roundName}.`);
+  }
+  if (report.bestGrossRound && report.bestGrossRound.player !== report.bestNetRound?.player) {
+    lines.push(`Das sauberste Brutto gelang ${name(report.bestGrossRound.player)} mit ${report.bestGrossRound.gross} Schlägen.`);
+  }
+  if (report.mostThreePutts && Number(report.mostThreePutts.threePutts) >= 3) {
+    lines.push(`${name(report.mostThreePutts)} sammelte ${report.mostThreePutts.threePutts} Drei-Putts — die Schlange von Mittelerde hatte einen klaren Liebling.`);
+  }
+  return lines;
+}
+
+// Ewige Bestenliste ueber alle ausgewerteten Saisons.
+function buildAllTimeTable(reports = []) {
+  const byPlayer = new Map();
+  (reports || []).forEach((report) => {
+    (report.standings || []).forEach((player) => {
+      const id = String(player.id);
+      const entry = byPlayer.get(id) || {
+        id, alias_name: player.alias_name, character_name: player.character_name,
+        display_name: player.display_name, titles: 0, podiums: 0, seasons: 0, bestRank: null, ranks: [],
+      };
+      const rank = Number(player.finalRank || 0);
+      entry.seasons += 1;
+      if (rank === 1) entry.titles += 1;
+      if (rank >= 1 && rank <= 3) entry.podiums += 1;
+      if (rank > 0) {
+        entry.ranks.push(rank);
+        entry.bestRank = entry.bestRank == null ? rank : Math.min(entry.bestRank, rank);
+      }
+      byPlayer.set(id, entry);
+    });
+  });
+  return [...byPlayer.values()]
+    .map((e) => ({ ...e, avgRank: e.ranks.length ? Number((e.ranks.reduce((s, r) => s + r, 0) / e.ranks.length).toFixed(2)) : null }))
+    .sort((a, b) => b.titles - a.titles || b.podiums - a.podiums || (a.avgRank ?? 99) - (b.avgRank ?? 99));
+}
+
 function TournamentStandings({ players, rounds, holes, scores, courses = fallbackCourses, activeRoundId = "" }) {
   const standings = useMemo(() => buildTournamentNetStandings(players, rounds, holes, scores, courses), [players, rounds, holes, scores, courses]);
   const finalStandings = useMemo(() => buildFinalNetStandings(players, rounds, holes, scores, courses), [players, rounds, holes, scores, courses]);
@@ -1551,6 +1695,11 @@ function LordOfTheHolesApp() {
   const [mainMenu, setMainMenu] = useState("current");
   const [menuOpen, setMenuOpen] = useState(false);
   const [openMenuGroups, setOpenMenuGroups] = useState(() => readLocalJson("lordOfTheHoles.openMenuGroups", { tournament: true, round: false, info: false, system: false }));
+  // Erfolge: vergangene Turniere. Wird beim ersten Oeffnen der Seite geladen
+  // und lokal gecacht, damit sie auch ohne Netz lesbar bleibt.
+  const [history, setHistory] = useState(() => readLocalJson("lordOfTheHoles.history", []));
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historySeason, setHistorySeason] = useState(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [scoreSyncCount, setScoreSyncCount] = useState(0);
@@ -1868,7 +2017,10 @@ function LordOfTheHolesApp() {
   const showRoundHonorPopup = Boolean(displayedRoundHonorCelebration && !showFinalWinnerPopup && !roundSummaryPopup);
   const identityFlowActive = !showSplash && (!appLocked || lockAdminBypass);
   const myPlayerIsKnown = Boolean(myPlayerId && ([...(visiblePlayers || []), ...(allPlayers || [])].some((player) => String(player.id) === String(myPlayerId))));
-  const showDevicePlayerGate = Boolean(identityFlowActive && (!myPlayerIsKnown || forceMyPlayerPromptOpen));
+  // Auf der Erfolge-Seite wird nur gelesen - dafuer braucht es keine Identitaet.
+  // Sonst legt sich die Spielerabfrage vor die Chronik, obwohl sie dort nichts
+  // beitraegt. Bei ausdruecklichem Aufruf (forceMyPlayerPromptOpen) trotzdem zeigen.
+  const showDevicePlayerGate = Boolean(identityFlowActive && (!myPlayerIsKnown || forceMyPlayerPromptOpen) && (view !== "erfolge" || forceMyPlayerPromptOpen));
   const lockCountdown = useMemo(() => {
     const diffMs = Math.max(0, LOCK_COUNTDOWN_TARGET.getTime() - (lockCountdownNow.getTime() + serverTimeOffsetMs));
     const totalSeconds = Math.floor(diffMs / 1000);
@@ -2888,10 +3040,28 @@ function LordOfTheHolesApp() {
     setScoredPlayerByRound(next);
   }
 
+  // Vergangene Turniere nachladen. Bewusst getrennt von getState: die Daten
+  // aendern sich nach dem Archivieren nicht mehr, also nicht bei jedem Sync.
+  async function loadHistory() {
+    if (historyLoading) return;
+    setHistoryLoading(true);
+    try {
+      const result = await callSheetApi({ action: "getHistory" });
+      const seasons = result?.seasons || [];
+      setHistory(seasons);
+      writeLocalJson("lordOfTheHoles.history", seasons);
+    } catch {
+      // Ohne Netz bleibt der zuletzt gecachte Stand stehen.
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
   function setMainMenuAndView(value) {
     setMainMenu(value);
     setMenuOpen(false);
     if (value === "current") setView("score");
+    if (value === "erfolge") { setView("erfolge"); if (!history.length) loadHistory(); }
     if (value === "roundTables") setView("leaderboard");
     if (value === "tournament") setView("tournament");
     if (value === "dailyTeams") setView("dailyTeams");
@@ -2905,7 +3075,7 @@ function LordOfTheHolesApp() {
   }
 
   function renderHeader() {
-    const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "flights" ? "Flights" : mainMenu === "rules" ? "Regeln" : mainMenu === "dailyTeams" ? "Tageswertungen" : mainMenu === "prizes" ? "Kasse & Ehre" : mainMenu === "admin" ? "Admin & HCPs" : mainMenu === "settings" ? "Einstellungen" : "Scoring";
+    const subtitle = mainMenu === "current" ? getRoundChapterLabel(displayedActiveRound) : mainMenu === "roundTables" ? "Tabellen Runde" : mainMenu === "tournament" ? "Turnier" : mainMenu === "archive" ? "Scorekarten" : mainMenu === "erfolge" ? "Erfolge & Chronik" : mainMenu === "fun" ? "Mittelerde" : mainMenu === "flights" ? "Flights" : mainMenu === "rules" ? "Regeln" : mainMenu === "dailyTeams" ? "Tageswertungen" : mainMenu === "prizes" ? "Kasse & Ehre" : mainMenu === "admin" ? "Admin & HCPs" : mainMenu === "settings" ? "Einstellungen" : "Scoring";
     return (
       <motion.header initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} className="mb-1 pt-1">
         <div className="relative flex h-8 items-center justify-center">
@@ -2966,7 +3136,7 @@ function LordOfTheHolesApp() {
                 return (
                   <>
                     {renderMenuButton("current", "Scoring", true)}
-                    {renderMenuGroup("tournament", "Turnier", [["tournament", "Turnierstand"], ["dailyTeams", "Tageswertungen"], ["prizes", "Kasse & Ehre"], ["archive", "Scorekarten"]])}
+                    {renderMenuGroup("tournament", "Turnier", [["tournament", "Turnierstand"], ["dailyTeams", "Tageswertungen"], ["prizes", "Kasse & Ehre"], ["archive", "Scorekarten"], ["erfolge", "Erfolge & Chronik"]])}
                     {renderMenuGroup("round", "Runde", [["roundTables", "Tabellen Runde"], ["fun", "Mittelerde"], ["flights", "Flights"]])}
                     {renderMenuGroup("info", "Info", [["rules", "Regeln"]])}
                     {renderMenuGroup("system", "System", [["settings", "Einstellungen"], ["admin", "Admin & HCPs"]])}
@@ -2977,6 +3147,168 @@ function LordOfTheHolesApp() {
           ) : null}
         </div>
       </motion.header>
+    );
+  }
+
+  function renderErfolgeView() {
+    const reports = (history || [])
+      .map((seasonData) => buildSeasonReport(seasonData, allHoles, courses))
+      .filter(Boolean)
+      .sort((a, b) => b.season - a.season);
+
+    if (historyLoading && !reports.length) {
+      return <Card className="rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl"><CardContent className="p-3 text-amber-100">⟳ Lade vergangene Turniere ...</CardContent></Card>;
+    }
+    if (!reports.length) {
+      return (
+        <Card className="rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl">
+          <CardContent className="p-4 text-center">
+            <div className="font-serif text-lg text-amber-200">Noch keine Sagen verzeichnet</div>
+            <p className="mt-2 text-sm text-amber-100/75">Sobald ein Turnier abgeschlossen und archiviert ist, steht seine Geschichte hier.</p>
+            <Button onClick={loadHistory} className="mt-3 rounded-2xl bg-amber-600 px-4 py-2 text-sm font-bold text-amber-50">Erneut laden</Button>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    const selected = reports.find((r) => r.season === historySeason) || reports[0];
+    const allTime = buildAllTimeTable(reports);
+    const chronicle = buildSeasonChronicle(selected);
+    const medal = ["🥇", "🥈", "🥉"];
+    const nameOf = (p) => (p ? (p.alias_name || p.character_name || p.display_name || p.id) : "–");
+
+    return (
+      <div className="space-y-3">
+        {reports.length > 1 ? (
+          <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {reports.map((r) => (
+              <button key={r.season} type="button" onClick={() => setHistorySeason(r.season)}
+                className={cls("shrink-0 rounded-2xl border px-3 py-1.5 text-sm font-bold transition",
+                  r.season === selected.season ? "border-amber-400 bg-amber-600 text-amber-50" : "border-amber-700/40 bg-black/25 text-amber-100/80")}>
+                {r.season}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {/* Podest */}
+        <Card className="overflow-hidden rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl">
+          <div className="border-b border-amber-700/35 bg-amber-500/10 px-3 py-2">
+            <div className="text-[10px] uppercase tracking-[0.2em] text-amber-300/75">Turnier {selected.season}</div>
+            <div className="font-serif text-lg text-amber-200">{selected.title || "Der Herr der Löcher"}</div>
+          </div>
+          <CardContent className="p-3">
+            {selected.podium.map((player, index) => (
+              <div key={player.id} className={cls("mb-2 flex items-center gap-3 rounded-2xl border p-3 last:mb-0",
+                index === 0 ? "border-amber-400/60 bg-[linear-gradient(180deg,rgba(217,119,6,0.28),rgba(0,0,0,0.25))]" : "border-amber-700/30 bg-black/25")}>
+                <span className="text-2xl">{medal[index]}</span>
+                <span className="min-w-0 flex-1">
+                  <span className={cls("block truncate font-serif", index === 0 ? "text-xl text-amber-200" : "text-base text-amber-100")}>{nameOf(player)}</span>
+                  <span className="block truncate text-[11px] text-amber-100/65">{player.display_name}</span>
+                </span>
+                <span className="text-right">
+                  <span className="block font-serif text-xl font-black text-amber-300">{player.finalHcpAdjustedStrokes ?? "–"}</span>
+                  <span className="block text-[10px] uppercase tracking-wider text-amber-100/60">Finale</span>
+                </span>
+              </div>
+            ))}
+            {selected.margin != null ? (
+              <p className="mt-2 text-center text-xs text-amber-100/70">
+                {selected.margin === 0 ? "Sieg und Platz zwei trennte kein Schlag." : `Vorsprung: ${selected.margin} ${selected.margin === 1 ? "Schlag" : "Schläge"}`}
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        {/* Chronik */}
+        {chronicle.length ? (
+          <Card className="overflow-hidden rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl">
+            <div className="border-b border-amber-700/35 bg-amber-500/10 px-3 py-2 font-serif text-base text-amber-200">Was bisher geschah</div>
+            <CardContent className="space-y-2 p-3">
+              {chronicle.map((line, i) => (
+                <p key={i} className="text-sm leading-relaxed text-amber-100/85">{line}</p>
+              ))}
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {/* Endstand */}
+        <div className="overflow-hidden rounded-2xl border border-amber-700/35 bg-black/25">
+          <div className="border-b border-amber-700/35 bg-amber-500/10 px-3 py-2 font-serif text-base text-amber-200">Endstand</div>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm text-amber-50">
+              <thead>
+                <tr className="text-left text-[11px] uppercase tracking-wider text-amber-100/70">
+                  <th className="px-2 py-2">#</th><th className="px-2 py-2">Held</th>
+                  <th className="px-2 py-2 text-right">Quali</th><th className="px-2 py-2 text-right">Finale</th>
+                </tr>
+              </thead>
+              <tbody>
+                {selected.standings.map((player) => (
+                  <tr key={player.id} className={cls("border-t border-amber-700/20", myPlayerId && String(player.id) === String(myPlayerId) && "bg-amber-500/12")}>
+                    <td className="px-2 py-2 text-amber-200/80">{player.finalRank}</td>
+                    <td className="px-2 py-2">
+                      <span className="block font-semibold text-amber-100">{nameOf(player)}</span>
+                      <span className="block text-[10px] text-amber-100/55">{player.finalGroup === "championship" ? "Meisterschaft" : "Platzierung"}</span>
+                    </td>
+                    <td className="px-2 py-2 text-right text-amber-100/80">{player.totalBestTwo ?? "–"}</td>
+                    <td className="px-2 py-2 text-right font-serif text-base font-bold text-amber-300">{player.finalHcpAdjustedStrokes ?? "–"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Rekorde */}
+        <Card className="overflow-hidden rounded-2xl border-amber-700/40 bg-[#20170f]/82 shadow-xl">
+          <div className="border-b border-amber-700/35 bg-amber-500/10 px-3 py-2 font-serif text-base text-amber-200">Bestleistungen</div>
+          <CardContent className="grid grid-cols-2 gap-2 p-3">
+            {[
+              ["Beste Runde (netto)", selected.bestNetRound ? `${nameOf(selected.bestNetRound.player)} · ${selected.bestNetRound.netto}` : "–", selected.bestNetRound?.roundName],
+              ["Bestes Brutto", selected.bestGrossRound ? `${nameOf(selected.bestGrossRound.player)} · ${selected.bestGrossRound.gross}` : "–", selected.bestGrossRound?.roundName],
+              ["Meiste Birdies", selected.mostBirdies ? `${nameOf(selected.mostBirdies)} · ${selected.mostBirdies.birdies}` : "–", null],
+              ["Meiste Pars", selected.mostPars ? `${nameOf(selected.mostPars)} · ${selected.mostPars.pars}` : "–", null],
+              ["Eagles oder besser", selected.mostEagles ? `${nameOf(selected.mostEagles)} · ${selected.mostEagles.eaglesOrBetter}` : "keine", null],
+              ["Die Schlange", selected.mostThreePutts ? `${nameOf(selected.mostThreePutts)} · ${selected.mostThreePutts.threePutts}` : "–", "Drei-Putts"],
+            ].map(([label, value, note]) => (
+              <div key={label} className="rounded-2xl border border-amber-700/30 bg-black/25 p-2.5">
+                <div className="text-[10px] uppercase tracking-wider text-amber-100/60">{label}</div>
+                <div className="mt-0.5 truncate font-serif text-sm text-amber-200">{value}</div>
+                {note ? <div className="text-[10px] text-amber-100/50">{note}</div> : null}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Ewige Bestenliste */}
+        <div className="overflow-hidden rounded-2xl border border-amber-700/35 bg-black/25">
+          <div className="border-b border-amber-700/35 bg-amber-500/10 px-3 py-2">
+            <div className="font-serif text-base text-amber-200">Ewige Bestenliste</div>
+            <div className="text-[10px] text-amber-100/55">über {reports.length} {reports.length === 1 ? "Turnier" : "Turniere"}</div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm text-amber-50">
+              <thead>
+                <tr className="text-left text-[11px] uppercase tracking-wider text-amber-100/70">
+                  <th className="px-2 py-2">Held</th><th className="px-2 py-2 text-right">Titel</th>
+                  <th className="px-2 py-2 text-right">Podest</th><th className="px-2 py-2 text-right">Ø Rang</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allTime.map((entry) => (
+                  <tr key={entry.id} className={cls("border-t border-amber-700/20", myPlayerId && String(entry.id) === String(myPlayerId) && "bg-amber-500/12")}>
+                    <td className="px-2 py-2 font-semibold text-amber-100">{entry.alias_name || entry.display_name || entry.id}</td>
+                    <td className="px-2 py-2 text-right font-serif text-base font-bold text-amber-300">{entry.titles || "–"}</td>
+                    <td className="px-2 py-2 text-right text-amber-100/80">{entry.podiums || "–"}</td>
+                    <td className="px-2 py-2 text-right text-amber-100/80">{entry.avgRank ?? "–"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -4570,6 +4902,7 @@ function LordOfTheHolesApp() {
     if (view === "leaderboard") return renderLeaderboardView();
     if (view === "tournament") return renderTournamentView();
     if (view === "archive") return renderArchiveView();
+    if (view === "erfolge") return renderErfolgeView();
     if (view === "fun") return renderFunView();
     if (view === "dailyTeams") return renderDailyTeamsView();
     if (view === "prizes") return renderPrizesView();
