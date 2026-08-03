@@ -16,3 +16,6 @@ npm-debug.log*
 # Editor / OS
 .DS_Store
 .claude/
+
+# Einmalige Migrationsdaten (echte Turnierdaten, nicht ins Repo)
+supabase/import.sql
