@@ -1727,7 +1727,10 @@ function LordOfTheHolesApp() {
   const [scoreHintMessage, setScoreHintMessage] = useState("");
   const [adminScoreEntryUnlocks, setAdminScoreEntryUnlocks] = useState(() => readLocalJson("lordOfTheHoles.adminScoreEntryUnlocks", {}));
   const [zeroNetTributeDismissedKeys, setZeroNetTributeDismissedKeys] = useState(() => readLocalJson("lordOfTheHoles.zeroNetTributeDismissedKeys", []));
-  const [showSplash, setShowSplash] = useState(true);
+  // Wer die App nur nachschlagen will, soll nicht durch Splash und Zeremonie
+  // muessen. Der Schalter liegt in den Einstellungen und gilt pro Geraet.
+  const [skipCeremonies, setSkipCeremonies] = useState(() => readLocalJson("lordOfTheHoles.skipCeremonies", false));
+  const [showSplash, setShowSplash] = useState(() => !readLocalJson("lordOfTheHoles.skipCeremonies", false));
   const [splashEntering, setSplashEntering] = useState(false);
   const [appLocked, setAppLocked] = useState(() => readLocalJson("lordOfTheHoles.appLocked", true));
   const [lockUnlockOpen, setLockUnlockOpen] = useState(false);
@@ -1920,6 +1923,7 @@ function LordOfTheHolesApp() {
   const myHcpAdjustedStrokeRank = useMemo(() => { const index = hcpAdjustedStrokeLeaderboard.findIndex((player) => String(player.id) === String(myPlayerId)); return index >= 0 ? index + 1 : null; }, [hcpAdjustedStrokeLeaderboard, myPlayerId]);
   const myNetStablefordRank = useMemo(() => { const index = netStablefordLeaderboard.findIndex((player) => String(player.id) === String(myPlayerId)); return index >= 0 ? index + 1 : null; }, [netStablefordLeaderboard, myPlayerId]);
   const roundSummaryPopup = useMemo(() => {
+    if (skipCeremonies) return null;
     if (!myPlayerId || !displayedActiveRound?.round_id) return null;
 
     const roundId = displayedActiveRound.round_id;
@@ -1982,7 +1986,7 @@ function LordOfTheHolesApp() {
     };
 
     return buildSummary(9) || buildSummary(18);
-  }, [myPlayerId, displayedActiveRound?.round_id, visiblePlayers, allPlayers, displayCourseId, courses, holes, officialScores, roundSummaryDismissedKeys]);
+  }, [skipCeremonies, myPlayerId, displayedActiveRound?.round_id, visiblePlayers, allPlayers, displayCourseId, courses, holes, officialScores, roundSummaryDismissedKeys]);
   const roundsWithLocalPendingScores = useMemo(() => {
     const roundIds = new Set();
     [...(pendingScores || []), ...(localScoreDrafts || [])].forEach((score) => {
@@ -2020,8 +2024,8 @@ function LordOfTheHolesApp() {
   const roundHonorCloseLabel = myRoundHonorRole === "lord" ? "Krone richten ×" : myRoundHonorRole === "shieldbearer" ? "Schild aufnehmen ×" : "Erlass zur Kenntnis nehmen ×";
   const finalWinnerCelebration = useMemo(() => getFinalWinnerCelebration(allPlayers, rounds, allHoles, officialAllScores, roundPlayers, courses), [allPlayers, rounds, allHoles, officialAllScores, roundPlayers, courses]);
   const finalWinnerPopupKey = finalWinnerCelebration ? `${finalWinnerCelebration.roundId}_${finalWinnerCelebration.winner?.id || "winner"}` : "";
-  const showFinalWinnerPopup = Boolean(finalWinnerCelebration && finalWinnerPopupKey !== winnerPopupDismissedKey);
-  const showRoundHonorPopup = Boolean(displayedRoundHonorCelebration && !showFinalWinnerPopup && !roundSummaryPopup);
+  const showFinalWinnerPopup = Boolean(!skipCeremonies && finalWinnerCelebration && finalWinnerPopupKey !== winnerPopupDismissedKey);
+  const showRoundHonorPopup = Boolean(!skipCeremonies && displayedRoundHonorCelebration && !showFinalWinnerPopup && !roundSummaryPopup);
   const identityFlowActive = !showSplash && (!appLocked || lockAdminBypass);
   const myPlayerIsKnown = Boolean(myPlayerId && ([...(visiblePlayers || []), ...(allPlayers || [])].some((player) => String(player.id) === String(myPlayerId))));
   // Auf der Erfolge-Seite wird nur gelesen - dafuer braucht es keine Identitaet.
@@ -3653,6 +3657,19 @@ function LordOfTheHolesApp() {
           <CardContent className="p-3">
             <p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Einstellungen</p>
             <h2 className="font-serif text-lg text-amber-200">Mein Handy</h2>
+            <label className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-amber-700/30 bg-black/25 p-3">
+              <span>
+                <span className="block text-sm font-bold text-amber-100">Zeremonien überspringen</span>
+                <span className="block text-[11px] leading-snug text-amber-100/60">Startbild, Sieger- und Rundenmeldungen werden nicht mehr angezeigt. Gilt nur für dieses Handy.</span>
+              </span>
+              <input type="checkbox" checked={skipCeremonies} className="h-6 w-6 shrink-0 accent-amber-500"
+                onChange={(e) => {
+                  const next = e.target.checked;
+                  setSkipCeremonies(next);
+                  writeLocalJson("lordOfTheHoles.skipCeremonies", next);
+                  if (next) setShowSplash(false);
+                }} />
+            </label>
             <p className="mt-1 text-sm text-amber-100/65">Diese Einstellung wird nur lokal auf diesem Handy gespeichert.</p>
             <div className="mt-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2">
               <label className="mb-1 block text-sm text-amber-100/80">Handy-Eigentümer / Zähler auf diesem Gerät</label>
