@@ -51,7 +51,21 @@ class AppErrorBoundary extends React.Component {
 // Zugang zur Datenbank läuft jetzt über die eigene Server-"Tür-Funktion" (/api/data
 // -> Supabase). Der geheime Schlüssel liegt serverseitig, nie in dieser App.
 const DATA_API_URL = "/api/data";
-const ADMIN_PASSWORD = "weimar";
+// Das Admin-Passwort steht bewusst NICHT mehr hier: es lag sonst im Bundle und
+// war für jeden lesbar. Geprüft wird es serverseitig in /api/data; diese Liste
+// sagt nur, welchen Aktionen das eingegebene Passwort mitgeschickt werden muss.
+const ADMIN_ACTIONS = new Set([
+  "verifyAdmin",
+  "saveSetup",
+  "saveFlightDraw",
+  "saveTeamDraw",
+  "clearTeamDraw",
+  "setAppLocked",
+  "clearScores",
+  "resetDeviceAssignments",
+  "clearResetMarkersAndFullReset",
+  "createRoundBackup",
+]);
 const LOCK_COUNTDOWN_TARGET = new Date("2026-05-22T10:00:00+02:00");
 const FLIGHT_DRAW_TARGET = new Date("2026-05-21T20:00:00+02:00");
 const FLIGHT_DRAW_STORAGE_KEY = "lordOfTheHoles.flightDraw";
@@ -1549,6 +1563,8 @@ function LordOfTheHolesApp() {
   const [forceMyPlayerPromptOpen, setForceMyPlayerPromptOpen] = useState(false);
   const [adminPinInput, setAdminPinInput] = useState("");
   const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+  // Nur im Arbeitsspeicher: geht bei Reload verloren, genau wie isAdminUnlocked.
+  const adminPasswordRef = useRef("");
   const [adminEditing, setAdminEditing] = useState(false);
   const [setupSavedMessage, setSetupSavedMessage] = useState("");
   const [backupSavedMessage, setBackupSavedMessage] = useState("");
@@ -2178,15 +2194,48 @@ function LordOfTheHolesApp() {
     }
   }
 
+  // Prüft das eingegebene Passwort beim Server. Bei Erfolg wird es für die
+  // laufende Sitzung gemerkt, damit die Admin-Aktionen es mitschicken können.
+  async function unlockAdminWithPassword(candidate) {
+    const password = String(candidate || "");
+    if (!password) {
+      setError("Bitte Passwort eingeben.");
+      return false;
+    }
+    const previousPassword = adminPasswordRef.current;
+    adminPasswordRef.current = password;
+    try {
+      await callSheetApi({ action: "verifyAdmin" });
+      setIsAdminUnlocked(true);
+      setError("");
+      return true;
+    } catch (err) {
+      adminPasswordRef.current = previousPassword;
+      setError(err.message || "Admin-Passwort ist falsch.");
+      return false;
+    }
+  }
+
   async function callSheetApi(payload) {
     const requestStartedAt = Date.now();
+    const requestBody = { ...(payload || {}), _client_request_started_at: requestStartedAt };
+    // Verändernde Aktionen brauchen das Admin-Passwort. Es liegt nur im
+    // Arbeitsspeicher (nicht in localStorage) und geht nie ins Bundle.
+    if (ADMIN_ACTIONS.has(requestBody.action)) {
+      requestBody.admin_password = adminPasswordRef.current || "";
+    }
     const response = await fetch(DATA_API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...(payload || {}), _client_request_started_at: requestStartedAt }),
+      body: JSON.stringify(requestBody),
     });
 
-    if (!response.ok) throw new Error("Datenbank nicht erreichbar.");
+    if (!response.ok) {
+      // Fehlermeldung des Servers durchreichen (z. B. "Admin-Passwort ist
+      // falsch."), sonst käme jede Ablehnung als Verbindungsfehler an.
+      const serverError = await response.json().then((d) => d?.error).catch(() => "");
+      throw new Error(serverError || "Datenbank nicht erreichbar.");
+    }
     const responseReceivedAt = Date.now();
     const data = await response.json();
     const atomicSynced = false;
@@ -2806,8 +2855,8 @@ function LordOfTheHolesApp() {
     }
   }
 
-  function enterLockedAppAsAdmin() {
-    if (lockPasswordInput !== ADMIN_PASSWORD) { setError("Passwort ist falsch."); return; }
+  async function enterLockedAppAsAdmin() {
+    if (!(await unlockAdminWithPassword(lockPasswordInput))) return;
     const storedMyPlayerId = readLocalJson("lordOfTheHoles.myPlayerId", "");
     const knownPlayers = [...(visiblePlayers || []), ...(allPlayers || [])];
     const hasKnownDeviceOwner = Boolean((myPlayerId || storedMyPlayerId) && knownPlayers.some((player) => String(player.id) === String(myPlayerId || storedMyPlayerId)));
@@ -3187,7 +3236,7 @@ function LordOfTheHolesApp() {
         <Card className="mb-2 rounded-2xl border border-amber-500/30 bg-[linear-gradient(180deg,rgba(48,35,22,0.86),rgba(18,13,9,0.82))] shadow-[inset_0_1px_0_rgba(251,191,36,0.10),0_18px_46px_rgba(0,0,0,0.38)] backdrop-blur-sm">
           <CardContent className="p-3">
             <div className="mb-2"><p className="text-xs uppercase tracking-[0.2em] text-amber-300/75">Admin</p><h2 className="font-serif text-lg text-amber-200">Turnierverwaltung</h2></div>
-            {!isAdminUnlocked ? <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Admin-Passwort</label><input type="password" value={adminPinInput} onChange={(e) => setAdminPinInput(e.target.value)} placeholder="Passwort eingeben" className="mb-3 w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" /><Button onClick={() => { if (adminPinInput === ADMIN_PASSWORD) { setIsAdminUnlocked(true); setError(""); } else { setError("Admin-Passwort ist falsch."); } }} className="w-full rounded-2xl bg-amber-600 py-2 text-amber-50">Admin entsperren</Button></div> : <div className="mb-2 rounded-2xl border border-emerald-700/30 bg-emerald-950/30 p-3 text-sm text-emerald-100">Admin entsperrt. Änderungen können gespeichert werden.</div>}
+            {!isAdminUnlocked ? <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Admin-Passwort</label><input type="password" value={adminPinInput} onChange={(e) => setAdminPinInput(e.target.value)} placeholder="Passwort eingeben" className="mb-3 w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 placeholder:text-amber-100/30" /><Button onClick={() => { unlockAdminWithPassword(adminPinInput); }} className="w-full rounded-2xl bg-amber-600 py-2 text-amber-50">Admin entsperren</Button></div> : <div className="mb-2 rounded-2xl border border-emerald-700/30 bg-emerald-950/30 p-3 text-sm text-emerald-100">Admin entsperrt. Änderungen können gespeichert werden.</div>}
             {isAdminUnlocked ? <>
             <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Aktive Runde</label><select value={selectedActiveRoundId} onChange={(e) => { const nextRoundId = e.target.value; const nextRound = (rounds.length ? rounds : fallbackRounds).find((round) => String(round.round_id) === String(nextRoundId)); const nextCourseId = nextRound?.course_id || selectedCourseId || ""; setAdminEditing(true); setSelectedActiveRoundId(nextRoundId); setSelectedCourseId(nextCourseId); setScoredPlayerId(""); lastLoadedRoundRef.current = ""; setScoreEntryMode("player"); saveAdminRoundCourse(nextRoundId, nextCourseId); }} disabled={!isAdminUnlocked} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:opacity-60"><option value="">Runde auswählen</option>{(rounds.length ? rounds : fallbackRounds).map((round) => <option key={round.round_id} value={round.round_id}>{round.round_name}</option>)}</select></div>
             <div className="mb-2 rounded-2xl border border-amber-700/30 bg-black/25 p-2"><label className="mb-1 block text-sm text-amber-100/80">Kurs für aktive Runde</label><select value={selectedCourseId} onChange={(e) => { const nextCourseId = e.target.value; setAdminEditing(true); setSelectedCourseId(nextCourseId); saveAdminRoundCourse(selectedActiveRoundId, nextCourseId); }} disabled={!isAdminUnlocked} className="w-full rounded-2xl border border-amber-700/40 bg-stone-950 p-2 text-amber-50 disabled:opacity-60"><option value="">Kurs auswählen</option>{(courses.length ? courses : fallbackCourses).map((course) => <option key={course.course_id} value={course.course_id}>{course.course_name}</option>)}</select></div>
@@ -4699,12 +4748,8 @@ function LordOfTheHolesApp() {
     return true;
   }
 
-  function startFlightCeremonyAsAdmin() {
-    if (lockPasswordInput !== ADMIN_PASSWORD) {
-      setError("Passwort ist falsch.");
-      return;
-    }
-    setIsAdminUnlocked(true);
+  async function startFlightCeremonyAsAdmin() {
+    if (!(await unlockAdminWithPassword(lockPasswordInput))) return;
     const started = startFlightCeremony(flightDraw || readLocalJson(FLIGHT_DRAW_STORAGE_KEY, null));
     if (started) {
       setLockPasswordInput("");

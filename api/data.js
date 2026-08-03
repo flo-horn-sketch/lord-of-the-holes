@@ -5,13 +5,47 @@
 // Spricht bewusst dasselbe {action: ...}-Protokoll wie das alte Apps-Script,
 // damit die App unverändert weiterfunktioniert (Drop-in-Ersatz).
 import { createClient } from "@supabase/supabase-js";
+import { timingSafeEqual } from "node:crypto";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 const supabase = SUPABASE_URL && SUPABASE_SERVICE_KEY
   ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, { auth: { persistSession: false } })
   : null;
+
+// Aktionen, die den Turnierzustand verändern und deshalb das Admin-Passwort
+// brauchen. Alles andere (getState, upsertScores) bleibt offen – das machen
+// die Spieler-Geräte im normalen Betrieb.
+const ADMIN_ACTIONS = new Set([
+  "verifyAdmin",
+  "saveSetup",
+  "saveFlightDraw",
+  "saveTeamDraw",
+  "clearTeamDraw",
+  "setAppLocked",
+  "clearScores",
+  "resetDeviceAssignments",
+  "clearResetMarkersAndFullReset",
+  "createRoundBackup",
+]);
+
+// Vergleich mit konstanter Laufzeit, damit sich das Passwort nicht über
+// Antwortzeiten Zeichen für Zeichen erraten lässt.
+function passwordMatches(candidate) {
+  const expected = String(ADMIN_PASSWORD ?? "");
+  const given = String(candidate ?? "");
+  if (!expected) return false;
+  const a = Buffer.from(expected, "utf8");
+  const b = Buffer.from(given, "utf8");
+  if (a.length !== b.length) {
+    // Trotzdem einmal vergleichen, damit die Laufzeit nicht die Länge verrät.
+    timingSafeEqual(a, a);
+    return false;
+  }
+  return timingSafeEqual(a, b);
+}
 
 // ---- kleine Helfer ------------------------------------------------
 function nb(v) {
@@ -228,10 +262,27 @@ async function fullReset() {
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store, max-age=0");
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "POST erforderlich." });
-  if (!supabase) return res.status(500).json({ ok: false, error: "Supabase-Konfiguration fehlt (SUPABASE_URL / SUPABASE_SERVICE_KEY)." });
 
   const body = readBody(req);
   const action = body.action;
+
+  // Türsteher zuerst, noch vor jeder Konfigurationsprüfung: Wer sich nicht
+  // ausweist, soll auch nichts über den Zustand des Servers erfahren.
+  // Ohne gesetzte Umgebungsvariable wird bewusst alles abgelehnt (fail closed),
+  // damit eine vergessene Konfiguration nicht in einer offenen Tür endet.
+  if (ADMIN_ACTIONS.has(action)) {
+    if (!ADMIN_PASSWORD || !passwordMatches(body.admin_password)) {
+      return res.status(403).json({ ok: false, error: "Admin-Passwort ist falsch." });
+    }
+  }
+
+  // Reine Passwortprüfung – braucht keine Datenbank. Wird bewusst vor dem
+  // Supabase-Check beantwortet, damit das Admin-Panel auch dann noch aufgeht,
+  // wenn die Datenbankverbindung gerade klemmt.
+  if (action === "verifyAdmin") return res.status(200).json({ ok: true });
+
+  if (!supabase) return res.status(500).json({ ok: false, error: "Supabase-Konfiguration fehlt (SUPABASE_URL / SUPABASE_SERVICE_KEY)." });
+
   try {
     switch (action) {
       case "getState": return res.status(200).json(await getState());
